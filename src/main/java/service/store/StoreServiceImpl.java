@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.ArrayList;
 import model.Card;
 import model.CardPack;
+import model.Player;
 
 public class StoreServiceImpl implements StoreService {
 
