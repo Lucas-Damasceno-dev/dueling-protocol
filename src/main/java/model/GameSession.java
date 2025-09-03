@@ -1,6 +1,8 @@
 package model;
 
 import java.util.*;
+import model.CardEffect;
+import model.AttackEffect;
 
 public class GameSession {
     private Player player1;
@@ -54,7 +56,23 @@ public class GameSession {
     public void resolveActions() {
         for (Map.Entry<String, List<String>> entry : pendingActions.entrySet()) {
             String playerId = entry.getKey();
+            Player caster = playerId.equals(player1.getId()) ? player1 : player2;
+            Player target = playerId.equals(player1.getId()) ? player2 : player1;
+            List<Card> hand = playerId.equals(player1.getId()) ? handP1 : handP2;
             for (String cardId : entry.getValue()) {
+                Card card = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst().orElse(null);
+                if (card == null) continue;
+                CardEffect effect = null;
+                switch (card.getCardType()) {
+                    case ATTACK:
+                        effect = new AttackEffect();
+                        break;
+                    default:
+                        break;
+                }
+                if (effect != null) {
+                    effect.execute(this, caster, target, card);
+                }
             }
         }
         pendingActions.clear();
@@ -67,4 +85,3 @@ public class GameSession {
     public List<Card> getHandP2() { return handP2; }
     public int getTurn() { return turn; }
 }
-
