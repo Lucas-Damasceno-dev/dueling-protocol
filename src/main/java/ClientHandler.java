@@ -10,7 +10,7 @@ import repository.InMemoryPlayerRepository;
 public class ClientHandler implements Runnable {
     private final Socket clientSocket;
     private final GameFacade gameFacade;
-    private Player player; // Player associado a este handler
+    private Player player;
     private static final InMemoryPlayerRepository playerRepository = new InMemoryPlayerRepository();
 
     public ClientHandler(Socket socket, GameFacade facade) {
@@ -26,9 +26,6 @@ public class ClientHandler implements Runnable {
         ) {
             String inputLine;
             while ((inputLine = in.readLine()) != null) {
-                // Exemplo de um protocolo simples baseado em texto
-                // Ex: "MATCHMAKING:ENTER:playerId123"
-                // Ex: "STORE:BUY:playerId123:BASIC_PACK"
                 String[] command = inputLine.split(":");
                 processCommand(command, out);
             }
@@ -39,23 +36,23 @@ public class ClientHandler implements Runnable {
 
     private void processCommand(String[] command, PrintWriter out) {
         String action = command[0];
-        // ... Lógica para extrair Player, etc.
-
         if ("MATCHMAKING".equals(action)) {
-            // Player player = getPlayerById(command[2]);
-            // gameFacade.enterMatchmaking(player);
+             Player player = getPlayerById(command[2]);
+             gameFacade.enterMatchmaking(player);
             out.println("SUCCESS:Você entrou na fila.");
+            gameFacade.tryToCreateMatch(out);
         } else if ("STORE".equals(action)) {
-            // Player player = getPlayerById(command[2]);
-            // gameFacade.buyPack(player, command[3]);
-            out.println("SUCCESS:Compra realizada.");
+             Player player = getPlayerById(command[2]);
+             gameFacade.buyPack(player, command[3]);
+            out.println("SUCCESS:Pacote comprado.");
+        } else if ("GAME".equals(action)) {
+            gameFacade.processGameCommand(command, out);
         } else {
             out.println("ERROR:Comando desconhecido.");
         }
     }
     
     private Player getPlayerById(String playerId) {
-        // por enquanto um player temporario. Depois do repository
         return new Player(playerId, "Jogador " + playerId);
     }
 }
