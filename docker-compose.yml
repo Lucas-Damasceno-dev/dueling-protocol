@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  # O serviço do servidor do jogo
+  server:
+    build: .
+    ports:
+      - "7777:7777/tcp"
+      - "7778:7778/udp"
+    networks:
+      - dueling-network
+
+  # O serviço do cliente do jogo
+  client:
+    build: .
+    # Sobrescreve o comando padrão do Dockerfile para executar o cliente
+    command: java -cp app.jar GameClient
+    depends_on:
+      - server
+    environment:
+      # Passa o nome do host do servidor para o cliente
+      - SERVER_HOST=server
+    networks:
+      - dueling-network
+
+networks:
+  dueling-network:
+    driver: bridge

@@ -15,11 +15,9 @@ public class PingServer implements Runnable {
             System.out.println("Servidor de Ping UDP ouvindo na porta " + port);
             byte[] buffer = new byte[256];
             while (true) {
-                // Aguarda um pacote de ping
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 socket.receive(packet);
 
-                // Apenas ecoa o pacote de volta para o remetente
                 socket.send(packet);
             }
         } catch (IOException e) {
