@@ -1,4 +1,3 @@
 #!/bin/bash
-
-# Run the client
-java -cp target/classes GameClient
+echo ">>> Iniciando o GameClient..."
+java -cp target/dueling-protocol-1.0-SNAPSHOT.jar GameClient
