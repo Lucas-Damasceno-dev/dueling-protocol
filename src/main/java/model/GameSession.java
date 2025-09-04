@@ -1,5 +1,6 @@
 package model;
 
+import repository.CardRepository;
 import java.util.*;
 
 public class GameSession {
@@ -80,24 +81,28 @@ public class GameSession {
             Player target = playerId.equals(player1.getId()) ? player2 : player1;
             
             for (String cardId : entry.getValue()) {
-                /*// Card card = findCardById(cardId); // Você precisaria de uma forma de encontrar o card
-                // if (card == null) continue;
+                Optional<Card> cardOpt = CardRepository.findById(cardId);
+                if (cardOpt.isEmpty()) {
+                    System.err.println("ERRO: Carta com ID " + cardId + " não encontrada no repositório.");
+                    continue;
+                }
+                Card card = cardOpt.get();
 
-                // switch (card.getCardType()) {
-                //     case ATTACK:
-                //         new AttackEffect().execute(this, caster, target, card);
-                //         break;
-                //     case MAGIC:
-                //         // new MagicEffect().execute(this, caster, target, card);
-                //         break;
-                //     case EQUIPMENT:
-                //         // new EquipmentEffect().execute(this, caster, target, card);
-                //         break;
-                //     // Outros casos...
-                //     default:
-                //         System.out.println("Efeito para " + card.getCardType() + " não implementado.");
-                //         break;
-                // }*/
+                switch (card.getCardType()) {
+                    case ATTACK:
+                        new AttackEffect().execute(this, caster, target, card);
+                        break;
+                    case MAGIC:
+                        new MagicEffect().execute(this, caster, target, card);
+                        break;
+                    case EQUIPMENT:
+                        new EquipmentEffect().execute(this, caster, target, card);
+                        break;
+                    // falta casos para DEFENSE, ATTRIBUTE, SCENARIO aqui...
+                    default:
+                        System.out.println("Efeito para o tipo de carta " + card.getCardType() + " ainda não foi implementado.");
+                        break;
+                }
             }
         }
         pendingActions.clear();
