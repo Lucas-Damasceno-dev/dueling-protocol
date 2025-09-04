@@ -52,9 +52,6 @@ public class GameFacade {
             PrintWriter outP2 = activeClients.get(p2.getId());
 
             if (outP1 == null || outP2 == null) {
-                System.err.println("ERRO: Um ou ambos os jogadores da partida não estão conectados.");
-                if (outP1 != null) matchmakingService.addPlayerToQueue(p1);
-                if (outP2 != null) matchmakingService.addPlayerToQueue(p2);
                 return;
             }
 
@@ -71,6 +68,15 @@ public class GameFacade {
             outP1.println("UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
             outP2.println("UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
         });
+    }
+
+    public void notifyPlayers(List<String> playerIds, String message) {
+        for (String id : playerIds) {
+            PrintWriter writer = activeClients.get(id);
+            if (writer != null) {
+                writer.println(message);
+            }
+        }
     }
 
     private String getCardIds(List<Card> cards) {

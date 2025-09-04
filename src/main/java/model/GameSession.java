@@ -21,7 +21,6 @@ public class GameSession {
     private long lastActionTimeP2;
     private static final long GLOBAL_COOLDOWN_MS = 3000;
 
-
     public GameSession(String matchId, Player p1, Player p2, List<Card> deckP1, List<Card> deckP2, GameFacade facade) {
         this.matchId = matchId;
         this.player1 = p1;
@@ -35,7 +34,6 @@ public class GameSession {
         this.gameFacade = facade;
     }
 
-    // ... (startGame, drawCards, playCard)
     public void startGame() {
         Collections.shuffle(deckP1);
         Collections.shuffle(deckP2);
@@ -93,25 +91,21 @@ public class GameSession {
             for (String cardId : entry.getValue()) {
                 Optional<Card> cardOpt = CardRepository.findById(cardId);
                 if (cardOpt.isEmpty()) {
-                    System.err.println("ERRO: Carta com ID " + cardId + " não encontrada no repositório.");
                     continue;
                 }
                 Card card = cardOpt.get();
 
-                switch (card.getCardType()) {
-                    case ATTACK:
-                        new AttackEffect().execute(this, caster, target, card);
-                        break;
-                    case MAGIC:
-                       new MagicEffect().execute(this, caster, target, card);
-                        break;
-                    case EQUIPMENT:
-                       new EquipmentEffect().execute(this, caster, target, card);
-                        break;
-                    // Adicione casos para DEFENSE, ATTRIBUTE, SCENARIO aqui...
-                    default:
-                        System.out.println("Efeito para o tipo de carta " + card.getCardType() + " ainda não foi implementado.");
-                        break;
+                int targetHealthBefore = target.getHealthPoints();
+
+                CardEffect effect = getCardEffect(card);
+                if (effect != null) {
+                    effect.execute(this, caster, target, card);
+                }
+
+                notifyAction(caster, target, card);
+
+                if (target.getHealthPoints() != targetHealthBefore) {
+                    notifyHealthUpdate(target);
                 }
             }
         }
@@ -119,6 +113,34 @@ public class GameSession {
         pendingActions.clear();
         turn++;
         checkGameStatus();
+    }
+    
+    private CardEffect getCardEffect(Card card) {
+        switch (card.getCardType()) {
+            case ATTACK:
+                return new AttackEffect();
+            case MAGIC:
+                return new MagicEffect();
+            case EQUIPMENT:
+                return new EquipmentEffect();
+            default:
+                System.out.println("Efeito para " + card.getCardType() + " não implementado.");
+                return null;
+        }
+    }
+
+    private void notifyAction(Player caster, Player target, Card card) {
+        String message = String.format("UPDATE:ACTION:%s:usou:'%s':em:%s", 
+            caster.getNickname(), card.getName(), target.getNickname());
+        
+        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
+    }
+
+    private void notifyHealthUpdate(Player playerToUpdate) {
+        String message = String.format("UPDATE:HEALTH:%s:%d", 
+            playerToUpdate.getId(), playerToUpdate.getHealthPoints());
+        
+        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
     }
 
     private void checkGameStatus() {
@@ -131,7 +153,6 @@ public class GameSession {
         }
     }
     
-    // ... (Getters)
     public Player getPlayer1() { return player1; }
     public Player getPlayer2() { return player2; }
     public List<Card> getHandP1() { return handP1; }
