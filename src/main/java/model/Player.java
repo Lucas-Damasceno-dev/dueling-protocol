@@ -26,19 +26,27 @@ public class Player {
         this.id = id;
         this.nickname = nickname;
         this.coins = 1000;
+        this.healthPoints = 100;
+        this.upgradePoints = 0;
     }
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    
-    public String getNickname() { return nickname; }
-    public void setNickname(String nickname) { this.nickname = nickname; }
-    
-    public int getCoins() { return coins; }
-    public void setCoins(int coins) { this.coins = coins; }
-    
-    public List<Card> getCardCollection() { return cardCollection; }
-    public void setCardCollection(List<Card> cardCollection) { this.cardCollection = cardCollection; }
+    public void setCharacter(String race, String playerClass) {
+        this.playerRace = race;
+        this.playerClass = playerClass;
+        applyAttributeBonuses();
+    }
+
+    private void applyAttributeBonuses() {
+        if ("Elfo".equals(this.playerRace) && "Guerreiro".equals(this.playerClass)) {
+            this.baseAttack = 15;
+            this.baseDefense = 10;
+            this.baseMana = 5;
+        } else if ("Anão".equals(this.playerRace) && "Guerreiro".equals(this.playerClass)) {
+            this.baseAttack = 12;
+            this.baseDefense = 15;
+            this.baseMana = 3;
+        }
+    }
 
     public String getPlayerRace() { return playerRace; }
     public void setPlayerRace(String playerRace) { this.playerRace = playerRace; }
@@ -54,4 +62,13 @@ public class Player {
     public void setBaseDefense(int baseDefense) { this.baseDefense = baseDefense; }
     public int getBaseMana() { return baseMana; }
     public void setBaseMana(int baseMana) { this.baseMana = baseMana; }
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getNickname() { return nickname; }
+    public void setNickname(String nickname) { this.nickname = nickname; }
+    public int getCoins() { return coins; }
+    public void setCoins(int coins) { this.coins = coins; }
+    public List<Card> getCardCollection() { return cardCollection; }
+    public void setCardCollection(List<Card> cardCollection) { this.cardCollection = cardCollection; }
 }
