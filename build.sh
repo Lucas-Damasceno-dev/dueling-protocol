@@ -1,4 +1,4 @@
 #!/bin/bash
-echo ">>> Limpando e construindo o projeto com Maven..."
-mvn clean package
-echo ">>> Build concluído! O JAR executável está em target/dueling-protocol-1.0-SNAPSHOT.jar"
+echo ">>> Construindo o projeto com Docker..."
+docker build -t dueling-protocol .
+echo ">>> Build concluído! A imagem Docker está pronta para uso."
