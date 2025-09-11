@@ -12,7 +12,7 @@ docker-compose build
 echo ""
 echo ">>> [PASSO 3/3] Iniciando o teste de estresse com 1 servidor e $CLIENT_COUNT clientes..."
 echo ">>> Pressione Ctrl+C para encerrar o teste."
-docker-compose up --scale client=$CLIENT_COUNT --remove-orphans
+BOT_MODE=autobot docker-compose up --scale client=$CLIENT_COUNT --remove-orphans
 
 echo ""
 echo ">>> Teste encerrado. Limpando os contêineres..."
