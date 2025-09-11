@@ -49,35 +49,50 @@ public class GameFacade {
     }
 
     public void tryToCreateMatch() {
-        matchmakingService.findMatch().ifPresent(match -> {
-            Player p1 = match.getPlayer1();
-            Player p2 = match.getPlayer2();
-            String matchId = UUID.randomUUID().toString();
+    matchmakingService.findMatch().ifPresent(match -> {
+        Player p1 = match.getPlayer1();
+        Player p2 = match.getPlayer2();
 
-            PrintWriter outP1 = activeClients.get(p1.getId());
-            PrintWriter outP2 = activeClients.get(p2.getId());
+        if (!activeClients.containsKey(p1.getId()) || !activeClients.containsKey(p2.getId())) {
+            logger.warn("Partida cancelada. Um ou ambos os jogadores ({}, {}) desconectaram antes do início.", p1.getId(), p2.getId());
 
-            if (outP1 == null || outP2 == null) {
-                logger.warn("Não foi possível notificar um ou ambos os jogadores sobre o início da partida");
-                return;
+            if (activeClients.containsKey(p1.getId())) {
+                matchmakingService.addPlayerToQueue(p1);
+                logger.info("Jogador {} retornado para a fila.", p1.getId());
             }
+            if (activeClients.containsKey(p2.getId())) {
+                matchmakingService.addPlayerToQueue(p2);
+                logger.info("Jogador {} retornado para a fila.", p2.getId());
+            }
+            return; 
+        }
 
-            List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
-            List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
+        String matchId = UUID.randomUUID().toString();
 
-            GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this);
-            session.startGame();
-            activeGames.put(matchId, session);
-            
-            logger.info("Nova partida criada entre {} e {} com ID {}", p1.getId(), p2.getId(), matchId);
+        PrintWriter outP1 = activeClients.get(p1.getId());
+        PrintWriter outP2 = activeClients.get(p2.getId());
 
-            outP1.println("UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
-            outP2.println("UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
+        if (outP1 == null || outP2 == null) {
+            logger.error("Falha crítica: Cliente ativo para {} ou {} não encontrado, mesmo após a verificação inicial.", p1.getId(), p2.getId());
+            return;
+        }
 
-            outP1.println("UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
-            outP2.println("UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
-        });
-    }
+        List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
+        List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
+
+        GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this);
+        session.startGame();
+        activeGames.put(matchId, session);
+        
+        logger.info("Nova partida criada entre {} e {} com ID {}", p1.getId(), p2.getId(), matchId);
+
+        outP1.println("UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
+        outP2.println("UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
+
+        outP1.println("UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
+        outP2.println("UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
+    });
+}
 
     public void notifyPlayers(List<String> playerIds, String message) {
         for (String id : playerIds) {

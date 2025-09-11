@@ -18,21 +18,148 @@ public class GameClient {
         try {
             socket = new Socket(SERVER_ADDRESS, TCP_PORT);
             System.out.println("Conectado ao servidor em " + SERVER_ADDRESS + ":" + TCP_PORT);
-            
+
             Thread receiverThread = new Thread(new ServerMessageReceiver(socket));
             receiverThread.start();
-            
+
             out = new PrintWriter(socket.getOutputStream(), true);
-            
+
             playerId = "player-" + UUID.randomUUID().toString().substring(0, 8);
             System.out.println(">> Seu ID de jogador é: " + playerId);
-            
+
+            // Modos automáticos para testes
+            if (args.length > 0) {
+                switch (args[0]) {
+                    case "autobot":
+                        runAutobot(args.length > 1 ? args[1] : "");
+                        return;
+                    case "maliciousbot":
+                        runMaliciousBot();
+                        return;
+                }
+            }
+
             // Menu interativo
             showMenu();
-            
+
         } catch (Exception e) {
             System.err.println("Erro ao conectar ao servidor: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+    // Modo autobot para testes de desconexão abrupta e concorrência
+    private static void runAutobot(String scenario) {
+        try {
+            out.println("CHARACTER_SETUP:" + playerId + ":Elfo:Guerreiro");
+            Thread.sleep(200);
+
+            switch (scenario) {
+                case "matchmaking_disconnect":
+                    scenarioMatchmakingDisconnect();
+                    return;
+                case "pre_game_disconnect":
+                    scenarioPreGameDisconnect();
+                    return;
+                case "simultaneous_play":
+                    scenarioSimultaneousPlay();
+                    return;
+                case "mid_game_disconnect":
+                    scenarioMidGameDisconnect();
+                    return;
+                case "race_condition":
+                    scenarioRaceCondition();
+                    return;
+                default:
+                    scenarioDefault();
+                    return;
+            }
+        } catch (Exception e) {
+            System.err.println("[autobot] Erro: " + e.getMessage());
+        }
+    }
+
+    // Cada cenário extraído para métodos privados
+    private static void scenarioMatchmakingDisconnect() throws Exception {
+        out.println("MATCHMAKING:" + playerId + ":ENTER");
+        Thread.sleep(500);
+        System.out.println("[autobot] Desconectando abruptamente na fila de matchmaking");
+        socket.close();
+    }
+
+    private static void scenarioPreGameDisconnect() throws Exception {
+        out.println("MATCHMAKING:" + playerId + ":ENTER");
+        int waited = 0;
+        while (!inGame && waited < 10000) {
+            Thread.sleep(200);
+            waited += 200;
+        }
+        if (!inGame) {
+            System.out.println("[autobot] Desconectando abruptamente antes do GAME_START");
+            socket.close();
+        }
+    }
+
+    private static void scenarioSimultaneousPlay() throws Exception {
+        out.println("MATCHMAKING:" + playerId + ":ENTER");
+        int waited = 0;
+        while (!inGame && waited < 10000) {
+            Thread.sleep(200);
+            waited += 200;
+        }
+        if (inGame) {
+            out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:card-001");
+            System.out.println("[autobot] Jogada enviada imediatamente após GAME_START");
+            Thread.sleep(500);
+            socket.close();
+        }
+    }
+
+    private static void scenarioMidGameDisconnect() throws Exception {
+        out.println("MATCHMAKING:" + playerId + ":ENTER");
+        int waited = 0;
+        while (!inGame && waited < 10000) {
+            Thread.sleep(200);
+            waited += 200;
+        }
+        if (inGame) {
+            out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:card-001");
+            Thread.sleep(300);
+            System.out.println("[autobot] Desconectando abruptamente no meio da partida");
+            socket.close();
+        }
+    }
+
+    private static void scenarioRaceCondition() throws Exception {
+        out.println("STORE:" + playerId + ":BUY:BASIC");
+        out.println("UPGRADE:" + playerId + ":BASE_ATTACK");
+        Thread.sleep(500);
+        socket.close();
+    }
+
+    private static void scenarioDefault() throws Exception {
+        System.out.println("[autobot] Teste concluído, saindo...");
+        socket.close();
+    }
+
+    // Modo maliciousbot para enviar mensagens malformadas
+    private static void runMaliciousBot() {
+        try {
+            // Comando incompleto
+            out.println("MATCHMAKING:" + playerId);
+            Thread.sleep(200);
+            // Comando com parâmetro extra
+            out.println("STORE:" + playerId + ":BUY:BASIC:EXTRA_PARAM");
+            Thread.sleep(200);
+            // Comando fora de contexto
+            out.println("GAME:PLAY_CARD:card-001");
+            Thread.sleep(200);
+            // Comando totalmente inválido
+            out.println("INVALIDCOMMAND");
+            Thread.sleep(200);
+            System.out.println("[maliciousbot] Mensagens malformadas enviadas. Saindo...");
+            socket.close();
+        } catch (Exception e) {
+            System.err.println("[maliciousbot] Erro: " + e.getMessage());
         }
     }
     
