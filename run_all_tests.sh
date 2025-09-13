@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Garante que o script pare se algum comando falhar
 set -e
