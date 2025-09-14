@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Define o nome do arquivo de log com a data e hora atual para mantê-los organizados
 LOG_FILE="test_results_$(date +'%Y-%m-%d_%H-%M-%S').log"

@@ -7,6 +7,7 @@ import controller.GameFacade;
 import model.Player;
 import repository.PlayerRepository;
 import repository.PlayerRepositoryJson;
+import service.store.PurchaseResult;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,10 +101,33 @@ public class ClientHandler implements Runnable {
                     return;
                 }
                 String packType = command[3];
-                gameFacade.buyPack(player, packType);
-                playerRepository.save(player);
-                logger.info("Jogador {} comprou pacote do tipo {}", playerId, packType);
-                out.println("SUCCESS:Pacote comprado.");
+                PurchaseResult result = gameFacade.buyPack(player, packType);
+
+                if (result.isSuccess()) {
+                    playerRepository.save(player); // Garante que o estado do jogador (moedas, cartas) seja salvo
+                    StringBuilder cardsStr = new StringBuilder();
+                    result.getCards().forEach(c -> cardsStr.append(c.getName()).append(" (").append(c.getRarity()).append("), "));
+                    String cardList = cardsStr.length() > 0 ? cardsStr.substring(0, cardsStr.length() - 2) : "Nenhuma";
+                    
+                    logger.info("Jogador {} comprou pacote do tipo {} com sucesso.", playerId, packType);
+                    out.println("SUCCESS:Pacote comprado! Cartas obtidas: " + cardList);
+                } else {
+                    String errorMessage;
+                    switch (result.getStatus()) {
+                        case INSUFFICIENT_FUNDS:
+                            errorMessage = "Moedas insuficientes.";
+                            break;
+                        case OUT_OF_STOCK:
+                            errorMessage = "Pacote esgotado.";
+                            break;
+                        case PACK_NOT_FOUND:
+                        default:
+                            errorMessage = "Erro na compra do pacote.";
+                            break;
+                    }
+                    logger.warn("Falha na compra do pacote {} para o jogador {}: {}", packType, playerId, errorMessage);
+                    out.println("ERROR:" + errorMessage);
+                }
                 break;
 
             case "GAME":

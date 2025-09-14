@@ -1,7 +1,8 @@
 package service.store;
 
 import model.Player;
+import service.store.PurchaseResult;
 
 public interface StoreService {
-    boolean purchaseCardPack(Player player, String packType);
+    PurchaseResult purchaseCardPack(Player player, String packType);
 }
