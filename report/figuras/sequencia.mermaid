@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant C as Cliente
+    participant CH as ClientHandler
+    participant GF as GameFacade
+    participant CMS as ConcurrentMatchmakingService
+
+    C->>CH: JOIN nome
+    CH->>GF: joinGame(nome)
+    GF->>CMS: addToQueue(player)
+    CMS-->>GF: 
+    GF-->>CH: 
+    CH-->>C: OK
+
+    C->>CH: DRAW (ação do jogador)
+    CH->>GF: drawCard(player)
+    GF-->>CH: 
+    CH-->>C: CARTA id
+
+    Note over C,CMS: Processo de matchmaking ocorre em background
+    CMS->>CMS: Verifica fila
+    CMS->>GF: createGame(player1, player2)
+    GF->>GF: Cria GameSession
+    GF->>CH: Inicia sessão (player1)
+    GF->>CH: Inicia sessão (player2)
+    CH->>C: START_GAME oponente
+    CH->>C: START_GAME oponente

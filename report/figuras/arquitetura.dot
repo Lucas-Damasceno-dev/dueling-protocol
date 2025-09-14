@@ -1,0 +1,18 @@
+digraph G {
+  rankdir=TB;
+  node [shape=box, style=filled, fillcolor=lightblue];
+
+  GameServer [label="GameServer\n(Principal)"];
+  ClientHandler [label="ClientHandler\n(Uma por cliente)"];
+  GameFacade [label="GameFacade\n(L\u00f3gica de neg\u00f3cio)"];
+  ConcurrentMatchmakingService [label="ConcurrentMatchmakingService\n(Matchmaking)"];
+  PlayerRepositoryJson [label="PlayerRepositoryJson\n(Persist\u00eancia)"];
+  GameSession [label="GameSession\n(Sess\u00e3o de jogo)"];
+
+  GameServer -> ClientHandler [label="Cria thread"];
+  ClientHandler -> GameFacade [label="Chama m\u00e9todos"];
+  GameFacade -> ConcurrentMatchmakingService [label="Matchmaking"];
+  GameFacade -> PlayerRepositoryJson [label="Persist\u00eancia"];
+  ConcurrentMatchmakingService -> GameSession [label="Cria sess\u00e3o"];
+  GameFacade -> GameSession [label="Gerencia jogo"];
+}
