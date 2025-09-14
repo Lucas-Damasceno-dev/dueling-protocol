@@ -78,14 +78,14 @@ A comunicação entre cliente e servidor utiliza uma API remota baseada em texto
 \centering
 \caption{Principais comandos da API remota.}
 \label{tab:comandos}
-\begin{tabular}{ll}
+\begin{tabular}{lll}
 \toprule
-Comando & Descrição \\ \midrule
-\texttt{CHARACTER\_SETUP} & Configura a raça e classe do personagem. \\
-\texttt{MATCHMAKING} & Adiciona o jogador à fila de pareamento. \\
-\texttt{STORE:BUY} & Compra um pacote de cartas (\texttt{BASIC}, \texttt{PREMIUM}, etc.). \\
-\texttt{GAME:PLAY\_CARD} & Realiza uma jogada de carta dentro de uma partida. \\
-\texttt{UPGRADE} & Usa pontos para melhorar um atributo base. \\
+Comando & Formato & Descrição \\ \midrule
+\texttt{CHARACTER\_SETUP} & \texttt{CHARACTER\_SETUP:<playerId>:<race>:<class>} & Define a raça e a classe do personagem do jogador. \\
+\texttt{MATCHMAKING} & \texttt{MATCHMAKING:<playerId>} & Adiciona o jogador à fila para encontrar uma partida. \\
+\texttt{STORE} & \texttt{STORE:<playerId>:BUY:<packType>} & Compra um pacote de cartas de um tipo específico. \\
+\texttt{GAME} & \texttt{GAME:<playerId>:PLAY\_CARD:<matchId>:<cardId>} & Executa a ação de jogar uma carta durante uma partida. \\
+\texttt{UPGRADE} & \texttt{UPGRADE:<playerId>:<attribute>} & Melhora um atributo do jogador usando pontos de melhoria. \\
 \bottomrule
 \end{tabular}
 \end{table}
