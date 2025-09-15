@@ -3,6 +3,12 @@ import java.net.*;
 import java.util.Scanner;
 import java.util.UUID;
 
+/**
+ * Main client class for the Dueling Protocol card game.
+ * This class handles the connection to the game server, user interaction through a menu system,
+ * and automated testing scenarios. It supports both TCP communication for game commands and
+ * UDP communication for ping measurements.
+ */
 public class GameClient {
     private static final String SERVER_ADDRESS = System.getenv().getOrDefault("SERVER_HOST", "127.0.0.1");
     private static final int TCP_PORT = 7777;
@@ -14,6 +20,13 @@ public class GameClient {
     private static String currentMatchId;
     private static boolean inGame = false;
     
+    /**
+     * Main method that starts the game client.
+     * Establishes connection to the server, initializes the message receiver thread,
+     * and starts either the interactive menu or an automated test mode based on command line arguments.
+     *
+     * @param args command line arguments - if provided, can be "autobot" or "maliciousbot" for automated testing
+     */
     public static void main(String[] args) {
         try {
             socket = new Socket(SERVER_ADDRESS, TCP_PORT);
@@ -48,6 +61,11 @@ public class GameClient {
         }
     }
     // Modo autobot para testes de desconexão abrupta e concorrência
+    /**
+     * Runs the autobot test mode with different scenarios for testing concurrency and disconnection handling.
+     *
+     * @param scenario the specific test scenario to run (e.g., "matchmaking_disconnect", "pre_game_disconnect")
+     */
     private static void runAutobot(String scenario) {
         try {
             out.println("CHARACTER_SETUP:" + playerId + ":Elfo:Guerreiro");
@@ -79,6 +97,12 @@ public class GameClient {
     }
 
     // Cada cenário extraído para métodos privados
+    /**
+     * Simulates a matchmaking disconnect scenario for testing.
+     * Enters the matchmaking queue and then immediately closes the connection.
+     *
+     * @throws Exception if an error occurs during the scenario execution
+     */
     private static void scenarioMatchmakingDisconnect() throws Exception {
         out.println("MATCHMAKING:" + playerId + ":ENTER");
         Thread.sleep(500);
@@ -86,6 +110,12 @@ public class GameClient {
         socket.close();
     }
 
+    /**
+     * Simulates a pre-game disconnect scenario for testing.
+     * Enters the matchmaking queue and disconnects before the game starts.
+     *
+     * @throws Exception if an error occurs during the scenario execution
+     */
     private static void scenarioPreGameDisconnect() throws Exception {
         out.println("MATCHMAKING:" + playerId + ":ENTER");
         int waited = 0;
@@ -99,6 +129,12 @@ public class GameClient {
         }
     }
 
+    /**
+     * Simulates simultaneous play scenario for testing concurrency.
+     * Enters the matchmaking queue, waits for game start, and plays a card immediately.
+     *
+     * @throws Exception if an error occurs during the scenario execution
+     */
     private static void scenarioSimultaneousPlay() throws Exception {
         out.println("MATCHMAKING:" + playerId + ":ENTER");
         int waited = 0;
@@ -114,6 +150,12 @@ public class GameClient {
         }
     }
 
+    /**
+     * Simulates a mid-game disconnect scenario for testing.
+     * Enters the matchmaking queue, waits for game start, plays a card, and then disconnects.
+     *
+     * @throws Exception if an error occurs during the scenario execution
+     */
     private static void scenarioMidGameDisconnect() throws Exception {
         out.println("MATCHMAKING:" + playerId + ":ENTER");
         int waited = 0;
@@ -129,6 +171,12 @@ public class GameClient {
         }
     }
 
+    /**
+     * Simulates a race condition scenario for testing.
+     * Sends multiple commands in quick succession to test server handling of concurrent requests.
+     *
+     * @throws Exception if an error occurs during the scenario execution
+     */
     private static void scenarioRaceCondition() throws Exception {
         out.println("STORE:" + playerId + ":BUY:BASIC");
         out.println("UPGRADE:" + playerId + ":BASE_ATTACK");
@@ -136,12 +184,20 @@ public class GameClient {
         socket.close();
     }
 
+    /**
+     * Default test scenario that simply closes the connection.
+     *
+     * @throws Exception if an error occurs during the scenario execution
+     */
     private static void scenarioDefault() throws Exception {
         System.out.println("[autobot] Teste concluído, saindo...");
         socket.close();
     }
 
     // Modo maliciousbot para enviar mensagens malformadas
+    /**
+     * Runs the malicious bot test mode that sends malformed messages to test server robustness.
+     */
     private static void runMaliciousBot() {
         try {
             // Comando incompleto
@@ -163,6 +219,11 @@ public class GameClient {
         }
     }
     
+    /**
+     * Displays the main game menu and handles user input for various game actions.
+     * Provides options for character setup, matchmaking, purchasing card packs, checking ping,
+     * playing cards during a match, upgrading attributes, and exiting the game.
+     */
     private static void showMenu() {
         Scanner scanner = new Scanner(System.in);
         while (true) {
@@ -216,6 +277,12 @@ public class GameClient {
         }
     }
     
+    /**
+     * Sets up the player's character by allowing them to choose a race and class.
+     * Sends the character setup command to the server with the selected options.
+     *
+     * @param scanner the Scanner object for reading user input
+     */
     private static void setupCharacter(Scanner scanner) {
         System.out.println("\n=== CONFIGURAÇÃO DE PERSONAGEM ===");
         System.out.println("Raças disponíveis: Elfo, Anão, Humano, Orc");
@@ -229,11 +296,20 @@ public class GameClient {
         out.println("CHARACTER_SETUP:" + playerId + ":" + race + ":" + playerClass);
     }
     
+    /**
+     * Enters the matchmaking queue by sending a matchmaking command to the server.
+     */
     private static void enterMatchmaking() {
         System.out.println("Entrando na fila de matchmaking...");
         out.println("MATCHMAKING:" + playerId + ":ENTER");
     }
     
+    /**
+     * Allows the player to purchase a card pack from the store.
+     * Prompts the user for the type of pack they want to buy and sends the purchase command to the server.
+     *
+     * @param scanner the Scanner object for reading user input
+     */
     private static void buyCardPack(Scanner scanner) {
         System.out.println("\n=== LOJA DE CARDS ===");
         System.out.println("Tipos de pacotes: BASIC, PREMIUM, LEGENDARY");
@@ -243,6 +319,12 @@ public class GameClient {
         out.println("STORE:" + playerId + ":BUY:" + packType);
     }
     
+    /**
+     * Plays a card during a match by sending the play card command to the server.
+     * Only available when the player is currently in a game.
+     *
+     * @param scanner the Scanner object for reading user input
+     */
     private static void playCard(Scanner scanner) {
         System.out.print("ID da carta a ser jogada: ");
         String cardId = scanner.nextLine().trim();
@@ -250,6 +332,12 @@ public class GameClient {
         out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:" + cardId);
     }
     
+    /**
+     * Allows the player to upgrade their attributes using upgrade points.
+     * Prompts the user for the attribute they want to upgrade and sends the upgrade command to the server.
+     *
+     * @param scanner the Scanner object for reading user input
+     */
     private static void upgradeAttributes(Scanner scanner) {
         System.out.println("\n=== MELHORIA DE ATRIBUTOS ===");
         System.out.println("Atributos disponíveis para melhoria:");
@@ -260,6 +348,10 @@ public class GameClient {
         out.println("UPGRADE:" + playerId + ":" + attribute);
     }
     
+    /**
+     * Measures the network latency to the server using UDP ping.
+     * Sends a timestamp packet to the server and measures the round-trip time.
+     */
     public static void checkPing() {
         try (DatagramSocket socket = new DatagramSocket()) {
             InetAddress address = InetAddress.getByName(SERVER_ADDRESS);
@@ -287,10 +379,19 @@ public class GameClient {
     static class ServerMessageReceiver implements Runnable {
         private Socket socket;
         
+        /**
+         * Constructs a new ServerMessageReceiver for the specified socket.
+         *
+         * @param socket the socket for receiving messages from the server
+         */
         public ServerMessageReceiver(Socket socket) {
             this.socket = socket;
         }
         
+        /**
+         * Continuously reads messages from the server and processes them.
+         * Runs in a separate thread to handle asynchronous server communication.
+         */
         @Override
         public void run() {
             try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
@@ -303,6 +404,12 @@ public class GameClient {
             }
         }
         
+        /**
+         * Processes a message received from the server.
+         * Handles different types of server messages including game updates, success notifications, and errors.
+         *
+         * @param message the raw message string received from the server
+         */
         private void processServerMessage(String message) {
             String[] parts = message.split(":");
             String type = parts[0];
