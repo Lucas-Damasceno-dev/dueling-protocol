@@ -55,10 +55,11 @@ public class ClientHandler implements Runnable {
         } catch (Exception e) {
             logger.warn("Connection with client lost: {}", e.getMessage(), e);
         } finally {
-            // Ensures the client is removed when disconnecting
             if (player != null) {
                 gameFacade.removeClient(player.getId());
-                logger.info("Client {} disconnected", player.getId());
+                logger.info("Client {} from {} disconnected", player.getId(), clientSocket.getInetAddress().getHostAddress());
+            } else {
+                logger.info("Client from {} disconnected (player was not created)", clientSocket.getInetAddress().getHostAddress());
             }
         }
     }
