@@ -3,8 +3,8 @@ package model;
 import java.util.UUID;
 
 /**
- * Representa uma partida entre dois jogadores no jogo Dueling Protocol.
- * Cada partida possui um identificador único e os dois jogadores participantes.
+ * Represents a match between two players in the Dueling Protocol game.
+ * Each match has a unique identifier and the two participating players.
  */
 public class Match {
     private String matchId;
@@ -12,11 +12,11 @@ public class Match {
     private Player player2;
     
     /**
-     * Construtor para criar uma nova partida entre dois jogadores.
-     * Gera automaticamente um identificador único para a partida.
+     * Constructor to create a new match between two players.
+     * Automatically generates a unique identifier for the match.
      *
-     * @param player1 o primeiro jogador da partida
-     * @param player2 o segundo jogador da partida
+     * @param player1 the first player in the match
+     * @param player2 the second player in the match
      */
     public Match(Player player1, Player player2) {
         this.matchId = UUID.randomUUID().toString();
@@ -26,23 +26,23 @@ public class Match {
     
     // Getters
     /**
-     * Retorna o identificador único da partida.
+     * Returns the unique identifier of the match.
      *
-     * @return o ID da partida
+     * @return the match ID
      */
     public String getMatchId() { return matchId; }
     
     /**
-     * Retorna o primeiro jogador da partida.
+     * Returns the first player in the match.
      *
-     * @return o primeiro jogador
+     * @return the first player
      */
     public Player getPlayer1() { return player1; }
     
     /**
-     * Retorna o segundo jogador da partida.
+     * Returns the second player in the match.
      *
-     * @return o segundo jogador
+     * @return the second player
      */
     public Player getPlayer2() { return player2; }
 }
