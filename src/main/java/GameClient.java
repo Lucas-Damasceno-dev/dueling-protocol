@@ -20,7 +20,7 @@ public class GameClient {
     private static String currentMatchId;
     private static boolean inGame = false;
     
-    // Variável para controlar a saída intencional e evitar a mensagem de erro
+    // Variable to control intentional exit and avoid error message
     private static volatile boolean isExiting = false;
     
     /**
@@ -33,7 +33,7 @@ public class GameClient {
     public static void main(String[] args) {
         try {
             socket = new Socket(SERVER_ADDRESS, TCP_PORT);
-            System.out.println("Conectado ao servidor em " + SERVER_ADDRESS + ":" + TCP_PORT);
+            System.out.println("Connected to server at " + SERVER_ADDRESS + ":" + TCP_PORT);
 
             Thread receiverThread = new Thread(new ServerMessageReceiver(socket));
             receiverThread.start();
@@ -41,9 +41,9 @@ public class GameClient {
             out = new PrintWriter(socket.getOutputStream(), true);
 
             playerId = "player-" + UUID.randomUUID().toString().substring(0, 8);
-            System.out.println(">> Seu ID de jogador é: " + playerId);
+            System.out.println(">> Your player ID is: " + playerId);
 
-            // Modos automáticos para testes
+            // Automatic modes for testing
             if (args.length > 0) {
                 switch (args[0]) {
                     case "autobot":
@@ -55,27 +55,27 @@ public class GameClient {
                 }
             }
 
-            // Exibe o menu pela primeira vez para o modo interativo
+            // Display menu for the first time for interactive mode
             printFullMenu();
-            // Inicia o loop que apenas lê a entrada do usuário
+            // Start the loop that only reads user input
             handleUserInput();
 
         } catch (Exception e) {
-            System.err.println("Erro ao conectar ao servidor: " + e.getMessage());
+            System.err.println("Error connecting to server: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     private static void printFullMenu() {
-        System.out.println("\n=== MENU DO JOGO ===");
-        System.out.println("1. Configurar personagem");
-        System.out.println("2. Entrar na fila de matchmaking");
-        System.out.println("3. Comprar pacote de cards");
-        System.out.println("4. Verificar ping");
-        System.out.println("5. Jogar carta (durante partida)");
-        System.out.println("6. Melhorar atributos");
-        System.out.println("7. Sair");
-        System.out.print("Escolha uma opção: ");
+        System.out.println("\n=== GAME MENU ===");
+        System.out.println("1. Set up character");
+        System.out.println("2. Enter matchmaking queue");
+        System.out.println("3. Buy card pack");
+        System.out.println("4. Check ping");
+        System.out.println("5. Play card (during match)");
+        System.out.println("6. Upgrade attributes");
+        System.out.println("7. Exit");
+        System.out.print("Choose an option: ");
     }
     
     /**
@@ -103,34 +103,34 @@ public class GameClient {
                     if (inGame) {
                         playCard(scanner);
                     } else {
-                        System.out.println("\nVocê precisa estar em uma partida para jogar cartas!");
-                        printFullMenu(); // Reexibe o menu pois não haverá resposta do servidor
+                        System.out.println("\nYou need to be in a match to play cards!");
+                        printFullMenu(); // Redisplay menu since there will be no server response
                     }
                     break;
                 case "6":
                     upgradeAttributes(scanner);
                     break;
                 case "7":
-                    System.out.println("Saindo...");
-                    isExiting = true; // Sinaliza que a saída é intencional
+                    System.out.println("Exiting...");
+                    isExiting = true; // Signals that exit is intentional
                     try {
                         socket.close();
                     } catch (IOException e) {
-                        // Não é necessário imprimir erro, a saída foi solicitada
+                        // No need to print error, exit was requested
                     }
-                    return; // Encerra o método e a thread principal
+                    return; // End method and main thread
                 default:
-                    System.out.println("\nOpção inválida!");
-                    printFullMenu(); // Reexibe o menu
+                    System.out.println("\nInvalid option!");
+                    printFullMenu(); // Redisplay menu
                     break;
             }
         }
     }
     
-    // MODO AUTOBOT E CENÁRIOS (INTACTOS)
+    // AUTOBOT MODE AND SCENARIOS
     private static void runAutobot(String scenario) {
         try {
-            out.println("CHARACTER_SETUP:" + playerId + ":Elfo:Guerreiro");
+            out.println("CHARACTER_SETUP:" + playerId + ":Elf:Warrior");
             Thread.sleep(200);
 
             switch (scenario) {
@@ -154,13 +154,13 @@ public class GameClient {
                     return;
             }
         } catch (Exception e) {
-            System.err.println("[autobot] Erro: " + e.getMessage());
+            System.err.println("[autobot] Error: " + e.getMessage());
         }
     }
     private static void scenarioMatchmakingDisconnect() throws Exception {
         out.println("MATCHMAKING:" + playerId + ":ENTER");
         Thread.sleep(500);
-        System.out.println("[autobot] Desconectando abruptamente na fila de matchmaking");
+        System.out.println("[autobot] Disconnecting abruptly in matchmaking queue");
         socket.close();
     }
     private static void scenarioPreGameDisconnect() throws Exception {
@@ -171,7 +171,7 @@ public class GameClient {
             waited += 200;
         }
         if (!inGame) {
-            System.out.println("[autobot] Desconectando abruptamente antes do GAME_START");
+            System.out.println("[autobot] Disconnecting abruptly before GAME_START");
             socket.close();
         }
     }
@@ -184,7 +184,7 @@ public class GameClient {
         }
         if (inGame) {
             out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:card-001");
-            System.out.println("[autobot] Jogada enviada imediatamente após GAME_START");
+            System.out.println("[autobot] Play sent immediately after GAME_START");
             Thread.sleep(500);
             socket.close();
         }
@@ -199,7 +199,7 @@ public class GameClient {
         if (inGame) {
             out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:card-001");
             Thread.sleep(300);
-            System.out.println("[autobot] Desconectando abruptamente no meio da partida");
+            System.out.println("[autobot] Disconnecting abruptly in the middle of the match");
             socket.close();
         }
     }
@@ -210,7 +210,7 @@ public class GameClient {
         socket.close();
     }
     private static void scenarioDefault() throws Exception {
-        System.out.println("[autobot] Teste concluído, saindo...");
+        System.out.println("[autobot] Test completed, exiting...");
         socket.close();
     }
     private static void runMaliciousBot() {
@@ -223,53 +223,53 @@ public class GameClient {
             Thread.sleep(200);
             out.println("INVALIDCOMMAND");
             Thread.sleep(200);
-            System.out.println("[maliciousbot] Mensagens malformadas enviadas. Saindo...");
+            System.out.println("[maliciousbot] Malformed messages sent. Exiting...");
             socket.close();
         } catch (Exception e) {
-            System.err.println("[maliciousbot] Erro: " + e.getMessage());
+            System.err.println("[maliciousbot] Error: " + e.getMessage());
         }
     }
     
-    // MÉTODOS DE AÇÃO DO CLIENTE (INTACTOS)
+    // CLIENT ACTION METHODS
     private static void setupCharacter(Scanner scanner) {
-        System.out.println("\n=== CONFIGURAÇÃO DE PERSONAGEM ===");
-        System.out.println("Raças disponíveis: Elfo, Anão, Humano, Orc");
-        System.out.print("Escolha sua raça: ");
+        System.out.println("\n=== CHARACTER SETUP ===");
+        System.out.println("Available races: Elf, Dwarf, Human, Orc");
+        System.out.print("Choose your race: ");
         String race = scanner.nextLine().trim();
         
-        System.out.println("Classes disponíveis: Guerreiro, Mago, Arqueiro, Ladino");
-        System.out.print("Escolha sua classe: ");
+        System.out.println("Available classes: Warrior, Mage, Archer, Rogue");
+        System.out.print("Choose your class: ");
         String playerClass = scanner.nextLine().trim();
         
         out.println("CHARACTER_SETUP:" + playerId + ":" + race + ":" + playerClass);
     }
     
     private static void enterMatchmaking() {
-        System.out.println("\nEntrando na fila de matchmaking...");
+        System.out.println("\nEntering matchmaking queue...");
         out.println("MATCHMAKING:" + playerId + ":ENTER");
     }
     
     private static void buyCardPack(Scanner scanner) {
-        System.out.println("\n=== LOJA DE CARDS ===");
-        System.out.println("Tipos de pacotes: BASIC, PREMIUM, LEGENDARY");
-        System.out.print("Qual pacote deseja comprar? ");
+        System.out.println("\n=== CARD STORE ===");
+        System.out.println("Package types: BASIC, PREMIUM, LEGENDARY");
+        System.out.print("Which package do you want to buy? ");
         String packType = scanner.nextLine().trim().toUpperCase();
         
         out.println("STORE:" + playerId + ":BUY:" + packType);
     }
     
     private static void playCard(Scanner scanner) {
-        System.out.print("ID da carta a ser jogada: ");
+        System.out.print("Card ID to play: ");
         String cardId = scanner.nextLine().trim();
         
         out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:" + cardId);
     }
     
     private static void upgradeAttributes(Scanner scanner) {
-        System.out.println("\n=== MELHORIA DE ATRIBUTOS ===");
-        System.out.println("Atributos disponíveis para melhoria:");
-        System.out.println("BASE_ATTACK - Custo: 5 pontos");
-        System.out.print("Qual atributo deseja melhorar? ");
+        System.out.println("\n=== ATTRIBUTE UPGRADE ===");
+        System.out.println("Available attributes to upgrade:");
+        System.out.println("BASE_ATTACK - Cost: 5 points");
+        System.out.print("Which attribute do you want to upgrade? ");
         String attribute = scanner.nextLine().trim().toUpperCase();
         
         out.println("UPGRADE:" + playerId + ":" + attribute);
@@ -293,15 +293,15 @@ public class GameClient {
             long endTime = System.currentTimeMillis();
             long latency = endTime - startTime;
             System.out.println("\nPing: " + latency + " ms");
-            printFullMenu(); // Reexibe o menu
+            printFullMenu(); // Redisplay menu
 
         } catch (IOException e) {
-            System.err.println("\nPing falhou: " + e.getMessage());
-            printFullMenu(); // Reexibe o menu
+            System.err.println("\nPing failed: " + e.getMessage());
+            printFullMenu(); // Redisplay menu
         }
     }
     
-    // CLASSE INTERNA PARA RECEBER MENSAGENS
+    // INNER CLASS TO RECEIVE MESSAGES
     static class ServerMessageReceiver implements Runnable {
         private Socket socket;
         
@@ -317,9 +317,9 @@ public class GameClient {
                     processServerMessage(response);
                 }
             } catch (IOException e) {
-                // Apenas exibe a mensagem de erro se a saída NÃO foi intencional
+                // Only display error message if exit was NOT intentional
                 if (!isExiting) {
-                    System.err.println("\nConexão com o servidor perdida: " + e.getMessage());
+                    System.err.println("\nConnection to server lost: " + e.getMessage());
                 }
             }
         }
@@ -328,7 +328,7 @@ public class GameClient {
             String[] parts = message.split(":");
             String type = parts[0];
 
-            System.out.println(); // Adiciona uma linha em branco para espaçamento
+            System.out.println(); // Add a blank line for spacing
 
             if ("UPDATE".equals(type)) {
                 String subType = parts[1];
@@ -337,39 +337,39 @@ public class GameClient {
                         currentMatchId = parts[2];
                         inGame = true;
                         System.out.println("=========================================");
-                        System.out.println(">> Partida encontrada contra: " + parts[3]);
-                        System.out.println(">> ID da partida: " + currentMatchId);
+                        System.out.println(">> Match found against: " + parts[3]);
+                        System.out.println(">> Match ID: " + currentMatchId);
                         System.out.println("=========================================");
                         break;
                     case "GAME_OVER":
                         inGame = false;
                         currentMatchId = null;
                         System.out.println("=========================================");
-                        System.out.println(">> FIM DE JOGO: Você " + (parts[2].equals("VICTORY") ? "VENCEU!" : "PERDEU!"));
+                        System.out.println(">> GAME OVER: You " + (parts[2].equals("VICTORY") ? "WON!" : "LOST!"));
                         System.out.println("=========================================");
                         break;
                     case "ACTION":
-                        System.out.println("[AÇÃO] >> " + parts[2]);
+                        System.out.println("[ACTION] >> " + parts[2]);
                         break;
                     case "HEALTH":
-                        System.out.println("[VIDA] >> " + parts[2] + " agora tem " + parts[3] + " pontos de vida");
+                        System.out.println("[HEALTH] >> " + parts[2] + " now has " + parts[3] + " health points");
                         break;
                     case "DRAW_CARDS":
-                        System.out.println("[CARTAS] >> Cartas recebidas: " + parts[2]);
+                        System.out.println("[CARDS] >> Cards received: " + parts[2]);
                         break;
                     default:
-                        System.out.println("\nServidor: " + message);
+                        System.out.println("\nServer: " + message);
                         break;
                 }
             } else if ("SUCCESS".equals(type)) {
-                System.out.println("[SUCESSO] ✓ " + message.substring(8)); // Remove "SUCCESS:" prefix
+                System.out.println("[SUCCESS] ✓ " + message.substring(8)); // Remove "SUCCESS:" prefix
             } else if ("ERROR".equals(type)) {
-                System.out.println("[ERRO] ✗ " + message.substring(6)); // Remove "ERROR:" prefix
+                System.out.println("[ERROR] ✗ " + message.substring(6)); // Remove "ERROR:" prefix
             } else {
-                System.out.println("\nServidor: " + message);
+                System.out.println("\nServer: " + message);
             }
 
-            // Após cada mensagem do servidor, reexibe o menu para uma nova entrada
+            // After each server message, redisplay the menu for new input
             printFullMenu();
         }
     }

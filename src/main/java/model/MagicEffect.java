@@ -1,24 +1,24 @@
 package model;
 
 /**
- * Implementação do efeito mágico para cartas do tipo MAGIC.
- * Este efeito causa dano mágico ao jogador alvo, que é calculado como
- * o dobro do valor de ataque da carta.
+ * Implementation of the magic effect for MAGIC-type cards.
+ * This effect deals magical damage to the target player, calculated as
+ * double the card's attack value.
  */
 public class MagicEffect implements CardEffect {
     /**
      * {@inheritDoc}
-     * Causa dano mágico ao jogador alvo igual ao dobro do valor de ataque da carta.
+     * Deals magical damage to the target player equal to double the card's attack value.
      *
-     * @param session a sessão de jogo onde o efeito será aplicado
-     * @param caster o jogador que está lançando a carta
-     * @param target o jogador alvo do efeito da carta
-     * @param card a carta que está sendo jogada
+     * @param session the game session where the effect will be applied
+     * @param caster the player casting the card
+     * @param target the target player of the card's effect
+     * @param card the card being played
      */
     @Override
     public void execute(GameSession session, Player caster, Player target, Card card) {
-        int magicDamage = card.getAttack() * 2; // Magia pode ter um multiplicador, por exemplo
+        int magicDamage = card.getAttack() * 2; // Magic can have a multiplier, for example
         target.setHealthPoints(target.getHealthPoints() - magicDamage);
-        System.out.println(caster.getNickname() + " usou '" + card.getName() + "' em " + target.getNickname() + ", causando " + magicDamage + " de dano mágico!");
+        System.out.println(caster.getNickname() + " used '" + card.getName() + "' on " + target.getNickname() + ", dealing " + magicDamage + " magical damage!");
     }
 }
