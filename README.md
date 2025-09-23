@@ -1,2 +1,2 @@
 # dueling-protocol
-Implementation of a communication protocol for a 1v1 card dueling game. The focus is on the centralized server architecture, bidirectional communication with native sockets, and player matchmaking.
+A server for a 1v1 tactical card game. This project implements a custom communication protocol over native sockets to manage player matchmaking, game state, and real-time interactions. An academic project for Computer Engineering (UEFS).
