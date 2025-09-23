@@ -55,8 +55,7 @@ public class ClientHandler implements Runnable {
     }
     
     private Player getPlayerById(String playerId) {
-        // Em uma implementação real, você buscaria o jogador no repositório
-        // Por enquanto, vamos criar um jogador temporário
+        // por enquanto um player temporario. Depois do repository
         return new Player(playerId, "Jogador " + playerId);
     }
 }
