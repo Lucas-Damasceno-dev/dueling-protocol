@@ -1,3 +1,5 @@
+package model;
+
 import java.util.List;
 import java.util.ArrayList;
 
@@ -31,4 +33,3 @@ public class Player {
     public List<Card> getCardCollection() { return cardCollection; }
     public void setCardCollection(List<Card> cardCollection) { this.cardCollection = cardCollection; }
 }
-
