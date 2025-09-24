@@ -3,11 +3,14 @@
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/repository/InMemoryPlayerRepository.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/controller/GameFacade.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/service/store/StoreService.java
+/home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/model/EquipmentEffect.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/repository/PlayerRepository.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/service/store/StoreServiceImpl.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/model/CardEffect.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/model/AttackEffect.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/service/matchmaking/ConcurrentMatchmakingService.java
+/home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/model/MagicEffect.java
+/home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/repository/CardRepository.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/service/store/CardPackFactory.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/model/CardPack.java
 /home/tec502/Documentos/lucas/pbl01Redes/dueling-protocol/src/main/java/PingServer.java
