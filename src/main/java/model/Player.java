@@ -9,6 +9,14 @@ public class Player {
     private int coins;
     private List<Card> cardCollection;
     
+    private String playerRace;
+    private String playerClass;
+    private int healthPoints;
+    private int upgradePoints;
+    private int baseAttack;
+    private int baseDefense;
+    private int baseMana;
+
     public Player() {
         this.cardCollection = new ArrayList<>();
     }
@@ -17,10 +25,9 @@ public class Player {
         this();
         this.id = id;
         this.nickname = nickname;
-        this.coins = 1000; // Moedas iniciais
+        this.coins = 1000;
     }
-    
-    // Getters e Setters
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
     
@@ -32,4 +39,19 @@ public class Player {
     
     public List<Card> getCardCollection() { return cardCollection; }
     public void setCardCollection(List<Card> cardCollection) { this.cardCollection = cardCollection; }
+
+    public String getPlayerRace() { return playerRace; }
+    public void setPlayerRace(String playerRace) { this.playerRace = playerRace; }
+    public String getPlayerClass() { return playerClass; }
+    public void setPlayerClass(String playerClass) { this.playerClass = playerClass; }
+    public int getHealthPoints() { return healthPoints; }
+    public void setHealthPoints(int healthPoints) { this.healthPoints = healthPoints; }
+    public int getUpgradePoints() { return upgradePoints; }
+    public void setUpgradePoints(int upgradePoints) { this.upgradePoints = upgradePoints; }
+    public int getBaseAttack() { return baseAttack; }
+    public void setBaseAttack(int baseAttack) { this.baseAttack = baseAttack; }
+    public int getBaseDefense() { return baseDefense; }
+    public void setBaseDefense(int baseDefense) { this.baseDefense = baseDefense; }
+    public int getBaseMana() { return baseMana; }
+    public void setBaseMana(int baseMana) { this.baseMana = baseMana; }
 }
