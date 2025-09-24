@@ -16,7 +16,6 @@ public class CardPackFactory {
     }
 }
 
-// Implementações concretas
 class BasicCardPack implements CardPack {
     @Override
     public String getName() { return "Pacote Básico"; }
@@ -24,10 +23,18 @@ class BasicCardPack implements CardPack {
     public int getCost() { return 100; }
     @Override
     public List<Card> open() {
-        // Lógica para gerar 5 cartas básicas aleatórias
         List<Card> cards = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            cards.add(new Card("basic-" + i, "Carta Básica " + i, 1, 1, "Comum"));
+            cards.add(new Card(
+                "basic-" + i,
+                "Carta Básica " + i,
+                1,
+                1,
+                "Comum",
+                Card.CardType.ATTACK,
+                "Efeito padrão",
+                1
+            ));
         }
         return cards;
     }
@@ -40,10 +47,18 @@ class RareCardPack implements CardPack {
     public int getCost() { return 500; }
     @Override
     public List<Card> open() {
-        // Lógica para gerar 5 cartas básicas aleatórias
         List<Card> cards = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            cards.add(new Card("rare-" + i, "Carta Rara " + i, 3, 3, "Rara"));
+            cards.add(new Card(
+                "rare-" + i,
+                "Carta Rara " + i,
+                3,
+                3,
+                "Rara",
+                Card.CardType.MAGIC,
+                "Efeito raro",
+                2
+            ));
         }
         return cards;
     }
