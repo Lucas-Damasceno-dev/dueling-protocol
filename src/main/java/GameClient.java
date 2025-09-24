@@ -2,7 +2,7 @@ import java.io.*;
 import java.net.*;
 
 public class GameClient {
-    private static final String SERVER_ADDRESS = "172.16.103.10";
+    private static final String SERVER_ADDRESS = System.getenv().getOrDefault("SERVER_HOST", "127.0.0.1");
     private static final int TCP_PORT = 7777;
     private static final int UDP_PORT = 7778;
     
@@ -15,10 +15,12 @@ public class GameClient {
             receiverThread.start();
             
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+
+            String playerId = "player123";
+
+            out.println("MATCHMAKING:" + playerId + ":ENTER");
             
-            out.println("MATCHMAKING:ENTER:player123");
-            
-            out.println("STORE:BUY:player123:BASIC_PACK");
+            out.println("STORE:" + playerId + ":BUY:BASIC");
             
             checkPing();
             

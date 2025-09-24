@@ -41,7 +41,7 @@ public class ClientHandler implements Runnable {
         String action = command[0];
         String playerId = command.length > 1 ? command[1] : null;
 
-        if (playerId == null) {
+        if (playerId == null || playerId.trim().isEmpty()) {
             out.println("ERROR:ID do jogador não fornecido.");
             return;
         }

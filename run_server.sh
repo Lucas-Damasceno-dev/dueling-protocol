@@ -1,4 +1,3 @@
 #!/bin/bash
-
-# Run the server
-java -cp target/classes GameServer
+echo ">>> Iniciando o GameServer..."
+java -jar target/dueling-protocol-1.0-SNAPSHOT.jar

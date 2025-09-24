@@ -1,16 +1,4 @@
 #!/bin/bash
-
-# Clean previous builds
-rm -rf target
-mkdir -p target/classes
-
-# Compile all Java files with correct classpath
-javac -cp src/main/java -d target/classes \
-  src/main/java/model/*.java \
-  src/main/java/repository/*.java \
-  src/main/java/service/matchmaking/*.java \
-  src/main/java/service/store/*.java \
-  src/main/java/controller/*.java \
-  src/main/java/*.java
-
-echo "Compilation completed successfully!"
+echo ">>> Limpando e construindo o projeto com Maven..."
+mvn clean package
+echo ">>> Build concluído! O JAR executável está em target/dueling-protocol-1.0-SNAPSHOT.jar"
