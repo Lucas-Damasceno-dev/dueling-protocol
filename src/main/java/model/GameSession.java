@@ -1,19 +1,20 @@
 package model;
 
 import java.util.*;
-import model.CardEffect;
-import model.AttackEffect;
 
 public class GameSession {
-    private Player player1;
-    private Player player2;
-    private List<Card> deckP1;
-    private List<Card> deckP2;
-    private List<Card> handP1;
-    private List<Card> handP2;
+    private final Player player1;
+    private final Player player2;
+    private final List<Card> deckP1;
+    private final List<Card> deckP2;
+    private final List<Card> handP1;
+    private final List<Card> handP2;
     private int turn;
-    private long startTime;
-    private Map<String, List<String>> pendingActions;
+    private final Map<String, List<String>> pendingActions;
+
+    private long lastActionTimeP1;
+    private long lastActionTimeP2;
+    private static final long GLOBAL_COOLDOWN_MS = 3000;
 
     public GameSession(Player p1, Player p2, List<Card> deckP1, List<Card> deckP2) {
         this.player1 = p1;
@@ -29,11 +30,11 @@ public class GameSession {
     public void startGame() {
         Collections.shuffle(deckP1);
         Collections.shuffle(deckP2);
-        player1.setHealthPoints(100);
-        player2.setHealthPoints(100);
+        long currentTime = System.currentTimeMillis();
+        this.lastActionTimeP1 = currentTime;
+        this.lastActionTimeP2 = currentTime;
         drawCards(player1.getId(), 5);
         drawCards(player2.getId(), 5);
-        this.startTime = System.currentTimeMillis();
     }
 
     public void drawCards(String playerId, int count) {
@@ -45,11 +46,30 @@ public class GameSession {
     }
 
     public boolean playCard(String playerId, String cardId) {
+        long currentTime = System.currentTimeMillis();
+        
+        if (playerId.equals(player1.getId())) {
+            if (currentTime - lastActionTimeP1 < GLOBAL_COOLDOWN_MS) {
+                System.out.println(player1.getNickname() + " está em tempo de recarga.");
+                return false;
+            }
+            lastActionTimeP1 = currentTime;
+        } else {
+            if (currentTime - lastActionTimeP2 < GLOBAL_COOLDOWN_MS) {
+                System.out.println(player2.getNickname() + " está em tempo de recarga.");
+                return false;
+            }
+            lastActionTimeP2 = currentTime;
+        }
+
         List<Card> hand = playerId.equals(player1.getId()) ? handP1 : handP2;
         Card card = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst().orElse(null);
         if (card == null) return false;
+
         hand.remove(card);
-        pendingActions.computeIfAbsent(playerId, k -> new ArrayList<>()).add(cardId);
+        pendingActions.computeIfAbsent(playerId, k -> new ArrayList<>()).add(card.getId());
+        
+        resolveActions();
         return true;
     }
 
@@ -58,21 +78,26 @@ public class GameSession {
             String playerId = entry.getKey();
             Player caster = playerId.equals(player1.getId()) ? player1 : player2;
             Player target = playerId.equals(player1.getId()) ? player2 : player1;
-            List<Card> hand = playerId.equals(player1.getId()) ? handP1 : handP2;
+            
             for (String cardId : entry.getValue()) {
-                Card card = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst().orElse(null);
-                if (card == null) continue;
-                CardEffect effect = null;
-                switch (card.getCardType()) {
-                    case ATTACK:
-                        effect = new AttackEffect();
-                        break;
-                    default:
-                        break;
-                }
-                if (effect != null) {
-                    effect.execute(this, caster, target, card);
-                }
+                /*// Card card = findCardById(cardId); // Você precisaria de uma forma de encontrar o card
+                // if (card == null) continue;
+
+                // switch (card.getCardType()) {
+                //     case ATTACK:
+                //         new AttackEffect().execute(this, caster, target, card);
+                //         break;
+                //     case MAGIC:
+                //         // new MagicEffect().execute(this, caster, target, card);
+                //         break;
+                //     case EQUIPMENT:
+                //         // new EquipmentEffect().execute(this, caster, target, card);
+                //         break;
+                //     // Outros casos...
+                //     default:
+                //         System.out.println("Efeito para " + card.getCardType() + " não implementado.");
+                //         break;
+                // }*/
             }
         }
         pendingActions.clear();

@@ -4,7 +4,8 @@ import service.matchmaking.MatchmakingService;
 import service.matchmaking.ConcurrentMatchmakingService;
 import service.store.StoreService;
 import service.store.StoreServiceImpl;
-import repository.InMemoryPlayerRepository;
+import repository.PlayerRepository;
+import repository.PlayerRepositoryJson;
 import model.Player;
 import model.GameSession;
 import model.Card;
@@ -15,11 +16,13 @@ import java.util.*;
 public class GameFacade {
     private final MatchmakingService matchmakingService;
     private final StoreService storeService;
+    private final PlayerRepository playerRepository;
     private final Map<String, GameSession> activeGames = new HashMap<>();
 
     public GameFacade() {
         this.matchmakingService = ConcurrentMatchmakingService.getInstance();
         this.storeService = new StoreServiceImpl();
+        this.playerRepository = new PlayerRepositoryJson();
     }
 
     public void enterMatchmaking(Player player) {
@@ -33,10 +36,12 @@ public class GameFacade {
             String matchId = UUID.randomUUID().toString();
             List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
             List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
+            
             GameSession session = new GameSession(p1, p2, deckP1, deckP2);
             session.startGame();
             activeGames.put(matchId, session);
-            out.println("UPDATE:GAME_START:" + p2.getNickname());
+        
+            out.println("UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
             out.println("UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
         });
     }
@@ -59,14 +64,26 @@ public class GameFacade {
             if (session != null && session.playCard(playerId, cardId)) {
                 out.println("UPDATE:OPPONENT_ACTION:Jogada realizada pelo jogador " + playerId);
             } else {
-                out.println("ERROR:Jogada inválida");
+                out.println("ERROR:Jogada inválida ou jogador em tempo de recarga.");
             }
-        } else if ("CHOOSE_ORDER".equals(subAction)) {
-            out.println("UPDATE:ORDER_CHOSEN");
         }
     }
 
     public void buyPack(Player player, String packType) {
         storeService.purchaseCardPack(player, packType);
+        playerRepository.update(player);
+    }
+
+    public void finishGame(String matchId, String winnerId) {
+        activeGames.remove(matchId);
+        Optional<Player> winnerOpt = playerRepository.findById(winnerId);
+        
+        if (winnerOpt.isPresent()) {
+            Player winner = winnerOpt.get();
+            int pointsEarned = 10;
+            winner.setUpgradePoints(winner.getUpgradePoints() + pointsEarned);
+            playerRepository.update(winner);
+            System.out.println("Partida finalizada. " + winner.getNickname() + " ganhou " + pointsEarned + " pontos!");
+        }
     }
 }
