@@ -4,7 +4,6 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import controller.GameFacade;
 import model.Player;
-import java.util.Optional;
 import repository.InMemoryPlayerRepository;
 
 public class ClientHandler implements Runnable {
