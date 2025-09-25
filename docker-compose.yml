@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # O serviço do servidor do jogo
   server:
     build: .
     ports:
@@ -10,16 +9,21 @@ services:
     networks:
       - dueling-network
 
-  # O serviço do cliente do jogo
   client:
     build: .
-    # Sobrescreve o comando padrão do Dockerfile para executar o cliente
-    command: java -cp app.jar GameClient
+    command: >
+      sh -c '
+        echo "Aguardando o servidor..."
+        sleep 5
+        echo "Iniciando cliente em modo: ${BOT_MODE} com cenário: ${BOT_SCENARIO}"
+        java -cp app.jar GameClient ${BOT_MODE} ${BOT_SCENARIO}
+      '
     depends_on:
       - server
     environment:
-      # Passa o nome do host do servidor para o cliente
       - SERVER_HOST=server
+      - BOT_MODE=${BOT_MODE:-autobot}
+      - BOT_SCENARIO=${BOT_SCENARIO}
     networks:
       - dueling-network
 

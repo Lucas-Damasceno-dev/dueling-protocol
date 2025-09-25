@@ -23,19 +23,18 @@ public class Player {
     private static final Logger logger = LoggerFactory.getLogger(Player.class);
 
     public Player() {
-        this.cardCollection = new ArrayList<>();
-        initializeStarterDeck();
+    this.cardCollection = new ArrayList<>();
     }
     
     public Player(String id, String nickname) {
-        this();
-        this.id = id;
-        this.nickname = nickname;
-        this.coins = 1000;
-        this.healthPoints = 100;
-        this.upgradePoints = 0;
-        initializeStarterDeck();
-        logger.debug("Novo jogador criado: {} ({})", nickname, id);
+    this.cardCollection = new ArrayList<>();
+    this.id = id;
+    this.nickname = nickname;
+    this.coins = 1000;
+    this.healthPoints = 100;
+    this.upgradePoints = 0;
+    initializeStarterDeck();
+    logger.debug("Novo jogador criado: {} ({})", nickname, id);
     }
 
     public void setCharacter(String race, String playerClass) {
