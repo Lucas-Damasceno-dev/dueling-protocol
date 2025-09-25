@@ -65,7 +65,7 @@ public class GameSession {
     /**
      * Starts the game session by shuffling decks and dealing initial cards.
      */
-    public void startGame() {
+    public synchronized void startGame() {
         Collections.shuffle(deckP1);
         Collections.shuffle(deckP2);
         long currentTime = System.currentTimeMillis();
@@ -82,7 +82,7 @@ public class GameSession {
      * @param playerId the ID of the player drawing cards
      * @param count the number of cards to draw
      */
-    public void drawCards(String playerId, int count) {
+    public synchronized void drawCards(String playerId, int count) {
         List<Card> deck = playerId.equals(player1.getId()) ? deckP1 : deckP2;
         List<Card> hand = playerId.equals(player1.getId()) ? handP1 : handP2;
         for (int i = 0; i < count && !deck.isEmpty(); i++) {
@@ -99,7 +99,7 @@ public class GameSession {
      * @param cardId the ID of the card to play
      * @return true if the card was played successfully, false otherwise
      */
-    public boolean playCard(String playerId, String cardId) {
+    public synchronized boolean playCard(String playerId, String cardId) {
         long currentTime = System.currentTimeMillis();
         
         if (playerId.equals(player1.getId())) {
@@ -135,7 +135,7 @@ public class GameSession {
      * Resolves all pending actions for the current turn.
      * Executes card effects and checks for game end conditions.
      */
-    public void resolveActions() {
+    public synchronized void resolveActions() {
         if (gameEnded) return;
 
         for (Map.Entry<String, List<String>> entry : pendingActions.entrySet()) {
