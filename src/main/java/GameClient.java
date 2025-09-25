@@ -66,10 +66,39 @@ public class GameClient {
             try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
                 String response;
                 while ((response = in.readLine()) != null) {
-                    System.out.println("Servidor: " + response);
+                    // ATUALIZADO: Interpreta as mensagens do servidor
+                    processServerMessage(response);
                 }
             } catch (IOException e) {
                 System.err.println("Erro ao receber mensagem do servidor: " + e.getMessage());
+            }
+        }
+        
+        private void processServerMessage(String message) {
+            String[] parts = message.split(":");
+            String type = parts[0];
+
+            if ("UPDATE".equals(type)) {
+                String subType = parts[1];
+                switch (subType) {
+                    case "GAME_START":
+                        System.out.println(">> Partida encontrada contra: " + parts[3]);
+                        break;
+                    case "ACTION":
+                        System.out.println(">> " + parts[2]);
+                        break;
+                    case "HEALTH":
+                        System.out.println(">> Vida de " + parts[2] + " agora é " + parts[3]);
+                        break;
+                    case "GAME_OVER":
+                        System.out.println(">> FIM DE JOGO: Você " + (parts[2].equals("VICTORY") ? "VENCEU!" : "PERDEU!"));
+                        break;
+                    default:
+                        System.out.println("Servidor: " + message);
+                        break;
+                }
+            } else {
+                System.out.println("Servidor: " + message);
             }
         }
     }
