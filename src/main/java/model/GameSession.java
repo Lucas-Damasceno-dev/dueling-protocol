@@ -4,6 +4,17 @@ import controller.GameFacade;
 import repository.CardRepository;
 import java.util.*;
 
+// Import card effects
+import model.AttackEffect;
+import model.DefenseEffect;
+import model.MagicEffect;
+import model.AttributeEffect;
+import model.ScenarioEffect;
+import model.EquipmentEffect;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class GameSession {
     private final String matchId;
     private final GameFacade gameFacade;
@@ -20,6 +31,8 @@ public class GameSession {
     private long lastActionTimeP1;
     private long lastActionTimeP2;
     private static final long GLOBAL_COOLDOWN_MS = 3000;
+    
+    private static final Logger logger = LoggerFactory.getLogger(GameSession.class);
 
     public GameSession(String matchId, Player p1, Player p2, List<Card> deckP1, List<Card> deckP2, GameFacade facade) {
         this.matchId = matchId;
@@ -42,6 +55,7 @@ public class GameSession {
         this.lastActionTimeP2 = currentTime;
         drawCards(player1.getId(), 5);
         drawCards(player2.getId(), 5);
+        logger.info("Partida {} iniciada entre {} e {}", matchId, player1.getId(), player2.getId());
     }
         public void drawCards(String playerId, int count) {
         List<Card> deck = playerId.equals(player1.getId()) ? deckP1 : deckP2;
@@ -49,6 +63,7 @@ public class GameSession {
         for (int i = 0; i < count && !deck.isEmpty(); i++) {
             hand.add(deck.remove(0));
         }
+        logger.debug("Jogador {} comprou {} cartas", playerId, count);
     }
 
     public boolean playCard(String playerId, String cardId) {
@@ -56,13 +71,13 @@ public class GameSession {
         
         if (playerId.equals(player1.getId())) {
             if (currentTime - lastActionTimeP1 < GLOBAL_COOLDOWN_MS) {
-                System.out.println(player1.getNickname() + " está em tempo de recarga.");
+                logger.debug("{} está em tempo de recarga", player1.getNickname());
                 return false;
             }
             lastActionTimeP1 = currentTime;
         } else {
             if (currentTime - lastActionTimeP2 < GLOBAL_COOLDOWN_MS) {
-                System.out.println(player2.getNickname() + " está em tempo de recarga.");
+                logger.debug("{} está em tempo de recarga", player2.getNickname());
                 return false;
             }
             lastActionTimeP2 = currentTime;
@@ -70,11 +85,15 @@ public class GameSession {
 
         List<Card> hand = playerId.equals(player1.getId()) ? handP1 : handP2;
         Card card = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst().orElse(null);
-        if (card == null) return false;
+        if (card == null) {
+            logger.warn("Carta {} não encontrada na mão do jogador {}", cardId, playerId);
+            return false;
+        }
 
         hand.remove(card);
         pendingActions.computeIfAbsent(playerId, k -> new ArrayList<>()).add(card.getId());
         
+        logger.info("Jogador {} jogou carta {}", playerId, cardId);
         resolveActions();
         return true;
     }
@@ -91,6 +110,7 @@ public class GameSession {
             for (String cardId : entry.getValue()) {
                 Optional<Card> cardOpt = CardRepository.findById(cardId);
                 if (cardOpt.isEmpty()) {
+                    logger.warn("Carta {} não encontrada no repositório", cardId);
                     continue;
                 }
                 Card card = cardOpt.get();
@@ -119,12 +139,18 @@ public class GameSession {
         switch (card.getCardType()) {
             case ATTACK:
                 return new AttackEffect();
+            case DEFENSE:
+                return new DefenseEffect();
             case MAGIC:
                 return new MagicEffect();
+            case ATTRIBUTE:
+                return new AttributeEffect();
+            case SCENARIO:
+                return new ScenarioEffect();
             case EQUIPMENT:
                 return new EquipmentEffect();
             default:
-                System.out.println("Efeito para " + card.getCardType() + " não implementado.");
+                logger.warn("Efeito para {} não implementado", card.getCardType());
                 return null;
         }
     }
@@ -146,9 +172,11 @@ public class GameSession {
     private void checkGameStatus() {
         if (player1.getHealthPoints() <= 0) {
             gameEnded = true;
+            logger.info("Partida {} finalizada. Vencedor: {}", matchId, player2.getId());
             gameFacade.finishGame(matchId, player2.getId(), player1.getId());
         } else if (player2.getHealthPoints() <= 0) {
             gameEnded = true;
+            logger.info("Partida {} finalizada. Vencedor: {}", matchId, player1.getId());
             gameFacade.finishGame(matchId, player1.getId(), player2.getId());
         }
     }

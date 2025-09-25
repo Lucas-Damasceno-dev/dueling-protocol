@@ -1,3 +1,3 @@
 #!/bin/bash
-echo ">>> Iniciando o GameClient..."
-java -cp target/dueling-protocol-1.0-SNAPSHOT.jar GameClient
+echo ">>> Iniciando o GameClient com Docker..."
+docker run --network=host dueling-protocol java -cp app.jar GameClient

@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.Scanner;
 import java.util.UUID;
 
 public class GameClient {
@@ -7,29 +8,129 @@ public class GameClient {
     private static final int TCP_PORT = 7777;
     private static final int UDP_PORT = 7778;
     
+    private static Socket socket;
+    private static PrintWriter out;
+    private static String playerId;
+    private static String currentMatchId;
+    private static boolean inGame = false;
+    
     public static void main(String[] args) {
         try {
-            Socket socket = new Socket(SERVER_ADDRESS, TCP_PORT);
-            System.out.println("Conectado ao servidor!");
+            socket = new Socket(SERVER_ADDRESS, TCP_PORT);
+            System.out.println("Conectado ao servidor em " + SERVER_ADDRESS + ":" + TCP_PORT);
             
             Thread receiverThread = new Thread(new ServerMessageReceiver(socket));
             receiverThread.start();
             
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            out = new PrintWriter(socket.getOutputStream(), true);
             
-            String playerId = "player-" + UUID.randomUUID().toString().substring(0, 8);
-            System.out.println(">> Eu sou o " + playerId);
-
-            out.println("MATCHMAKING:" + playerId + ":ENTER");
+            playerId = "player-" + UUID.randomUUID().toString().substring(0, 8);
+            System.out.println(">> Seu ID de jogador é: " + playerId);
             
-            out.println("STORE:" + playerId + ":BUY:BASIC");
-            
-            checkPing();
+            // Menu interativo
+            showMenu();
             
         } catch (Exception e) {
-            System.err.println("Erro no cliente: " + e.getMessage());
+            System.err.println("Erro ao conectar ao servidor: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+    
+    private static void showMenu() {
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            System.out.println("\n=== MENU DO JOGO ===");
+            System.out.println("1. Configurar personagem");
+            System.out.println("2. Entrar na fila de matchmaking");
+            System.out.println("3. Comprar pacote de cards");
+            System.out.println("4. Verificar ping");
+            System.out.println("5. Jogar carta (durante partida)");
+            System.out.println("6. Melhorar atributos");
+            System.out.println("7. Sair");
+            System.out.print("Escolha uma opção: ");
+            
+            String input = scanner.nextLine().trim();
+            
+            switch (input) {
+                case "1":
+                    setupCharacter(scanner);
+                    break;
+                case "2":
+                    enterMatchmaking();
+                    break;
+                case "3":
+                    buyCardPack(scanner);
+                    break;
+                case "4":
+                    checkPing();
+                    break;
+                case "5":
+                    if (inGame) {
+                        playCard(scanner);
+                    } else {
+                        System.out.println("Você precisa estar em uma partida para jogar cartas!");
+                    }
+                    break;
+                case "6":
+                    upgradeAttributes(scanner);
+                    break;
+                case "7":
+                    System.out.println("Saindo...");
+                    try {
+                        socket.close();
+                    } catch (IOException e) {
+                        System.err.println("Erro ao fechar conexão: " + e.getMessage());
+                    }
+                    return;
+                default:
+                    System.out.println("Opção inválida!");
+                    break;
+            }
+        }
+    }
+    
+    private static void setupCharacter(Scanner scanner) {
+        System.out.println("\n=== CONFIGURAÇÃO DE PERSONAGEM ===");
+        System.out.println("Raças disponíveis: Elfo, Anão, Humano, Orc");
+        System.out.print("Escolha sua raça: ");
+        String race = scanner.nextLine().trim();
+        
+        System.out.println("Classes disponíveis: Guerreiro, Mago, Arqueiro, Ladino");
+        System.out.print("Escolha sua classe: ");
+        String playerClass = scanner.nextLine().trim();
+        
+        out.println("CHARACTER_SETUP:" + playerId + ":" + race + ":" + playerClass);
+    }
+    
+    private static void enterMatchmaking() {
+        System.out.println("Entrando na fila de matchmaking...");
+        out.println("MATCHMAKING:" + playerId + ":ENTER");
+    }
+    
+    private static void buyCardPack(Scanner scanner) {
+        System.out.println("\n=== LOJA DE CARDS ===");
+        System.out.println("Tipos de pacotes: BASIC, PREMIUM, LEGENDARY");
+        System.out.print("Qual pacote deseja comprar? ");
+        String packType = scanner.nextLine().trim().toUpperCase();
+        
+        out.println("STORE:" + playerId + ":BUY:" + packType);
+    }
+    
+    private static void playCard(Scanner scanner) {
+        System.out.print("ID da carta a ser jogada: ");
+        String cardId = scanner.nextLine().trim();
+        
+        out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:" + cardId);
+    }
+    
+    private static void upgradeAttributes(Scanner scanner) {
+        System.out.println("\n=== MELHORIA DE ATRIBUTOS ===");
+        System.out.println("Atributos disponíveis para melhoria:");
+        System.out.println("BASE_ATTACK - Custo: 5 pontos");
+        System.out.print("Qual atributo deseja melhorar? ");
+        String attribute = scanner.nextLine().trim().toUpperCase();
+        
+        out.println("UPGRADE:" + playerId + ":" + attribute);
     }
     
     public static void checkPing() {
@@ -83,23 +184,35 @@ public class GameClient {
                 String subType = parts[1];
                 switch (subType) {
                     case "GAME_START":
-                        System.out.println(">> Partida encontrada contra: " + parts[3]);
+                        currentMatchId = parts[2];
+                        inGame = true;
+                        System.out.println("\n>> Partida encontrada contra: " + parts[3]);
+                        System.out.println(">> ID da partida: " + currentMatchId);
                         break;
                     case "ACTION":
-                        System.out.println(">> " + parts[2]);
+                        System.out.println("\n>> " + parts[2]);
                         break;
                     case "HEALTH":
-                        System.out.println(">> Vida de " + parts[2] + " agora é " + parts[3]);
+                        System.out.println("\n>> Vida atualizada: " + parts[2] + " agora tem " + parts[3] + " pontos de vida");
                         break;
                     case "GAME_OVER":
-                        System.out.println(">> FIM DE JOGO: Você " + (parts[2].equals("VICTORY") ? "VENCEU!" : "PERDEU!"));
+                        inGame = false;
+                        currentMatchId = null;
+                        System.out.println("\n>> FIM DE JOGO: Você " + (parts[2].equals("VICTORY") ? "VENCEU!" : "PERDEU!"));
+                        break;
+                    case "DRAW_CARDS":
+                        System.out.println("\n>> Cartas recebidas: " + parts[2]);
                         break;
                     default:
-                        System.out.println("Servidor: " + message);
+                        System.out.println("\nServidor: " + message);
                         break;
                 }
+            } else if ("SUCCESS".equals(type)) {
+                System.out.println("\n✓ " + message.substring(8)); // Remove "SUCCESS:" prefix
+            } else if ("ERROR".equals(type)) {
+                System.out.println("\n✗ Erro: " + message.substring(6)); // Remove "ERROR:" prefix
             } else {
-                System.out.println("Servidor: " + message);
+                System.out.println("\nServidor: " + message);
             }
         }
     }

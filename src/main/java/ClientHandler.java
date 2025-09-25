@@ -8,11 +8,16 @@ import model.Player;
 import repository.PlayerRepository;
 import repository.PlayerRepositoryJson;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class ClientHandler implements Runnable {
     private final Socket clientSocket;
     private final GameFacade gameFacade;
     private final PlayerRepository playerRepository;
     private Player player; // Armazena o jogador desta sessão
+    
+    private static final Logger logger = LoggerFactory.getLogger(ClientHandler.class);
 
     public ClientHandler(Socket socket, GameFacade facade) {
         this.clientSocket = socket;
@@ -28,25 +33,33 @@ public class ClientHandler implements Runnable {
         ) {
             String inputLine;
             while ((inputLine = in.readLine()) != null) {
-                System.out.println("Comando recebido: " + inputLine);
+                logger.debug("Comando recebido: {}", inputLine);
                 String[] command = inputLine.split(":");
                 processCommand(command, out);
             }
         } catch (Exception e) {
-            System.out.println("Conexão com o cliente perdida: " + e.getMessage());
+            logger.warn("Conexão com o cliente perdida: {}", e.getMessage(), e);
         } finally {
             // Garante que o cliente seja removido ao desconectar
             if (player != null) {
                 gameFacade.removeClient(player.getId());
+                logger.info("Cliente {} desconectado", player.getId());
             }
         }
     }
 
     private void processCommand(String[] command, PrintWriter out) {
+        if (command.length < 2) {
+            logger.warn("Comando inválido recebido: {}", String.join(":", command));
+            out.println("ERROR:Comando inválido.");
+            return;
+        }
+        
         String action = command[0];
-        String playerId = command.length > 1 ? command[1] : null;
+        String playerId = command[1];
 
         if (playerId == null || playerId.trim().isEmpty()) {
+            logger.warn("ID do jogador não fornecido para ação: {}", action);
             out.println("ERROR:ID do jogador não fornecido.");
             return;
         }
@@ -61,22 +74,35 @@ public class ClientHandler implements Runnable {
 
         switch (action) {
             case "CHARACTER_SETUP":
+                if (command.length < 4) {
+                    logger.warn("Comando CHARACTER_SETUP incompleto");
+                    out.println("ERROR:Comando CHARACTER_SETUP incompleto. Use: CHARACTER_SETUP:<playerId>:<race>:<class>");
+                    return;
+                }
                 String race = command[2];
                 String pClass = command[3];
                 player.setCharacter(race, pClass);
                 playerRepository.save(player);
+                logger.info("Personagem configurado para {}: {} {}", playerId, race, pClass);
                 out.println("SUCCESS:Personagem configurado como " + race + " " + pClass);
                 break;
 
             case "MATCHMAKING":
                 gameFacade.enterMatchmaking(player);
+                logger.info("Jogador {} entrou na fila de matchmaking", playerId);
                 out.println("SUCCESS:Você entrou na fila.");
                 break;
 
             case "STORE":
+                if (command.length < 4) {
+                    logger.warn("Comando STORE incompleto");
+                    out.println("ERROR:Comando STORE incompleto. Use: STORE:<playerId>:BUY:<packType>");
+                    return;
+                }
                 String packType = command[3];
                 gameFacade.buyPack(player, packType);
                 playerRepository.save(player);
+                logger.info("Jogador {} comprou pacote do tipo {}", playerId, packType);
                 out.println("SUCCESS:Pacote comprado.");
                 break;
 
@@ -85,6 +111,11 @@ public class ClientHandler implements Runnable {
                 break;
             
             case "UPGRADE":
+                if (command.length < 3) {
+                    logger.warn("Comando UPGRADE incompleto");
+                    out.println("ERROR:Comando UPGRADE incompleto. Use: UPGRADE:<playerId>:<attribute>");
+                    return;
+                }
                 String attribute = command[2];
                 int cost = 5;
 
@@ -94,13 +125,16 @@ public class ClientHandler implements Runnable {
                         player.setBaseAttack(player.getBaseAttack() + 1);
                     }
                     playerRepository.save(player);
+                    logger.info("Jogador {} melhorou o atributo {} com sucesso", playerId, attribute);
                     out.println("SUCCESS:Melhoria aplicada! Novo ataque: " + player.getBaseAttack());
                 } else {
+                    logger.warn("Jogador {} tentou melhorar atributo {} mas não tem pontos suficientes", playerId, attribute);
                     out.println("ERROR:Pontos de melhoria insuficientes.");
                 }
                 break;
 
             default:
+                logger.warn("Comando desconhecido recebido: {}", action);
                 out.println("ERROR:Comando desconhecido.");
                 break;
         }
@@ -111,6 +145,7 @@ public class ClientHandler implements Runnable {
         return playerOpt.orElseGet(() -> {
             Player newPlayer = new Player(playerId, "Jogador " + playerId);
             playerRepository.save(newPlayer);
+            logger.info("Novo jogador criado: {}", playerId);
             return newPlayer;
         });
     }
