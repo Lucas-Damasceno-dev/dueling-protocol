@@ -3,7 +3,6 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Optional;
-
 import controller.GameFacade;
 import model.Player;
 import repository.PlayerRepository;
@@ -13,6 +12,7 @@ public class ClientHandler implements Runnable {
     private final Socket clientSocket;
     private final GameFacade gameFacade;
     private final PlayerRepository playerRepository;
+    private Player player; // Armazena o jogador desta sessão
 
     public ClientHandler(Socket socket, GameFacade facade) {
         this.clientSocket = socket;
@@ -33,7 +33,12 @@ public class ClientHandler implements Runnable {
                 processCommand(command, out);
             }
         } catch (Exception e) {
-            System.out.println("Cliente desconectado: " + e.getMessage());
+            System.out.println("Conexão com o cliente perdida: " + e.getMessage());
+        } finally {
+            // Garante que o cliente seja removido ao desconectar
+            if (player != null) {
+                gameFacade.removeClient(player.getId());
+            }
         }
     }
 
@@ -44,6 +49,12 @@ public class ClientHandler implements Runnable {
         if (playerId == null || playerId.trim().isEmpty()) {
             out.println("ERROR:ID do jogador não fornecido.");
             return;
+        }
+
+        // Carrega o jogador ou cria um novo, e o registra
+        if (this.player == null) {
+            this.player = getOrCreatePlayer(playerId);
+            gameFacade.registerClient(playerId, out);
         }
 
         Player player = getOrCreatePlayer(playerId);
@@ -60,7 +71,6 @@ public class ClientHandler implements Runnable {
             case "MATCHMAKING":
                 gameFacade.enterMatchmaking(player);
                 out.println("SUCCESS:Você entrou na fila.");
-                gameFacade.tryToCreateMatch(out);
                 break;
 
             case "STORE":
