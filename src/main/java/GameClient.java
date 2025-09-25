@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.UUID;
 
 public class GameClient {
     private static final String SERVER_ADDRESS = System.getenv().getOrDefault("SERVER_HOST", "127.0.0.1");
@@ -15,8 +16,9 @@ public class GameClient {
             receiverThread.start();
             
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-
-            String playerId = "player123";
+            
+            String playerId = "player-" + UUID.randomUUID().toString().substring(0, 8);
+            System.out.println(">> Eu sou o " + playerId);
 
             out.println("MATCHMAKING:" + playerId + ":ENTER");
             
@@ -66,7 +68,6 @@ public class GameClient {
             try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
                 String response;
                 while ((response = in.readLine()) != null) {
-                    // ATUALIZADO: Interpreta as mensagens do servidor
                     processServerMessage(response);
                 }
             } catch (IOException e) {

@@ -19,6 +19,7 @@ public class Player {
 
     public Player() {
         this.cardCollection = new ArrayList<>();
+        initializeStarterDeck();
     }
     
     public Player(String id, String nickname) {
@@ -28,12 +29,25 @@ public class Player {
         this.coins = 1000;
         this.healthPoints = 100;
         this.upgradePoints = 0;
+        initializeStarterDeck();
     }
 
     public void setCharacter(String race, String playerClass) {
         this.playerRace = race;
         this.playerClass = playerClass;
         applyAttributeBonuses();
+    }
+
+    private void initializeStarterDeck() {
+        for (int i = 0; i < 5; i++) {
+            this.cardCollection.add(new Card(
+                "basic-" + i,
+                "Carta Básica " + i,
+                1, 1, "Comum",
+                Card.CardType.ATTACK,
+                "Ataque padrão", 1
+            ));
+        }
     }
 
     private void applyAttributeBonuses() {
