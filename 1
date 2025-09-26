@@ -1,0 +1,42 @@
+typeset -U path cdpath fpath manpath
+for profile in ${(z)NIX_PROFILES}; do
+  fpath+=($profile/share/zsh/site-functions $profile/share/zsh/$ZSH_VERSION/functions $profile/share/zsh/vendor-completions)
+done
+
+HELPDIR="/nix/store/jcs2x94ps3im3miq10cw6jv998nydffw-zsh-5.9/share/zsh/$ZSH_VERSION/help"
+
+autoload -U compinit && compinit
+source /nix/store/klkqagvr4d6zy6hq05phsg7g60qr0vc1-zsh-autosuggestions-0.7.1/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+ZSH_AUTOSUGGEST_STRATEGY=(history)
+
+
+# History options should be set in .zshrc and after oh-my-zsh sourcing.
+# See https://github.com/nix-community/home-manager/issues/177.
+HISTSIZE="10000"
+SAVEHIST="10000"
+
+HISTFILE="$HOME/.zsh_history"
+mkdir -p "$(dirname "$HISTFILE")"
+
+setopt HIST_FCNTL_LOCK
+unsetopt APPEND_HISTORY
+setopt HIST_IGNORE_DUPS
+unsetopt HIST_IGNORE_ALL_DUPS
+unsetopt HIST_SAVE_NO_DUPS
+unsetopt HIST_FIND_NO_DUPS
+setopt HIST_IGNORE_SPACE
+unsetopt HIST_EXPIRE_DUPS_FIRST
+setopt SHARE_HISTORY
+unsetopt EXTENDED_HISTORY
+
+
+if [[ $TERM != "dumb" ]]; then
+  eval "$(/nix/store/74rp5qfv37kp1nb6v7dnvsvpfn9rpy4j-starship-1.23.0/bin/starship init zsh)"
+fi
+
+eval "$(starship init zsh)"
+alias -- edit-home='nano /etc/nixos/home.nix'
+alias -- edit-nixos='sudo -E nano /etc/nixos/configuration.nix'
+alias -- update-system='sudo nixos-rebuild switch --flake /etc/nixos#meu-nixos'
+export PATH=$HOME/.npm-global/bin:$PATH
+
