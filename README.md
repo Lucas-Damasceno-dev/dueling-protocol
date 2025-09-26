@@ -1,99 +1,198 @@
 # Dueling Protocol
 
-Uma implementação de servidor para um jogo de cartas multiplayer, construído com uma arquitetura cliente-servidor utilizando comunicação TCP.
+A server implementation for a multiplayer card game, built with a client-server architecture using TCP communication.
 
-## Arquitetura
+## Table of Contents
 
-O projeto segue um modelo cliente-servidor clássico:
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Technologies](#technologies)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Running the Project](#running-the-project)
+  - [With Docker](#with-docker)
+  - [With Maven](#with-maven)
+- [Communication Protocol](#communication-protocol)
+- [Testing](#testing)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
+- [License](#license)
 
--   **Servidor**: Uma aplicação Java que gerencia a lógica central do jogo, incluindo matchmaking, sessões de partida, compra de pacotes de cartas e persistência de dados dos jogadores.
--   **Clientes**: Qualquer aplicação (desktop, mobile, web) capaz de se comunicar via sockets TCP. O projeto inclui um `GameClient` como uma implementação de exemplo.
+## Overview
 
-## Barema de Funcionalidades
+Dueling Protocol is a server for a multiplayer card game that allows the creation of 1v1 matches between players. The server manages the entire game lifecycle, from matchmaking to match resolution, and also offers features like a card shop, character upgrade system, and latency measurement.
 
-Esta seção detalha como o projeto atende aos critérios de avaliação propostos.
+## Architecture
 
-### 1. Comunicação e API Remota
+The project follows a classic client-server model:
 
-A comunicação entre cliente e servidor é baseada em texto e utiliza TCP para ações críticas (lógica de jogo, matchmaking, etc.) e UDP para medição de latência.
+- **Server**: A Java application that manages the core game logic, including matchmaking, match sessions, card pack purchases, and player data persistence.
+- **Clients**: Any application (desktop, mobile, web) capable of communicating via TCP sockets. The project includes a `GameClient` as an example implementation.
 
-**Formato Geral (TCP):** `COMANDO:ID_JOGADOR:ARG1:ARG2...`
+![Architecture Diagram](report/figuras/arquitetura.png)
 
-**Comandos Principais:**
+## Features
 
-| Comando | Formato | Descrição |
-| :--- | :--- | :--- |
-| `CHARACTER_SETUP` | `CHARACTER_SETUP:<playerId>:<race>:<class>` | Define a raça e a classe do personagem do jogador. |
-| `MATCHMAKING` | `MATCHMAKING:<playerId>` | Adiciona o jogador à fila para encontrar uma partida. |
-| `STORE` | `STORE:<playerId>:BUY:<packType>` | Compra um pacote de cartas de um tipo específico. |
-| `GAME` | `GAME:<playerId>:PLAY_CARD:<matchId>:<cardId>` | Executa a ação de jogar uma carta durante uma partida. |
-| `UPGRADE` | `UPGRADE:<playerId>:<attribute>` | Melhora um atributo do jogador usando pontos de melhoria. |
+- ✅ **TCP/UDP Communication**: Main communication via TCP and latency measurement via UDP
+- ✅ **1v1 Matchmaking**: Queue system to pair players
+- ✅ **1v1 Matches**: Complete match system between two players
+- ✅ **Card Shop**: Purchase card packs to expand the deck
+- ✅ **Upgrade System**: Improve character attributes with points earned from victories
+- ✅ **Data Persistence**: Storage of player data in JSON format
+- ✅ **Thread-Safe Concurrency**: Multithreaded architecture with safe data structures
+- ✅ **Latency Measurement**: Ping system to monitor connection quality
+- ✅ **Disconnection Handling**: Management of abrupt client disconnections
 
-**Respostas do Servidor:**
+## Technologies
 
-O servidor responde com prefixos que indicam o resultado da operação:
+- Java 21
+- Maven
+- Docker
+- TCP/UDP Sockets
+- Gson (for JSON serialization)
+- SLF4J/Logback (for logging)
+- JUnit (for testing)
 
--   `SUCCESS`: Ação executada com sucesso.
--   `ERROR`: Ocorreu um erro ao processar o comando.
--   `UPDATE`: Envia uma atualização assíncrona para o cliente (início de partida, compra de cartas, etc.).
+## Prerequisites
 
-### 2. Encapsulamento e Formato de Dados
+- Java 21
+- Maven 3.8+
+- Docker (optional, but recommended)
+- Docker Compose (optional, but recommended)
 
-Os dados são encapsulados em mensagens de texto simples. O servidor faz o parsing dessas mensagens para extrair comandos e argumentos. Em caso de formato inválido, o servidor responde com uma mensagem de `ERROR`.
+## Installation
 
-### 3. Concorrência
-
-O servidor é multithread, utilizando um modelo de uma thread por cliente (`ClientHandler`). Cada conexão de cliente é gerenciada em sua própria thread, permitindo o processamento simultâneo de múltiplas requisições.
-
-As estruturas de dados compartilhadas (ex: listas de jogos ativos, clientes conectados e a fila de matchmaking) utilizam implementações `thread-safe` (como `ConcurrentHashMap` e `ConcurrentLinkedQueue` no `ConcurrentMatchmakingService`) para garantir a consistência e evitar condições de corrida.
-
-### 4. Partidas 1v1
-
-O sistema de matchmaking permite que jogadores entrem em uma fila. O `ConcurrentMatchmakingService` processa a fila continuamente e, quando encontra dois jogadores, cria uma partida (`Match`).
-
-O sistema verifica se os dois jogadores ainda estão conectados antes de iniciar a partida. Se um jogador desconectar, o outro é devolvido à fila, garantindo que ninguém fique "preso" esperando por um oponente que já saiu.
-
-### 5. Pacotes de Cartas
-
-A aquisição de novas cartas é feita através da compra de pacotes na loja. O comando `STORE:BUY` aciona essa lógica. O `StoreServiceImpl` é responsável por determinar quais cartas são entregues ao jogador, simulando um "estoque" global de onde as cartas são sorteadas.
-
-### 6. Latência
-
-Para garantir uma experiência de jogo responsiva, o sistema oferece um mecanismo para medir a latência (ping) entre cliente e servidor. Isso é feito através do `PingServer`, que opera em uma porta dedicada (7778) utilizando o protocolo UDP.
-
--   **Funcionamento**: O `PingServer` é um servidor de eco. O cliente envia um pacote UDP para o servidor, que o devolve imediatamente.
--   **Visualização do Atraso**: O cliente pode medir o tempo de ida e volta (Round-Trip Time) e exibir essa informação na interface, permitindo que o jogador visualize a qualidade da sua conexão.
-
-### 7. Testes e Emulação
-
-O projeto inclui um script de teste de estresse (`stress_test.sh`) que atende aos critérios de automação e emulação:
-
--   **Emulação com Docker**: O teste utiliza `docker-compose` para orquestrar um ambiente com múltiplas instâncias do cliente e um servidor, simulando um cenário de uso real.
--   **Teste de Estresse Automatizado**: O script inicia 10 clientes (`BOT_MODE=autobot`) que se conectam e interagem com o servidor simultaneamente. O teste executa por um período fixo (30 segundos) e depois encerra e limpa os contêineres automaticamente, permitindo uma avaliação de desempenho e estabilidade sob carga.
-
-## Como Construir e Executar
-
-### Com Maven
+### With Docker (Recommended)
 
 ```bash
-# Compila o projeto e gera o JAR
+# Clone the repository
+git clone <repository-url>
+cd dueling-protocol
+
+# Build the Docker image
 ./build.sh
 ```
 
-### Com Docker
+### With Maven
 
 ```bash
-# Constrói a imagem Docker
-docker-compose build
+# Clone the repository
+git clone <repository-url>
+cd dueling-protocol
 
-# Inicia o servidor
-docker-compose up server
+# Compile the project
+mvn clean package
 ```
 
-### Executando os Testes
+## Running the Project
 
-Para executar o teste de estresse automatizado:
+### With Docker
 
 ```bash
+# Start the server
+./run_server.sh
+
+# In another terminal, start a client
+./run_client.sh
+```
+
+Or using docker-compose:
+
+```bash
+# Start the server
+docker-compose up server
+
+# In another terminal, start a client
+docker-compose up client
+```
+
+### With Maven
+
+```bash
+# Start the server (in the target/ folder)
+java -jar dueling-protocol-1.0-SNAPSHOT.jar
+
+# In another terminal, start a client
+java -cp dueling-protocol-1.0-SNAPSHOT.jar GameClient
+```
+
+## Communication Protocol
+
+The communication between client and server is text-based and uses TCP for critical actions and UDP for latency measurement.
+
+### General Format (TCP)
+
+```
+COMMAND:PLAYER_ID:ARG1:ARG2...
+```
+
+### Main Commands
+
+| Command | Format | Description |
+| :--- | :--- | :--- |
+| `CHARACTER_SETUP` | `CHARACTER_SETUP:<playerId>:<race>:<class>` | Defines the race and class of the player's character. |
+| `MATCHMAKING` | `MATCHMAKING:<playerId>` | Adds the player to the queue to find a match. |
+| `STORE` | `STORE:<playerId>:BUY:<packType>` | Buys a card pack of a specific type. |
+| `GAME` | `GAME:<playerId>:PLAY_CARD:<matchId>:<cardId>` | Executes the action of playing a card during a match. |
+| `UPGRADE` | `UPGRADE:<playerId>:<attribute>` | Improves a player attribute using upgrade points. |
+
+### Server Responses
+
+The server responds with prefixes that indicate the result of the operation:
+
+- `SUCCESS`: Action executed successfully.
+- `ERROR`: An error occurred while processing the command.
+- `UPDATE`: Sends an asynchronous update to the client (start of a match, card purchase, etc.).
+
+## Testing
+
+The project includes a complete suite of automated tests that cover various scenarios:
+
+### Scenario Tests
+
+```bash
+# Run all scenario tests
+./run_all_tests.sh
+```
+
+### Stress Test
+
+```bash
+# Run a stress test with 10 simultaneous clients
 ./stress_test.sh
 ```
+
+The tests cover:
+- Abrupt disconnections during matchmaking and matches
+- Race conditions in data persistence
+- Simultaneous moves
+- Handling of malformed inputs
+
+## Project Structure
+
+```
+src/main/java/
+├── controller/          # Controllers and facades
+├── model/               # Data models and entities
+├── repository/          # Data access layer
+├── service/             # Business logic
+│   ├── matchmaking/     # Matchmaking services
+│   └── store/           # Store services
+├── GameServer.java      # Main server class
+├── GameClient.java      # Example client
+├── ClientHandler.java   # Handler for client connections
+└── PingServer.java      # UDP server for latency measurement
+```
+
+## Contributing
+
+1. Fork the project
+2. Create a branch for your feature (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+Distributed under the MIT License. See `LICENSE` for more information.
