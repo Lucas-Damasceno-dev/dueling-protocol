@@ -1,18 +1,72 @@
-digraph G {
-  rankdir=TB;
-  node [shape=box, style=filled, fillcolor=lightblue];
+digraph DuelingProtocol {
+    bgcolor="#2E3440";
+    node [shape=box, style="filled", fillcolor="#4C566A", fontname="sans-serif", fontcolor="#ECEFF4", color="#5E81AC"];
+    edge [color="#88C0D0", fontname="sans-serif", fontcolor="#ECEFF4"];
 
-  GameServer [label="GameServer\n(Principal)"];
-  ClientHandler [label="ClientHandler\n(Uma por cliente)"];
-  GameFacade [label="GameFacade\n(L\u00f3gica de neg\u00f3cio)"];
-  ConcurrentMatchmakingService [label="ConcurrentMatchmakingService\n(Matchmaking)"];
-  PlayerRepositoryJson [label="PlayerRepositoryJson\n(Persist\u00eancia)"];
-  GameSession [label="GameSession\n(Sess\u00e3o de jogo)"];
+    subgraph cluster_client {
+        label = "Cliente";
+        style = "filled";
+        color = "#3B4252";
+        fontcolor = "#ECEFF4";
+        GameClient [label="GameClient\n(Interface do Usuário)"];
+    }
 
-  GameServer -> ClientHandler [label="Cria thread"];
-  ClientHandler -> GameFacade [label="Chama m\u00e9todos"];
-  GameFacade -> ConcurrentMatchmakingService [label="Matchmaking"];
-  GameFacade -> PlayerRepositoryJson [label="Persist\u00eancia"];
-  ConcurrentMatchmakingService -> GameSession [label="Cria sess\u00e3o"];
-  GameFacade -> GameSession [label="Gerencia jogo"];
+    subgraph cluster_server {
+        label = "Servidor Java";
+        style = "filled";
+        color = "#3B4252";
+        fontcolor = "#ECEFF4";
+
+        GameServer [label="GameServer\n(Ponto de Entrada TCP)"];
+        PingServer [label="PingServer\n(Serviço UDP)"];
+
+        subgraph cluster_handler {
+            label = "Thread do Cliente";
+            style = "dashed";
+            color = "#5E81AC";
+            ClientHandler [label="ClientHandler\n(Parser de Comandos)"];
+        }
+
+        subgraph cluster_facade {
+            label = "Lógica de Negócio";
+            style = "dashed";
+            color = "#5E81AC";
+            GameFacade [label="GameFacade\n(Orquestrador Central)"];
+        }
+
+        subgraph cluster_services {
+            label = "Serviços";
+            style = "dashed";
+            color = "#5E81AC";
+            MatchmakingService [label="ConcurrentMatchmakingService\n(Fila de Pareamento)"];
+            StoreService [label="StoreServiceImpl\n(Lógica da Loja)"];
+        }
+        
+        subgraph cluster_persistence {
+            label = "Persistência";
+            style = "dashed";
+            color = "#5E81AC";
+            PlayerRepository [label="PlayerRepositoryJson\n(Leitura/Escrita de JSON)"];
+            CardRepository [label="CardRepository\n(Estoque de Cartas)"];
+        }
+    }
+    
+    subgraph cluster_storage {
+        label = "Armazenamento";
+        style = "filled";
+        color = "#3B4252";
+        fontcolor = "#ECEFF4";
+        PlayerData [label="players.json", shape=document, fillcolor="#81A1C1"];
+    }
+
+    // Conexões
+    GameClient -> GameServer [label="Comandos TCP"];
+    GameClient -> PingServer [label="Pacotes UDP"];
+    GameServer -> ClientHandler [label="Cria Thread"];
+    ClientHandler -> GameFacade [label="Chama métodos"];
+    GameFacade -> MatchmakingService;
+    GameFacade -> StoreService;
+    GameFacade -> PlayerRepository;
+    StoreService -> CardRepository [label="Acessa estoque"];
+    PlayerRepository -> PlayerData [label="Lê/Escreve"];
 }

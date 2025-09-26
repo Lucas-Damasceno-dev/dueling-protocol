@@ -9,6 +9,7 @@ import service.matchmaking.ConcurrentMatchmakingService;
 import service.matchmaking.MatchmakingService;
 import service.store.StoreService;
 import service.store.StoreServiceImpl;
+import service.store.PurchaseResult;
 
 import java.io.PrintWriter;
 import java.util.*;
@@ -139,10 +140,13 @@ public class GameFacade {
         }
     }
 
-    public void buyPack(Player player, String packType) {
-        storeService.purchaseCardPack(player, packType);
-        playerRepository.update(player);
-        logger.info("Jogador {} comprou pacote do tipo {}", player.getId(), packType);
+    public PurchaseResult buyPack(Player player, String packType) {
+        PurchaseResult result = storeService.purchaseCardPack(player, packType);
+        if (result.isSuccess()) {
+            playerRepository.save(player); // Salva o estado do jogador após a compra
+            logger.info("Jogador {} comprou pacote do tipo {}", player.getId(), packType);
+        }
+        return result;
     }
 
     public void finishGame(String matchId, String winnerId, String loserId) {
