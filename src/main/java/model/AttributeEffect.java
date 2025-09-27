@@ -1,22 +1,22 @@
 package model;
 
 /**
- * Implementação do efeito de atributo para cartas do tipo ATTRIBUTE.
- * Este efeito aumenta os atributos base do jogador que lança a carta,
- * incluindo ataque, defesa e mana.
+ * Implementation of the attribute effect for ATTRIBUTE-type cards.
+ * This effect increases the casting player's base attributes,
+ * including attack, defense, and mana.
  */
 public class AttributeEffect implements CardEffect {
     /**
      * {@inheritDoc}
-     * Aumenta os atributos base do jogador que lança a carta:
-     * - Ataque base é aumentado pelo valor de ataque da carta
-     * - Defesa base é aumentada pelo valor de defesa da carta
-     * - Mana base é aumentada pela metade do custo de mana da carta
+     * Increases the casting player's base attributes:
+     * - Base attack is increased by the card's attack value
+     * - Base defense is increased by the card's defense value
+     * - Base mana is increased by half the card's mana cost
      *
-     * @param session a sessão de jogo onde o efeito será aplicado
-     * @param caster o jogador que está lançando a carta
-     * @param target o jogador alvo do efeito da carta (não utilizado neste efeito)
-     * @param card a carta que está sendo jogada
+     * @param session the game session where the effect will be applied
+     * @param caster the player casting the card
+     * @param target the target player of the card's effect (not used in this effect)
+     * @param card the card being played
      */
     @Override
     public void execute(GameSession session, Player caster, Player target, Card card) {
@@ -29,8 +29,8 @@ public class AttributeEffect implements CardEffect {
         caster.setBaseDefense(caster.getBaseDefense() + defenseBonus);
         caster.setBaseMana(caster.getBaseMana() + manaBonus);
         
-        System.out.println(caster.getNickname() + " usou '" + card.getName() + 
-            "', ganhando +" + attackBonus + " ataque, +" + defenseBonus + 
-            " defesa e +" + manaBonus + " mana!");
+        System.out.println(caster.getNickname() + " used '" + card.getName() + 
+            "', gaining +" + attackBonus + " attack, +" + defenseBonus + 
+            " defense and +" + manaBonus + " mana!");
     }
 }

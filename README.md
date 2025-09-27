@@ -52,7 +52,6 @@ The project follows a classic client-server model:
 - TCP/UDP Sockets
 - Gson (for JSON serialization)
 - SLF4J/Logback (for logging)
-- JUnit (for testing)
 
 ## Prerequisites
 
@@ -101,20 +100,20 @@ Or using docker-compose:
 
 ```bash
 # Start the server
-docker-compose up server
+docker-compose -f docker/docker-compose.yml up server
 
 # In another terminal, start a client
-docker-compose up client
+docker-compose -f docker/docker-compose.yml up client
 ```
 
 ### With Maven
 
 ```bash
 # Start the server (in the target/ folder)
-java -jar dueling-protocol-1.0-SNAPSHOT.jar
+java -jar target/dueling-protocol-1.0-SNAPSHOT.jar
 
 # In another terminal, start a client
-java -cp dueling-protocol-1.0-SNAPSHOT.jar GameClient
+java -cp target/dueling-protocol-1.0-SNAPSHOT.jar GameClient
 ```
 
 ## Communication Protocol
@@ -132,7 +131,7 @@ COMMAND:PLAYER_ID:ARG1:ARG2...
 | Command | Format | Description |
 | :--- | :--- | :--- |
 | `CHARACTER_SETUP` | `CHARACTER_SETUP:<playerId>:<race>:<class>` | Defines the race and class of the player's character. |
-| `MATCHMAKING` | `MATCHMAKING:<playerId>` | Adds the player to the queue to find a match. |
+| `MATCHMAKING` | `MATCHMAKING:<playerId>:ENTER` | Adds the player to the queue to find a match. |
 | `STORE` | `STORE:<playerId>:BUY:<packType>` | Buys a card pack of a specific type. |
 | `GAME` | `GAME:<playerId>:PLAY_CARD:<matchId>:<cardId>` | Executes the action of playing a card during a match. |
 | `UPGRADE` | `UPGRADE:<playerId>:<attribute>` | Improves a player attribute using upgrade points. |
@@ -160,7 +159,7 @@ The project includes a complete suite of automated tests that cover various scen
 
 ```bash
 # Run a stress test with 10 simultaneous clients
-./stress_test.sh
+./test_scripts/test_stress.sh
 ```
 
 The tests cover:
@@ -174,11 +173,34 @@ The tests cover:
 ```
 src/main/java/
 ├── controller/          # Controllers and facades
+│   └── GameFacade.java  # Main facade for game operations
 ├── model/               # Data models and entities
+│   ├── AttackEffect.java
+│   ├── AttributeEffect.java
+│   ├── Card.java
+│   ├── CardEffect.java
+│   ├── CardPack.java
+│   ├── DefenseEffect.java
+│   ├── EquipmentEffect.java
+│   ├── GameSession.java
+│   ├── MagicEffect.java
+│   ├── Match.java
+│   └── Player.java
 ├── repository/          # Data access layer
+│   ├── CardRepository.java
+│   ├── InMemoryPlayerRepository.java
+│   ├── PlayerRepository.java
+│   └── PlayerRepositoryJson.java
 ├── service/             # Business logic
 │   ├── matchmaking/     # Matchmaking services
-│   └── store/           # Store services
+│   │   ├── ConcurrentMatchmakingService.java
+│   │   └── MatchmakingService.java
+│   └── store/          # Store services
+│       ├── CardPackFactory.java
+│       ├── PurchaseResult.java
+│       ├── PurchaseStatus.java
+│       ├── StoreService.java
+│       └── StoreServiceImpl.java
 ├── GameServer.java      # Main server class
 ├── GameClient.java      # Example client
 ├── ClientHandler.java   # Handler for client connections

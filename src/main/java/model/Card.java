@@ -3,10 +3,9 @@ package model;
 import java.util.Objects;
 
 /**
- * Representa uma carta no jogo Dueling Protocol.
- * Cada carta possui atributos como ataque, defesa, raridade, tipo e custo de mana.
- * As cartas são usadas pelos jogadores durante as partidas para aplicar efeitos
- * e estratégias.
+ * Represents a card in the Dueling Protocol game.
+ * Each card has attributes such as attack, defense, rarity, type, and mana cost.
+ * Cards are used by players during matches to apply effects and strategies.
  */
 public class Card {
     private String id;
@@ -19,179 +18,179 @@ public class Card {
     private int manaCost;
 
     /**
-     * Enumeração que define os tipos possíveis de cartas no jogo.
+     * Enumeration that defines the possible card types in the game.
      */
     public enum CardType {
-        /** Carta de ataque que causa dano ao oponente */
+        /** Attack card that deals damage to the opponent */
         ATTACK,
-        /** Carta de defesa que protege o jogador */
+        /** Defense card that protects the player */
         DEFENSE,
-        /** Carta mágica com efeitos especiais */
+        /** Magic card with special effects */
         MAGIC,
-        /** Carta que melhora os atributos do jogador */
+        /** Card that improves player attributes */
         ATTRIBUTE,
-        /** Carta que modifica o cenário da partida */
+        /** Card that modifies the match scenario */
         SCENARIO,
-        /** Carta de equipamento que fornece bônus permanentes */
+        /** Equipment card that provides permanent bonuses */
         EQUIPMENT
     }
 
     /**
-     * Construtor padrão para a classe Card.
+     * Default constructor for the Card class.
      */
     public Card() {}
 
     /**
-     * Construtor completo para criar uma carta com todos os atributos especificados.
+     * Complete constructor to create a card with all specified attributes.
      *
-     * @param id Identificador único da carta
-     * @param name Nome da carta
-     * @param attack Valor de ataque da carta
-     * @param defense Valor de defesa da carta
-     * @param rarity Raridade da carta (ex: "Comum", "Rara", "Lendária")
-     * @param cardType Tipo da carta, definido pela enumeração CardType
-     * @param effectDescription Descrição textual do efeito da carta
-     * @param manaCost Custo em mana para jogar a carta
-     * @throws NullPointerException se id, name, rarity, cardType ou effectDescription forem nulos
+     * @param id Unique identifier of the card
+     * @param name Card name
+     * @param attack Card attack value
+     * @param defense Card defense value
+     * @param rarity Card rarity (e.g.: "Common", "Rare", "Legendary")
+     * @param cardType Card type, defined by the CardType enumeration
+     * @param effectDescription Textual description of the card's effect
+     * @param manaCost Mana cost to play the card
+     * @throws NullPointerException if id, name, rarity, cardType or effectDescription are null
      */
     public Card(String id, String name, int attack, int defense, String rarity, CardType cardType, String effectDescription, int manaCost) {
-        this.id = Objects.requireNonNull(id, "ID não pode ser nulo");
-        this.name = Objects.requireNonNull(name, "Nome não pode ser nulo");
+        this.id = Objects.requireNonNull(id, "ID cannot be null");
+        this.name = Objects.requireNonNull(name, "Name cannot be null");
         this.attack = Math.max(0, attack);
         this.defense = Math.max(0, defense);
-        this.rarity = Objects.requireNonNull(rarity, "Raridade não pode ser nula");
-        this.cardType = Objects.requireNonNull(cardType, "Tipo de carta não pode ser nulo");
-        this.effectDescription = Objects.requireNonNull(effectDescription, "Descrição do efeito não pode ser nula");
+        this.rarity = Objects.requireNonNull(rarity, "Rarity cannot be null");
+        this.cardType = Objects.requireNonNull(cardType, "Card type cannot be null");
+        this.effectDescription = Objects.requireNonNull(effectDescription, "Effect description cannot be null");
         this.manaCost = Math.max(0, manaCost);
     }
 
-    // Getters e Setters
+    // Getters and Setters
     /**
-     * Retorna o identificador único da carta.
+     * Returns the card's unique identifier.
      *
-     * @return o ID da carta
+     * @return the card ID
      */
     public String getId() { return id; }
     
     /**
-     * Define o identificador único da carta.
+     * Sets the card's unique identifier.
      *
-     * @param id o novo ID da carta
-     * @throws NullPointerException se o id for nulo
+     * @param id the new card ID
+     * @throws NullPointerException if the id is null
      */
-    public void setId(String id) { this.id = Objects.requireNonNull(id, "ID não pode ser nulo"); }
+    public void setId(String id) { this.id = Objects.requireNonNull(id, "ID cannot be null"); }
 
     /**
-     * Retorna o nome da carta.
+     * Returns the card's name.
      *
-     * @return o nome da carta
+     * @return the card name
      */
     public String getName() { return name; }
     
     /**
-     * Define o nome da carta.
+     * Sets the card's name.
      *
-     * @param name o novo nome da carta
-     * @throws NullPointerException se o nome for nulo
+     * @param name the new card name
+     * @throws NullPointerException if the name is null
      */
-    public void setName(String name) { this.name = Objects.requireNonNull(name, "Nome não pode ser nulo"); }
+    public void setName(String name) { this.name = Objects.requireNonNull(name, "Name cannot be null"); }
 
     /**
-     * Retorna o valor de ataque da carta.
+     * Returns the card's attack value.
      *
-     * @return o valor de ataque da carta
+     * @return the card's attack value
      */
     public int getAttack() { return attack; }
     
     /**
-     * Define o valor de ataque da carta.
-     * Valores negativos são convertidos para zero.
+     * Sets the card's attack value.
+     * Negative values are converted to zero.
      *
-     * @param attack o novo valor de ataque da carta
+     * @param attack the new attack value for the card
      */
     public void setAttack(int attack) { this.attack = Math.max(0, attack); }
 
     /**
-     * Retorna o valor de defesa da carta.
+     * Returns the card's defense value.
      *
-     * @return o valor de defesa da carta
+     * @return the card's defense value
      */
     public int getDefense() { return defense; }
     
     /**
-     * Define o valor de defesa da carta.
-     * Valores negativos são convertidos para zero.
+     * Sets the card's defense value.
+     * Negative values are converted to zero.
      *
-     * @param defense o novo valor de defesa da carta
+     * @param defense the new defense value for the card
      */
     public void setDefense(int defense) { this.defense = Math.max(0, defense); }
 
     /**
-     * Retorna a raridade da carta.
+     * Returns the card's rarity.
      *
-     * @return a raridade da carta
+     * @return the card's rarity
      */
     public String getRarity() { return rarity; }
     
     /**
-     * Define a raridade da carta.
+     * Sets the card's rarity.
      *
-     * @param rarity a nova raridade da carta
-     * @throws NullPointerException se a raridade for nula
+     * @param rarity the new card rarity
+     * @throws NullPointerException if the rarity is null
      */
-    public void setRarity(String rarity) { this.rarity = Objects.requireNonNull(rarity, "Raridade não pode ser nula"); }
+    public void setRarity(String rarity) { this.rarity = Objects.requireNonNull(rarity, "Rarity cannot be null"); }
 
     /**
-     * Retorna o tipo da carta.
+     * Returns the card's type.
      *
-     * @return o tipo da carta
+     * @return the card's type
      */
     public CardType getCardType() { return cardType; }
     
     /**
-     * Define o tipo da carta.
+     * Sets the card's type.
      *
-     * @param cardType o novo tipo da carta
-     * @throws NullPointerException se o tipo for nulo
+     * @param cardType the new card type
+     * @throws NullPointerException if the type is null
      */
-    public void setCardType(CardType cardType) { this.cardType = Objects.requireNonNull(cardType, "Tipo de carta não pode ser nulo"); }
+    public void setCardType(CardType cardType) { this.cardType = Objects.requireNonNull(cardType, "Card type cannot be null"); }
 
     /**
-     * Retorna a descrição do efeito da carta.
+     * Returns the card's effect description.
      *
-     * @return a descrição do efeito da carta
+     * @return the card's effect description
      */
     public String getEffectDescription() { return effectDescription; }
     
     /**
-     * Define a descrição do efeito da carta.
+     * Sets the card's effect description.
      *
-     * @param effectDescription a nova descrição do efeito da carta
-     * @throws NullPointerException se a descrição for nula
+     * @param effectDescription the new effect description for the card
+     * @throws NullPointerException if the description is null
      */
-    public void setEffectDescription(String effectDescription) { this.effectDescription = Objects.requireNonNull(effectDescription, "Descrição do efeito não pode ser nula"); }
+    public void setEffectDescription(String effectDescription) { this.effectDescription = Objects.requireNonNull(effectDescription, "Effect description cannot be null"); }
 
     /**
-     * Retorna o custo em mana da carta.
+     * Returns the card's mana cost.
      *
-     * @return o custo em mana da carta
+     * @return the card's mana cost
      */
     public int getManaCost() { return manaCost; }
     
     /**
-     * Define o custo em mana da carta.
-     * Valores negativos são convertidos para zero.
+     * Sets the card's mana cost.
+     * Negative values are converted to zero.
      *
-     * @param manaCost o novo custo em mana da carta
+     * @param manaCost the new mana cost for the card
      */
     public void setManaCost(int manaCost) { this.manaCost = Math.max(0, manaCost); }
 
     /**
-     * Compara esta carta com outro objeto para verificar igualdade.
-     * Duas cartas são consideradas iguais se possuírem o mesmo ID.
+     * Compares this card with another object to check equality.
+     * Two cards are considered equal if they have the same ID.
      *
-     * @param o o objeto a ser comparado
-     * @return true se os objetos forem iguais, false caso contrário
+     * @param o the object to compare
+     * @return true if the objects are equal, false otherwise
      */
     @Override
     public boolean equals(Object o) {
@@ -202,10 +201,10 @@ public class Card {
     }
 
     /**
-     * Retorna o código hash para esta carta.
-     * O código hash é baseado no ID da carta.
+     * Returns the hash code for this card.
+     * The hash code is based on the card's ID.
      *
-     * @return o código hash da carta
+     * @return the card's hash code
      */
     @Override
     public int hashCode() {
@@ -213,9 +212,9 @@ public class Card {
     }
 
     /**
-     * Retorna uma representação em string desta carta.
+     * Returns a string representation of this card.
      *
-     * @return uma string que representa a carta
+     * @return a string representing the card
      */
     @Override
     public String toString() {

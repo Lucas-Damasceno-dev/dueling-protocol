@@ -1,3 +1,4 @@
-#!/bin/bash
-echo ">>> Iniciando o GameClient com Docker..."
-docker run -it --network=host dueling-protocol java -cp app.jar GameClient
+#!/usr/bin/env bash
+
+# Run the client
+./scripts/run_client.sh

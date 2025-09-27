@@ -22,3 +22,32 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Environment files
+.env
+
+# IDE specific files
+.idea/
+.vscode/
+.settings/
+
+# Build directories
+target/
+bin/
+build/
+
+# Eclipse files
+.classpath
+.project
+
+# Maven
+dependency-reduced-pom.xml
+
+# Temporary files
+*.tmp
+*.temp
+
+# Script directories
+scripts/
+docker/
+test_scripts/

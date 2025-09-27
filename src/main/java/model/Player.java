@@ -7,9 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Representa um jogador no jogo Dueling Protocol.
- * Um jogador possui atributos como vida, moedas, cartas e características
- * como raça e classe que influenciam seus atributos base.
+ * Represents a player in the Dueling Protocol game.
+ * A player has attributes such as health, coins, cards and characteristics
+ * such as race and class that influence their base attributes.
  */
 public class Player {
     private String id;
@@ -28,20 +28,20 @@ public class Player {
     private static final Logger logger = LoggerFactory.getLogger(Player.class);
 
     /**
-     * Construtor padrão para a classe Player.
-     * Inicializa a coleção de cartas como uma lista vazia.
+     * Default constructor for the Player class.
+     * Initializes the card collection as an empty list.
      */
     public Player() {
     this.cardCollection = new ArrayList<>();
     }
     
     /**
-     * Construtor para criar um jogador com ID e nickname especificados.
-     * Inicializa os atributos padrão do jogador, incluindo moedas, pontos de vida
-     * e um deck inicial de cartas.
+     * Constructor to create a player with specified ID and nickname.
+     * Initializes the player's default attributes, including coins, health points
+     * and an initial deck of cards.
      *
-     * @param id Identificador único do jogador
-     * @param nickname Nome de exibição do jogador
+     * @param id Unique identifier of the player
+     * @param nickname Display name of the player
      */
     public Player(String id, String nickname) {
     this.cardCollection = new ArrayList<>();
@@ -51,44 +51,44 @@ public class Player {
     this.healthPoints = 100;
     this.upgradePoints = 0;
     initializeStarterDeck();
-    logger.debug("Novo jogador criado: {} ({})", nickname, id);
+    logger.debug("New player created: {} ({})", nickname, id);
     }
 
     /**
-     * Configura a raça e classe do personagem do jogador.
-     * Aplica os bônus de atributos correspondentes à combinação de raça e classe.
+     * Sets the player's character race and class.
+     * Applies attribute bonuses corresponding to the race and class combination.
      *
-     * @param race Raça do personagem (ex: "Elfo", "Anão", "Humano", "Orc")
-     * @param playerClass Classe do personagem (ex: "Mago", "Arqueiro", "Guerreiro", "Ladino")
+     * @param race Character race (e.g.: "Elf", "Dwarf", "Human", "Orc")
+     * @param playerClass Character class (e.g.: "Mage", "Archer", "Warrior", "Rogue")
      */
     public void setCharacter(String race, String playerClass) {
         this.playerRace = race;
         this.playerClass = playerClass;
         applyAttributeBonuses();
-        logger.info("Personagem configurado: {} como {} {}", id, race, playerClass);
+        logger.info("Character set: {} as {} {}", id, race, playerClass);
     }
 
     /**
-     * Inicializa o deck inicial do jogador com cartas básicas.
-     * Adiciona 5 cartas básicas do tipo ATTACK ao deck do jogador.
+     * Initializes the player's initial deck with basic cards.
+     * Adds 5 basic ATTACK-type cards to the player's deck.
      */
     private void initializeStarterDeck() {
         // Add basic cards to starter deck
         for (int i = 0; i < 5; i++) {
             this.cardCollection.add(new Card(
                 "basic-" + i,
-                "Carta Básica " + i,
-                1, 1, "Comum",
+                "Basic Card " + i,
+                1, 1, "Common",
                 Card.CardType.ATTACK,
-                "Ataque padrão", 1
+                "Standard attack", 1
             ));
         }
-        logger.debug("Deck inicial criado com {} cartas para o jogador {}", cardCollection.size(), id);
+        logger.debug("Starter deck created with {} cards for player {}", cardCollection.size(), id);
     }
 
     /**
-     * Aplica os bônus de atributos baseados na raça e classe do jogador.
-     * Os bônus variam de acordo com a combinação específica de raça e classe.
+     * Applies attribute bonuses based on the player's race and class.
+     * Bonuses vary according to the specific race and class combination.
      */
     private void applyAttributeBonuses() {
         // Reset attributes
@@ -97,26 +97,26 @@ public class Player {
         this.baseMana = 5;
         
         // Apply race and class bonuses
-        if ("Elfo".equals(this.playerRace)) {
+        if ("Elf".equals(this.playerRace)) {
             this.baseMana += 3;
-            if ("Mago".equals(this.playerClass)) {
+            if ("Mage".equals(this.playerClass)) {
                 this.baseAttack += 2;
                 this.baseMana += 5;
-            } else if ("Arqueiro".equals(this.playerClass)) {
+            } else if ("Archer".equals(this.playerClass)) {
                 this.baseAttack += 5;
                 this.baseDefense += 2;
             }
-        } else if ("Anão".equals(this.playerRace)) {
+        } else if ("Dwarf".equals(this.playerRace)) {
             this.baseDefense += 5;
-            if ("Guerreiro".equals(this.playerClass)) {
+            if ("Warrior".equals(this.playerClass)) {
                 this.baseAttack += 5;
                 this.baseDefense += 5;
-            } else if ("Ladino".equals(this.playerClass)) {
+            } else if ("Rogue".equals(this.playerClass)) {
                 this.baseAttack += 3;
                 this.baseDefense += 2;
                 this.baseMana += 2;
             }
-        } else if ("Humano".equals(this.playerRace)) {
+        } else if ("Human".equals(this.playerRace)) {
             // Balanced bonuses
             this.baseAttack += 2;
             this.baseDefense += 2;
@@ -127,170 +127,170 @@ public class Player {
             this.baseMana -= 1;
         }
         
-        logger.debug("Atributos aplicados para {}: Atk={}, Def={}, Mana={}", 
+        logger.debug("Attributes applied for {}: Atk={}, Def={}, Mana={}", 
                     id, baseAttack, baseDefense, baseMana);
     }
 
     // Getters and setters
     /**
-     * Retorna a raça do personagem do jogador.
+     * Returns the player's character race.
      *
-     * @return a raça do personagem
+     * @return the character race
      */
     public String getPlayerRace() { return playerRace; }
     
     /**
-     * Define a raça do personagem do jogador.
+     * Sets the player's character race.
      *
-     * @param playerRace a nova raça do personagem
+     * @param playerRace the new character race
      */
     public void setPlayerRace(String playerRace) { this.playerRace = playerRace; }
     
     /**
-     * Retorna a classe do personagem do jogador.
+     * Returns the player's character class.
      *
-     * @return a classe do personagem
+     * @return the character class
      */
     public String getPlayerClass() { return playerClass; }
     
     /**
-     * Define a classe do personagem do jogador.
+     * Sets the player's character class.
      *
-     * @param playerClass a nova classe do personagem
+     * @param playerClass the new character class
      */
     public void setPlayerClass(String playerClass) { this.playerClass = playerClass; }
     
     /**
-     * Retorna os pontos de vida do jogador.
+     * Returns the player's health points.
      *
-     * @return os pontos de vida do jogador
+     * @return the player's health points
      */
     public int getHealthPoints() { return healthPoints; }
     
     /**
-     * Define os pontos de vida do jogador.
-     * Valores negativos são convertidos para zero.
+     * Sets the player's health points.
+     * Negative values are converted to zero.
      *
-     * @param healthPoints os novos pontos de vida do jogador
+     * @param healthPoints the new health points for the player
      */
     public void setHealthPoints(int healthPoints) { 
         this.healthPoints = Math.max(0, healthPoints); // Ensure health doesn't go below 0
     }
     
     /**
-     * Retorna os pontos de melhoria disponíveis para o jogador.
+     * Returns the player's available upgrade points.
      *
-     * @return os pontos de melhoria do jogador
+     * @return the player's upgrade points
      */
     public int getUpgradePoints() { return upgradePoints; }
     
     /**
-     * Define os pontos de melhoria do jogador.
-     * Valores negativos são convertidos para zero.
+     * Sets the player's upgrade points.
+     * Negative values are converted to zero.
      *
-     * @param upgradePoints os novos pontos de melhoria do jogador
+     * @param upgradePoints the new upgrade points for the player
      */
     public void setUpgradePoints(int upgradePoints) { this.upgradePoints = Math.max(0, upgradePoints); }
     
     /**
-     * Retorna o ataque base do jogador.
+     * Returns the player's base attack.
      *
-     * @return o ataque base do jogador
+     * @return the player's base attack
      */
     public int getBaseAttack() { return baseAttack; }
     
     /**
-     * Define o ataque base do jogador.
-     * Valores negativos são convertidos para zero.
+     * Sets the player's base attack.
+     * Negative values are converted to zero.
      *
-     * @param baseAttack o novo ataque base do jogador
+     * @param baseAttack the new base attack for the player
      */
     public void setBaseAttack(int baseAttack) { this.baseAttack = Math.max(0, baseAttack); }
     
     /**
-     * Retorna a defesa base do jogador.
+     * Returns the player's base defense.
      *
-     * @return a defesa base do jogador
+     * @return the player's base defense
      */
     public int getBaseDefense() { return baseDefense; }
     
     /**
-     * Define a defesa base do jogador.
-     * Valores negativos são convertidos para zero.
+     * Sets the player's base defense.
+     * Negative values are converted to zero.
      *
-     * @param baseDefense a nova defesa base do jogador
+     * @param baseDefense the new base defense for the player
      */
     public void setBaseDefense(int baseDefense) { this.baseDefense = Math.max(0, baseDefense); }
     
     /**
-     * Retorna o mana base do jogador.
+     * Returns the player's base mana.
      *
-     * @return o mana base do jogador
+     * @return the player's base mana
      */
     public int getBaseMana() { return baseMana; }
     
     /**
-     * Define o mana base do jogador.
-     * Valores negativos são convertidos para zero.
+     * Sets the player's base mana.
+     * Negative values are converted to zero.
      *
-     * @param baseMana o novo mana base do jogador
+     * @param baseMana the new base mana for the player
      */
     public void setBaseMana(int baseMana) { this.baseMana = Math.max(0, baseMana); }
 
     /**
-     * Retorna o identificador único do jogador.
+     * Returns the player's unique identifier.
      *
-     * @return o ID do jogador
+     * @return the player ID
      */
     public String getId() { return id; }
     
     /**
-     * Define o identificador único do jogador.
+     * Sets the player's unique identifier.
      *
-     * @param id o novo ID do jogador
+     * @param id the new player ID
      */
     public void setId(String id) { this.id = id; }
     
     /**
-     * Retorna o nome de exibição do jogador.
+     * Returns the player's display name.
      *
-     * @return o nickname do jogador
+     * @return the player's nickname
      */
     public String getNickname() { return nickname; }
     
     /**
-     * Define o nome de exibição do jogador.
+     * Sets the player's display name.
      *
-     * @param nickname o novo nickname do jogador
+     * @param nickname the new player nickname
      */
     public void setNickname(String nickname) { this.nickname = nickname; }
     
     /**
-     * Retorna a quantidade de moedas do jogador.
+     * Returns the player's coin amount.
      *
-     * @return a quantidade de moedas do jogador
+     * @return the player's coin amount
      */
     public int getCoins() { return coins; }
     
     /**
-     * Define a quantidade de moedas do jogador.
-     * Valores negativos são convertidos para zero.
+     * Sets the player's coin amount.
+     * Negative values are converted to zero.
      *
-     * @param coins a nova quantidade de moedas do jogador
+     * @param coins the new coin amount for the player
      */
     public void setCoins(int coins) { this.coins = Math.max(0, coins); }
     
     /**
-     * Retorna a coleção de cartas do jogador.
+     * Returns the player's card collection.
      *
-     * @return a lista de cartas do jogador
+     * @return the player's card list
      */
     public List<Card> getCardCollection() { return cardCollection; }
     
     /**
-     * Define a coleção de cartas do jogador.
+     * Sets the player's card collection.
      *
-     * @param cardCollection a nova lista de cartas do jogador
+     * @param cardCollection the new card list for the player
      */
     public void setCardCollection(List<Card> cardCollection) { this.cardCollection = cardCollection; }
 }
