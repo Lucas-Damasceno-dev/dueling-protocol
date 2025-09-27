@@ -20,14 +20,37 @@ public class PlayerRepositoryJson implements PlayerRepository {
     private static final Logger logger = LoggerFactory.getLogger(PlayerRepositoryJson.class);
 
     /**
+     * Sanitizes a player ID to prevent path traversal attacks.
+     * Only allows alphanumeric characters, hyphens, underscores, and periods.
+     * 
+     * @param playerId the player ID to sanitize
+     * @return a sanitized version of the player ID
+     */
+    private String sanitizePlayerId(String playerId) {
+        if (playerId == null) {
+            throw new IllegalArgumentException("Player ID cannot be null");
+        }
+        // Remove any path traversal sequences
+        String sanitized = playerId.replaceAll("\\.\\./", "").replaceAll("\\.\\.\\\\", "");
+        // Only allow safe characters
+        sanitized = sanitized.replaceAll("[^a-zA-Z0-9\\-_\\.]", "_");
+        // Ensure it doesn't start with a dot to prevent hidden files
+        if (sanitized.startsWith(".")) {
+            sanitized = "_" + sanitized.substring(1);
+        }
+        return sanitized;
+    }
+
+    /**
      * {@inheritDoc}
      * Saves a player to a JSON file named after their ID.
      *
      * @param player the player to save
      */
     @Override
-    public void save(Player player) {
+    public synchronized void save(Player player) {
         try {
+            String sanitizedId = sanitizePlayerId(player.getId());
             File dir = new File(basePath);
             if (!dir.exists()) {
                 if (!dir.mkdirs()) {
@@ -35,7 +58,7 @@ public class PlayerRepositoryJson implements PlayerRepository {
                     return;
                 }
             }
-            FileWriter writer = new FileWriter(basePath + player.getId() + ".json");
+            FileWriter writer = new FileWriter(basePath + sanitizedId + ".json");
             gson.toJson(player, writer);
             writer.close();
             logger.debug("Player {} saved successfully", player.getId());
@@ -52,9 +75,10 @@ public class PlayerRepositoryJson implements PlayerRepository {
      * @return an Optional containing the player if found, or empty if not found
      */
     @Override
-    public Optional<Player> findById(String id) {
+    public synchronized Optional<Player> findById(String id) {
         try {
-            File file = new File(basePath + id + ".json");
+            String sanitizedId = sanitizePlayerId(id);
+            File file = new File(basePath + sanitizedId + ".json");
             if (!file.exists()) {
                 logger.debug("Player file {} not found", id);
                 return Optional.empty();
@@ -77,7 +101,7 @@ public class PlayerRepositoryJson implements PlayerRepository {
      * @param player the player to update
      */
     @Override
-    public void update(Player player) {
+    public synchronized void update(Player player) {
         save(player);
     }
 }

@@ -23,6 +23,8 @@ public class ClientHandler implements Runnable {
     private Player player; // Stores the player for this session
     
     private static final Logger logger = LoggerFactory.getLogger(ClientHandler.class);
+    private static final long INACTIVITY_TIMEOUT_MS = 300000; // 5 minutes
+    private volatile long lastActivityTime;
 
     /**
      * Constructs a new ClientHandler for the specified client socket and game facade.
@@ -34,6 +36,7 @@ public class ClientHandler implements Runnable {
         this.clientSocket = socket;
         this.gameFacade = facade;
         this.playerRepository = new PlayerRepositoryJson();
+        this.lastActivityTime = System.currentTimeMillis();
     }
 
     /**
@@ -46,17 +49,43 @@ public class ClientHandler implements Runnable {
             PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))
         ) {
+            // Start timeout checking thread
+            Thread timeoutThread = new Thread(() -> {
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        Thread.sleep(30000); // Check every 30 seconds
+                        if (System.currentTimeMillis() - lastActivityTime > INACTIVITY_TIMEOUT_MS) {
+                            logger.warn("Client {} disconnected due to inactivity timeout", 
+                                       player != null ? player.getId() : "unknown");
+                            try {
+                                clientSocket.close();
+                            } catch (Exception e) {
+                                logger.warn("Error closing socket due to timeout: {}", e.getMessage());
+                            }
+                            break;
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            });
+            timeoutThread.start();
+            
             String inputLine;
             while ((inputLine = in.readLine()) != null) {
+                lastActivityTime = System.currentTimeMillis(); // Update last activity time
                 logger.debug("Command received: {}", inputLine);
                 String[] command = inputLine.split(":");
                 processCommand(command, out);
             }
+            
+            timeoutThread.interrupt(); // Stop timeout thread when main loop ends
         } catch (Exception e) {
             logger.warn("Connection with client lost: {}", e.getMessage(), e);
         } finally {
             if (player != null) {
-                gameFacade.removeClient(player.getId());
+                gameFacade.removeClientAndCleanUp(player.getId());
                 logger.info("Client {} from {} disconnected", player.getId(), clientSocket.getInetAddress().getHostAddress());
             } else {
                 logger.info("Client from {} disconnected (player was not created)", clientSocket.getInetAddress().getHostAddress());
@@ -90,9 +119,17 @@ public class ClientHandler implements Runnable {
         if (this.player == null) {
             this.player = getOrCreatePlayer(playerId);
             gameFacade.registerClient(playerId, out);
+        } else {
+            // Verify that the command is from the authenticated player (prevent ID spoofing)
+            if (!this.player.getId().equals(playerId)) {
+                logger.warn("ID Spoofing attempt: Connection authenticated as {} but command sent for {}", 
+                           this.player.getId(), playerId);
+                out.println("ERROR:Authentication mismatch. Disconnecting.");
+                return;
+            }
         }
 
-        Player player = getOrCreatePlayer(playerId);
+        Player player = this.player;
 
         switch (action) {
             case "CHARACTER_SETUP":

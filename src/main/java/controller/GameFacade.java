@@ -61,6 +61,42 @@ public class GameFacade {
         activeClients.remove(playerId);
         logger.info("Client removed: {}", playerId);
     }
+    
+    /**
+     * Removes a client connection and cleans up any active games they were involved in.
+     *
+     * @param playerId the unique identifier of the player
+     */
+    public void removeClientAndCleanUp(String playerId) {
+        // Find and remove any active games involving this player
+        List<String> gamesToRemove = new ArrayList<>();
+        for (Map.Entry<String, GameSession> entry : activeGames.entrySet()) {
+            GameSession session = entry.getValue();
+            if (session.getPlayer1().getId().equals(playerId) || session.getPlayer2().getId().equals(playerId)) {
+                gamesToRemove.add(entry.getKey());
+            }
+        }
+        
+        // Remove the games and notify the remaining players if any
+        for (String matchId : gamesToRemove) {
+            GameSession session = activeGames.remove(matchId);
+            if (session != null) {
+                String opponentId = session.getPlayer1().getId().equals(playerId) ? 
+                    session.getPlayer2().getId() : session.getPlayer1().getId();
+                
+                // Notify the opponent that the game is over due to disconnection
+                PrintWriter opponentOut = activeClients.get(opponentId);
+                if (opponentOut != null) {
+                    opponentOut.println("UPDATE:GAME_OVER:OPPONENT_DISCONNECT");
+                }
+                
+                logger.info("Game {} removed due to player {} disconnection", matchId, playerId);
+            }
+        }
+        
+        activeClients.remove(playerId);
+        logger.info("Client removed and games cleaned up: {}", playerId);
+    }
 
     /**
      * Adds a player to the matchmaking queue.

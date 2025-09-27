@@ -1,17 +1,17 @@
 package repository;
 
 import model.Player;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * In-memory implementation of the PlayerRepository interface.
- * Stores player data in a HashMap for quick access during gameplay.
+ * Stores player data in a ConcurrentHashMap for thread-safe access during gameplay.
  * Note: This implementation does not persist data between server restarts.
  */
 public class InMemoryPlayerRepository implements PlayerRepository {
-    private final Map<String, Player> players = new HashMap<>();
+    private final Map<String, Player> players = new ConcurrentHashMap<>();
     
     /**
      * {@inheritDoc}
