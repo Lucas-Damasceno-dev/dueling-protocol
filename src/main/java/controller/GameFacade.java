@@ -10,6 +10,7 @@ import service.matchmaking.MatchmakingService;
 import service.store.StoreService;
 import service.store.StoreServiceImpl;
 import service.store.PurchaseResult;
+import pubsub.EventManager;
 
 import java.io.PrintWriter;
 import java.util.*;
@@ -29,16 +30,26 @@ public class GameFacade {
     private final PlayerRepository playerRepository;
     private final Map<String, GameSession> activeGames = new ConcurrentHashMap<>();
     private final Map<String, PrintWriter> activeClients = new ConcurrentHashMap<>();
+    private final EventManager eventManager;
     
     private static final Logger logger = LoggerFactory.getLogger(GameFacade.class);
 
     /**
      * Constructs a new GameFacade with default implementations for services.
      */
-    public GameFacade() {
+    public GameFacade(EventManager eventManager) {
         this.matchmakingService = ConcurrentMatchmakingService.getInstance();
         this.storeService = new StoreServiceImpl();
         this.playerRepository = new PlayerRepositoryJson();
+        this.eventManager = eventManager;
+    }
+
+    /**
+     * Gets the EventManager instance.
+     * @return The event manager.
+     */
+    public EventManager getEventManager() {
+        return this.eventManager;
     }
 
     /**
@@ -49,17 +60,8 @@ public class GameFacade {
      */
     public void registerClient(String playerId, PrintWriter writer) {
         activeClients.put(playerId, writer);
-        logger.info("Client registered: {}", playerId);
-    }
-
-    /**
-     * Removes a client connection from the game facade.
-     *
-     * @param playerId the unique identifier of the player
-     */
-    public void removeClient(String playerId) {
-        activeClients.remove(playerId);
-        logger.info("Client removed: {}", playerId);
+        eventManager.subscribe(playerId, writer); // Subscribe the client to its topic
+        logger.info("Client registered and subscribed: {}", playerId);
     }
     
     /**
@@ -68,6 +70,11 @@ public class GameFacade {
      * @param playerId the unique identifier of the player
      */
     public void removeClientAndCleanUp(String playerId) {
+        PrintWriter writer = activeClients.remove(playerId);
+        if (writer != null) {
+            eventManager.unsubscribe(playerId, writer); // Unsubscribe the client
+        }
+
         // Find and remove any active games involving this player
         List<String> gamesToRemove = new ArrayList<>();
         for (Map.Entry<String, GameSession> entry : activeGames.entrySet()) {
@@ -85,17 +92,13 @@ public class GameFacade {
                     session.getPlayer2().getId() : session.getPlayer1().getId();
                 
                 // Notify the opponent that the game is over due to disconnection
-                PrintWriter opponentOut = activeClients.get(opponentId);
-                if (opponentOut != null) {
-                    opponentOut.println("UPDATE:GAME_OVER:OPPONENT_DISCONNECT");
-                }
+                notifyPlayer(opponentId, "UPDATE:GAME_OVER:OPPONENT_DISCONNECT");
                 
                 logger.info("Game {} removed due to player {} disconnection", matchId, playerId);
             }
         }
         
-        activeClients.remove(playerId);
-        logger.info("Client removed and games cleaned up: {}", playerId);
+        logger.info("Client removed, unsubscribed, and games cleaned up: {}", playerId);
     }
 
     /**
@@ -114,50 +117,52 @@ public class GameFacade {
      * If a match is found, a new game session is created and both players are notified.
      */
     public void tryToCreateMatch() {
-    matchmakingService.findMatch().ifPresent(match -> {
-        Player p1 = match.getPlayer1();
-        Player p2 = match.getPlayer2();
+        matchmakingService.findMatch().ifPresent(match -> {
+            Player p1 = match.getPlayer1();
+            Player p2 = match.getPlayer2();
 
-        if (!activeClients.containsKey(p1.getId()) || !activeClients.containsKey(p2.getId())) {
-            logger.warn("Match cancelled. One or both players ({}, {}) disconnected before start.", p1.getId(), p2.getId());
+            if (!activeClients.containsKey(p1.getId()) || !activeClients.containsKey(p2.getId())) {
+                logger.warn("Match cancelled. One or both players ({}, {}) disconnected before start.", p1.getId(), p2.getId());
 
-            if (activeClients.containsKey(p1.getId())) {
-                matchmakingService.addPlayerToQueue(p1);
-                logger.info("Player {} returned to queue.", p1.getId());
+                if (activeClients.containsKey(p1.getId())) {
+                    matchmakingService.addPlayerToQueue(p1);
+                    logger.info("Player {} returned to queue.", p1.getId());
+                }
+                if (activeClients.containsKey(p2.getId())) {
+                    matchmakingService.addPlayerToQueue(p2);
+                    logger.info("Player {} returned to queue.", p2.getId());
+                }
+                return; 
             }
-            if (activeClients.containsKey(p2.getId())) {
-                matchmakingService.addPlayerToQueue(p2);
-                logger.info("Player {} returned to queue.", p2.getId());
-            }
-            return; 
-        }
 
-        String matchId = UUID.randomUUID().toString();
+            String matchId = UUID.randomUUID().toString();
+            List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
+            List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
 
-        PrintWriter outP1 = activeClients.get(p1.getId());
-        PrintWriter outP2 = activeClients.get(p2.getId());
+            GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this);
+            session.startGame();
+            activeGames.put(matchId, session);
+            
+            logger.info("New match created between {} and {} with ID {}", p1.getId(), p2.getId(), matchId);
 
-        if (outP1 == null || outP2 == null) {
-            logger.error("Critical failure: Active client for {} or {} not found, even after initial verification.", p1.getId(), p2.getId());
-            return;
-        }
+            // Notify players using the EventManager
+            notifyPlayer(p1.getId(), "UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
+            notifyPlayer(p2.getId(), "UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
 
-        List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
-        List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
+            notifyPlayer(p1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
+            notifyPlayer(p2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
+        });
+    }
 
-        GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this);
-        session.startGame();
-        activeGames.put(matchId, session);
-        
-        logger.info("New match created between {} and {} with ID {}", p1.getId(), p2.getId(), matchId);
-
-        outP1.println("UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
-        outP2.println("UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
-
-        outP1.println("UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
-        outP2.println("UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
-    });
-}
+    /**
+     * Sends a notification message to a single player.
+     *
+     * @param playerId the player ID to notify
+     * @param message the message to send
+     */
+    public void notifyPlayer(String playerId, String message) {
+        eventManager.publish(playerId, message);
+    }
 
     /**
      * Sends a notification message to a list of players.
@@ -166,11 +171,8 @@ public class GameFacade {
      * @param message the message to send
      */
     public void notifyPlayers(List<String> playerIds, String message) {
-        for (String id : playerIds) {
-            PrintWriter writer = activeClients.get(id);
-            if (writer != null) {
-                writer.println(message);
-            }
+        for (String playerId : playerIds) {
+            notifyPlayer(playerId, message);
         }
     }
 
@@ -190,7 +192,7 @@ public class GameFacade {
      * Processes a game command from a player.
      *
      * @param command the command array received from the client
-     * @param out the PrintWriter for sending responses to the client
+     * @param out the PrintWriter for sending responses to the client (used for direct success/error feedback)
      */
     public void processGameCommand(String[] command, PrintWriter out) {
         if (command.length < 3) {
@@ -260,15 +262,9 @@ public class GameFacade {
             logger.info("Match {} finished. {} won {} points!", matchId, winner.getNickname(), pointsEarned);
         }
 
-        PrintWriter winnerOut = activeClients.get(winnerId);
-        if (winnerOut != null) {
-            winnerOut.println("UPDATE:GAME_OVER:VICTORY");
-        }
-
-        PrintWriter loserOut = activeClients.get(loserId);
-        if (loserOut != null) {
-            loserOut.println("UPDATE:GAME_OVER:DEFEAT");
-        }
+        // Notify players using the EventManager
+        notifyPlayer(winnerId, "UPDATE:GAME_OVER:VICTORY");
+        notifyPlayer(loserId, "UPDATE:GAME_OVER:DEFEAT");
         
         logger.info("Match {} finished. Winner: {}, Loser: {}", matchId, winnerId, loserId);
     }
