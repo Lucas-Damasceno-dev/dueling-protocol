@@ -226,6 +226,16 @@ public class GameFacade {
     }
 
     /**
+     * Finds a player by their ID.
+     *
+     * @param playerId the ID of the player to find
+     * @return the Player object, or null if not found
+     */
+    public Player findPlayerById(String playerId) {
+        return playerRepository.findById(playerId).orElse(null);
+    }
+
+    /**
      * Processes a card pack purchase for a player.
      *
      * @param player the player purchasing the card pack
