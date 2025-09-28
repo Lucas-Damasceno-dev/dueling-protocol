@@ -8,41 +8,26 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 /**
  * Thread-safe implementation of the MatchmakingService interface.
  * Uses a concurrent queue to manage the player matchmaking queue and ensures
  * thread safety when multiple players are added to the queue simultaneously.
+ * This service is managed by the Spring container as a singleton.
  */
+@Service
 public class ConcurrentMatchmakingService implements MatchmakingService {
 
-    private static volatile ConcurrentMatchmakingService instance;
     private final Queue<Player> matchmakingQueue = new ConcurrentLinkedQueue<>();
     private final Object lock = new Object();
     
     private static final Logger logger = LoggerFactory.getLogger(ConcurrentMatchmakingService.class);
 
     /**
-     * Private constructor to enforce singleton pattern.
+     * Public constructor for Spring's dependency injection.
      */
-    private ConcurrentMatchmakingService() {}
-
-    /**
-     * Gets the singleton instance of ConcurrentMatchmakingService.
-     * Uses double-checked locking for thread-safe lazy initialization.
-     *
-     * @return the singleton instance of ConcurrentMatchmakingService
-     */
-    public static ConcurrentMatchmakingService getInstance() {
-        if (instance == null) {
-            synchronized (ConcurrentMatchmakingService.class) {
-                if (instance == null) {
-                    instance = new ConcurrentMatchmakingService();
-                }
-            }
-        }
-        return instance;
-    }
+    public ConcurrentMatchmakingService() {}
 
     /**
      * {@inheritDoc}
@@ -57,6 +42,8 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
             return;
         }
         
+        // The contains check is not atomic with the offer, but it prevents spamming the logs
+        // for a player that is already waiting. ConcurrentLinkedQueue handles duplicates gracefully.
         if (!matchmakingQueue.contains(player)) {
             matchmakingQueue.offer(player);
             logger.info("{} entered the matchmaking queue", player.getNickname());
@@ -68,7 +55,8 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
     /**
      * {@inheritDoc}
      * Attempts to find a match between players in the queue.
-     * This method is synchronized to ensure that match creation is atomic.
+     * This method is synchronized to ensure that match creation is atomic,
+     * preventing a race condition where multiple threads might try to create a match with the same players.
      *
      * @return an Optional containing a Match if two players are available, or empty if not enough players
      */
@@ -84,7 +72,15 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
                     Match match = new Match(player1, player2);
                     return Optional.of(match);
                 } else {
-                    logger.warn("Error forming match: one or both players are null");
+                    // This case can happen if a player disconnects right after being polled
+                    logger.warn("Error forming match: one or both players are null after polling from queue.");
+                    // Re-queue the non-null player if one exists
+                    if (player1 != null) {
+                        addPlayerToQueue(player1);
+                    }
+                    if (player2 != null) {
+                        addPlayerToQueue(player2);
+                    }
                 }
             }
             return Optional.empty();

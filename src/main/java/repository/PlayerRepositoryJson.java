@@ -8,11 +8,13 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Repository;
 
 /**
  * JSON-based implementation of the PlayerRepository interface.
  * This class persists player data to individual JSON files in a "players" directory.
  */
+@Repository
 public class PlayerRepositoryJson implements PlayerRepository {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final String basePath = "players/";

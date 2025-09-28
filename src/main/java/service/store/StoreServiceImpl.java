@@ -9,12 +9,15 @@ import service.store.PurchaseResult.PurchaseStatus;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Implementation of the StoreService interface.
  * Handles the purchase of card packs, including stock management and player currency deduction.
  */
+@Service
 public class StoreServiceImpl implements StoreService {
     
     private static final Logger logger = LoggerFactory.getLogger(StoreServiceImpl.class);
