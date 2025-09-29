@@ -9,34 +9,24 @@ import service.store.PurchaseResult.PurchaseStatus;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.locks.ReentrantLock;
-
-/**
- * Implementation of the StoreService interface.
- * Handles the purchase of card packs, including stock management and player currency deduction.
- */
 @Service
 public class StoreServiceImpl implements StoreService {
     
     private static final Logger logger = LoggerFactory.getLogger(StoreServiceImpl.class);
-    private static final ReentrantLock packPurchaseLock = new ReentrantLock(true); // Fair lock
+    private final CardPackFactory cardPackFactory;
 
-    /**
-     * {@inheritDoc}
-     * Purchases a card pack for a player, deducting the cost from their coins and adding
-     * the cards to their collection. This method is thread-safe to prevent race conditions
-     * when multiple players try to purchase packs simultaneously.
-     *
-     * @param player the player purchasing the card pack
-     * @param packType the type of card pack to purchase (e.g., "BASIC", "PREMIUM", "LEGENDARY")
-     * @return a PurchaseResult indicating the success or failure of the purchase
-     */
+    @Autowired
+    public StoreServiceImpl(CardPackFactory cardPackFactory) {
+        this.cardPackFactory = cardPackFactory;
+    }
+
     @Override
     public PurchaseResult purchaseCardPack(Player player, String packType) {
         try {
-            CardPack pack = CardPackFactory.createCardPack(packType);
+            CardPack pack = cardPackFactory.createCardPack(packType);
 
             if (player.getCoins() < pack.getCost()) {
                 logger.warn("{} tried to buy {} but doesn't have enough coins (has: {}, needs: {})", 
@@ -44,22 +34,15 @@ public class StoreServiceImpl implements StoreService {
                 return PurchaseResult.failure(PurchaseStatus.INSUFFICIENT_FUNDS);
             }
 
-            List<Card> newCards;
-            packPurchaseLock.lock();
-            try {
-                newCards = pack.open();
-                if (newCards.isEmpty()) {
-                    logger.warn("{} failed to get cards from pack {}. Probably out of stock.", 
-                               player.getNickname(), pack.getName());
-                    return PurchaseResult.failure(PurchaseStatus.OUT_OF_STOCK);
-                }
-                
-                // Deduct coins only if the purchase is successful
-                player.setCoins(player.getCoins() - pack.getCost());
-                player.getCardCollection().addAll(newCards);
-            } finally {
-                packPurchaseLock.unlock();
+            List<Card> newCards = pack.open();
+            if (newCards.isEmpty()) {
+                logger.warn("{} failed to get cards from pack {}. Probably out of stock.", 
+                           player.getNickname(), pack.getName());
+                return PurchaseResult.failure(PurchaseStatus.OUT_OF_STOCK);
             }
+            
+            player.setCoins(player.getCoins() - pack.getCost());
+            player.getCardCollection().addAll(newCards);
 
             logger.info("{} bought a {} for {} coins and got {} cards.", 
                        player.getNickname(), pack.getName(), pack.getCost(), newCards.size());
@@ -68,8 +51,7 @@ public class StoreServiceImpl implements StoreService {
         } catch (Exception e) {
             logger.error("Error buying pack {} for player {}: {}", 
                         packType, player.getId(), e.getMessage(), e);
-            // In case of error, ideally the transaction would be rolled back, but for simplicity, we just log.
-            return PurchaseResult.failure(PurchaseStatus.PACK_NOT_FOUND); // Generic for other errors
+            return PurchaseResult.failure(PurchaseStatus.PACK_NOT_FOUND);
         }
     }
 }
