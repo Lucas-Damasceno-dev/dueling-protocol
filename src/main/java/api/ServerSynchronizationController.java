@@ -78,4 +78,25 @@ public class ServerSynchronizationController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @PostMapping("/lock/acquire")
+    public ResponseEntity<String> acquireLock() {
+        if (!leaderElectionService.isLeader()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("This server is not the leader.");
+        }
+        if (lockService.acquire()) {
+            return ResponseEntity.ok("Lock acquired.");
+        } else {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Lock already held.");
+        }
+    }
+
+    @PostMapping("/lock/release")
+    public ResponseEntity<String> releaseLock() {
+        if (!leaderElectionService.isLeader()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("This server is not the leader.");
+        }
+        lockService.release();
+        return ResponseEntity.ok("Lock released.");
+    }
 }

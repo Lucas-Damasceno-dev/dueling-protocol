@@ -51,4 +51,15 @@ public class ServerApiClient {
         ResponseEntity<Player> response = restTemplate.postForEntity(url, null, Player.class);
         return response.getBody();
     }
+
+    public boolean acquireLock(String leaderUrl) {
+        String url = leaderUrl + "/api/lock/acquire";
+        ResponseEntity<String> response = restTemplate.postForEntity(url, null, String.class);
+        return response.getStatusCode().is2xxSuccessful();
+    }
+
+    public void releaseLock(String leaderUrl) {
+        String url = leaderUrl + "/api/lock/release";
+        restTemplate.postForEntity(url, null, String.class);
+    }
 }
