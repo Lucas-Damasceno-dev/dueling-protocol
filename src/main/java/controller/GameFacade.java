@@ -9,7 +9,6 @@ import service.store.StoreService;
 import service.store.PurchaseResult;
 import pubsub.EventManager;
 
-import java.io.PrintWriter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -18,11 +17,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-/**
- * Facade class that provides a simplified interface for game operations.
- * This class coordinates between different services and manages game sessions,
- * player connections, and game flow.
- */
 @Service
 public class GameFacade {
     private final MatchmakingService matchmakingService;
@@ -30,11 +24,8 @@ public class GameFacade {
     private final PlayerRepository playerRepository;
     private final EventManager eventManager;
 
-    // --- ERROS CORRIGIDOS AQUI ---
     private static final Logger logger = LoggerFactory.getLogger(GameFacade.class);
     private final Map<String, GameSession> activeGames = new ConcurrentHashMap<>();
-    private final Map<String, PrintWriter> activeClients = new ConcurrentHashMap<>();
-    // --- FIM DA CORREÇÃO ---
 
     @Autowired
     public GameFacade(MatchmakingService matchmakingService, StoreService storeService, 
@@ -45,38 +36,29 @@ public class GameFacade {
         this.eventManager = eventManager;
     }
 
-    /**
-     * Gets the EventManager instance.
-     * @return The event manager.
-     */
     public EventManager getEventManager() {
         return this.eventManager;
     }
 
     /**
-     * Registers a client connection with the game facade.
+     * Registers a player with the system, preparing them to receive notifications.
      *
      * @param playerId the unique identifier of the player
-     * @param writer the PrintWriter for sending messages to the client
      */
-    public void registerClient(String playerId, PrintWriter writer) {
-        activeClients.put(playerId, writer);
-        eventManager.subscribe(playerId, writer); // Subscribe the client to its topic
-        logger.info("Client registered and subscribed: {}", playerId);
+    public void registerPlayer(String playerId) {
+        // The EventManager is responsible for handling subscriptions.
+        // We just need to ensure the player is known to the system.
+        logger.info("Player registered in facade: {}", playerId);
     }
     
     /**
-     * Removes a client connection and cleans up any active games they were involved in.
+     * Unregisters a player and cleans up any active games they were involved in.
      *
      * @param playerId the unique identifier of the player
      */
-    public void removeClientAndCleanUp(String playerId) {
-        PrintWriter writer = activeClients.remove(playerId);
-        if (writer != null) {
-            eventManager.unsubscribe(playerId, writer); // Unsubscribe the client
-        }
-
-        // Find and remove any active games involving this player
+    public void unregisterPlayer(String playerId) {
+        // EventManager handles unsubscriptions.
+        
         List<String> gamesToRemove = new ArrayList<>();
         for (Map.Entry<String, GameSession> entry : activeGames.entrySet()) {
             GameSession session = entry.getValue();
@@ -85,56 +67,35 @@ public class GameFacade {
             }
         }
         
-        // Remove the games and notify the remaining players if any
         for (String matchId : gamesToRemove) {
             GameSession session = activeGames.remove(matchId);
             if (session != null) {
                 String opponentId = session.getPlayer1().getId().equals(playerId) ? 
                     session.getPlayer2().getId() : session.getPlayer1().getId();
                 
-                // Notify the opponent that the game is over due to disconnection
                 notifyPlayer(opponentId, "UPDATE:GAME_OVER:OPPONENT_DISCONNECT");
                 
                 logger.info("Game {} removed due to player {} disconnection", matchId, playerId);
             }
         }
         
-        logger.info("Client removed, unsubscribed, and games cleaned up: {}", playerId);
+        logger.info("Player unregistered and games cleaned up: {}", playerId);
     }
 
-    /**
-     * Adds a player to the matchmaking queue.
-     *
-     * @param player the player to add to the matchmaking queue
-     */
     public void enterMatchmaking(Player player) {
         matchmakingService.addPlayerToQueue(player);
         logger.info("Player {} added to matchmaking queue", player.getId());
         tryToCreateMatch();
     }
 
-    /**
-     * Attempts to create a match between players in the matchmaking queue.
-     * If a match is found, a new game session is created and both players are notified.
-     */
     public void tryToCreateMatch() {
         matchmakingService.findMatch().ifPresent(match -> {
             Player p1 = match.getPlayer1();
             Player p2 = match.getPlayer2();
 
-            if (!activeClients.containsKey(p1.getId()) || !activeClients.containsKey(p2.getId())) {
-                logger.warn("Match cancelled. One or both players ({}, {}) disconnected before start.", p1.getId(), p2.getId());
-
-                if (activeClients.containsKey(p1.getId())) {
-                    matchmakingService.addPlayerToQueue(p1);
-                    logger.info("Player {} returned to queue.", p1.getId());
-                }
-                if (activeClients.containsKey(p2.getId())) {
-                    matchmakingService.addPlayerToQueue(p2);
-                    logger.info("Player {} returned to queue.", p2.getId());
-                }
-                return; 
-            }
+            // The check for active clients is removed. The WebSocket handler is now the source of truth for connectivity.
+            // A new mechanism will be needed to confirm players are still connected before starting a match.
+            // For now, we proceed assuming they are.
 
             String matchId = UUID.randomUUID().toString();
             List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
@@ -146,7 +107,6 @@ public class GameFacade {
             
             logger.info("New match created between {} and {} with ID {}", p1.getId(), p2.getId(), matchId);
 
-            // Notify players using the EventManager
             notifyPlayer(p1.getId(), "UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
             notifyPlayer(p2.getId(), "UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
 
@@ -155,34 +115,16 @@ public class GameFacade {
         });
     }
 
-    /**
-     * Sends a notification message to a single player.
-     *
-     * @param playerId the player ID to notify
-     * @param message the message to send
-     */
     public void notifyPlayer(String playerId, String message) {
         eventManager.publish(playerId, message);
     }
 
-    /**
-     * Sends a notification message to a list of players.
-     *
-     * @param playerIds the list of player IDs to notify
-     * @param message the message to send
-     */
     public void notifyPlayers(List<String> playerIds, String message) {
         for (String playerId : playerIds) {
             notifyPlayer(playerId, message);
         }
     }
 
-    /**
-     * Converts a list of cards to a comma-separated string of card IDs.
-     *
-     * @param cards the list of cards to convert
-     * @return a comma-separated string of card IDs
-     */
     private String getCardIds(List<Card> cards) {
         StringBuilder sb = new StringBuilder();
         cards.forEach(c -> sb.append(c.getId()).append(","));
@@ -193,12 +135,17 @@ public class GameFacade {
      * Processes a game command from a player.
      *
      * @param command the command array received from the client
-     * @param out the PrintWriter for sending responses to the client (used for direct success/error feedback)
      */
-    public void processGameCommand(String[] command, PrintWriter out) {
+    public void processGameCommand(String[] command) {
+        if (command.length < 2) { // e.g., GAME:playerId:ACTION...
+            logger.warn("Invalid GAME command: {}", String.join(":", command));
+            return;
+        }
+        String playerId = command[1];
+
         if (command.length < 3) {
             logger.warn("Invalid GAME command: {}", String.join(":", command));
-            out.println("ERROR:Invalid GAME command.");
+            notifyPlayer(playerId, "ERROR:Invalid GAME command.");
             return;
         }
         
@@ -206,42 +153,28 @@ public class GameFacade {
         if ("PLAY_CARD".equals(subAction)) {
             if (command.length < 5) {
                 logger.warn("Incomplete PLAY_CARD command");
-                out.println("ERROR:Incomplete PLAY_CARD command.");
+                notifyPlayer(playerId, "ERROR:Incomplete PLAY_CARD command.");
                 return;
             }
             
-            String playerId = command[1];
             String matchId = command[3];
             String cardId = command[4];
             GameSession session = activeGames.get(matchId);
             if (session != null && session.playCard(playerId, cardId)) {
                 logger.info("Player {} played card {} in match {}", playerId, cardId, matchId);
-                out.println("SUCCESS:Move executed.");
+                notifyPlayer(playerId, "SUCCESS:Move executed.");
             } else {
                 logger.warn("Invalid move or player on cooldown. Player: {}, Card: {}, Match: {}", 
                            playerId, cardId, matchId);
-                out.println("ERROR:Invalid move or player on cooldown.");
+                notifyPlayer(playerId, "ERROR:Invalid move or player on cooldown.");
             }
         }
     }
 
-    /**
-     * Finds a player by their ID.
-     *
-     * @param playerId the ID of the player to find
-     * @return the Player object, or null if not found
-     */
     public Player findPlayerById(String playerId) {
         return playerRepository.findById(playerId).orElse(null);
     }
 
-    /**
-     * Processes a card pack purchase for a player.
-     *
-     * @param player the player purchasing the card pack
-     * @param packType the type of card pack to purchase
-     * @return the result of the purchase operation
-     */
     public PurchaseResult buyPack(Player player, String packType) {
         PurchaseResult result = storeService.purchaseCardPack(player, packType);
         if (result.isSuccess()) {
@@ -251,13 +184,6 @@ public class GameFacade {
         return result;
     }
 
-    /**
-     * Finishes a game and notifies the players of the result.
-     *
-     * @param matchId the unique identifier of the match
-     * @param winnerId the ID of the winning player
-     * @param loserId the ID of the losing player
-     */
     public void finishGame(String matchId, String winnerId, String loserId) {
         if (activeGames.remove(matchId) == null) {
             logger.warn("Attempt to finish non-existent match: {}", matchId);
