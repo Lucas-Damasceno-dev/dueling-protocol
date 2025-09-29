@@ -1,51 +1,41 @@
 package client;
 
-import java.io.*;
-import java.net.*;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
+
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.URI;
 import java.util.Scanner;
 import java.util.UUID;
 
-/**
- * Main client class for the Dueling Protocol card game.
- * This class handles the connection to the game server, user interaction through a menu system,
- * and automated testing scenarios. It supports both TCP communication for game commands and
- * UDP communication for ping measurements.
- */
 public class GameClient {
-    private static final String SERVER_ADDRESS = System.getenv().getOrDefault("SERVER_HOST", "172.16.201.6");
-    private static final int TCP_PORT = 7777;
+    private static final String SERVER_ADDRESS = System.getenv().getOrDefault("SERVER_HOST", "localhost");
+    private static final String SERVER_PORT = System.getenv().getOrDefault("SERVER_PORT", "8081");
     private static final int UDP_PORT = 7778;
 
-    private static Socket socket;
-    private static PrintWriter out;
+    private static MyWebSocketClient webSocketClient;
     private static String playerId;
     private static String currentMatchId;
     private static boolean inGame = false;
-
-    // Variable to control intentional exit and avoid error message
     private static volatile boolean isExiting = false;
 
-    /**
-     * Main method that starts the game client.
-     * Establishes connection to the server, initializes the message receiver thread,
-     * and starts either the interactive menu or an automated test mode based on command line arguments.
-     *
-     * @param args command line arguments - if provided, can be "autobot" or "maliciousbot" for automated testing
-     */
     public static void main(String[] args) {
         try {
-            socket = new Socket(SERVER_ADDRESS, TCP_PORT);
-            System.out.println("Connected to server at " + SERVER_ADDRESS + ":" + TCP_PORT);
-
-            Thread receiverThread = new Thread(new ServerMessageReceiver(socket));
-            receiverThread.start();
-
-            out = new PrintWriter(socket.getOutputStream(), true);
-
             playerId = "player-" + UUID.randomUUID().toString().substring(0, 8);
+            String serverUri = "ws://" + SERVER_ADDRESS + ":" + SERVER_PORT + "/ws?playerId=" + playerId;
+            System.out.println("Connecting to server at " + serverUri);
+
+            webSocketClient = new MyWebSocketClient(new URI(serverUri));
+            if (!webSocketClient.connectBlocking()) {
+                System.err.println("Failed to connect to the WebSocket server.");
+                return;
+            }
+
             System.out.println(">> Your player ID is: " + playerId);
 
-            // Automatic modes for testing
             if (args.length > 0) {
                 switch (args[0]) {
                     case "autobot":
@@ -57,14 +47,16 @@ public class GameClient {
                 }
             }
 
-            // Display menu for the first time for interactive mode
             printFullMenu();
-            // Start the loop that only reads user input
             handleUserInput();
 
         } catch (Exception e) {
-            System.err.println("Error connecting to server: " + e.getMessage());
+            System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
+        } finally {
+            if (webSocketClient != null) {
+                webSocketClient.close();
+            }
         }
     }
 
@@ -80,12 +72,9 @@ public class GameClient {
         System.out.print("Choose an option: ");
     }
 
-    /**
-     * Handles user input in a loop. Menu display is handled by other methods.
-     */
     private static void handleUserInput() {
         Scanner scanner = new Scanner(System.in);
-        while (!isExiting) {
+        while (!isExiting && webSocketClient.isOpen()) {
             String input = scanner.nextLine().trim();
 
             switch (input) {
@@ -106,7 +95,7 @@ public class GameClient {
                         playCard(scanner);
                     } else {
                         System.out.println("\nYou need to be in a match to play cards!");
-                        printFullMenu(); // Redisplay menu since there will be no server response
+                        printFullMenu();
                     }
                     break;
                 case "6":
@@ -114,16 +103,12 @@ public class GameClient {
                     break;
                 case "7":
                     System.out.println("Exiting...");
-                    isExiting = true; // Signals that exit is intentional
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        // No need to print error, exit was requested
-                    }
-                    return; // End method and main thread
+                    isExiting = true;
+                    webSocketClient.close();
+                    return;
                 default:
                     System.out.println("\nInvalid option!");
-                    printFullMenu(); // Redisplay menu
+                    printFullMenu();
                     break;
             }
         }
@@ -132,7 +117,7 @@ public class GameClient {
     // AUTOBOT MODE AND SCENARIOS
     private static void runAutobot(String scenario) {
         try {
-            out.println("CHARACTER_SETUP:" + playerId + ":Elf:Warrior");
+            webSocketClient.send("CHARACTER_SETUP:Elf:Warrior");
             Thread.sleep(200);
 
             switch (scenario) {
@@ -159,14 +144,16 @@ public class GameClient {
             System.err.println("[autobot] Error: " + e.getMessage());
         }
     }
+
     private static void scenarioMatchmakingDisconnect() throws Exception {
-        out.println("MATCHMAKING:" + playerId + ":ENTER");
+        webSocketClient.send("MATCHMAKING:ENTER");
         Thread.sleep(500);
         System.out.println("[autobot] Disconnecting abruptly in matchmaking queue");
-        socket.close();
+        webSocketClient.close();
     }
+
     private static void scenarioPreGameDisconnect() throws Exception {
-        out.println("MATCHMAKING:" + playerId + ":ENTER");
+        webSocketClient.send("MATCHMAKING:ENTER");
         int waited = 0;
         while (!inGame && waited < 10000) {
             Thread.sleep(200);
@@ -174,68 +161,67 @@ public class GameClient {
         }
         if (!inGame) {
             System.out.println("[autobot] Disconnecting abruptly before GAME_START");
-            socket.close();
+            webSocketClient.close();
         }
     }
+
     private static void scenarioSimultaneousPlay() throws Exception {
-        out.println("MATCHMAKING:" + playerId + ":ENTER");
+        webSocketClient.send("MATCHMAKING:ENTER");
         int waited = 0;
         while (!inGame && waited < 10000) {
             Thread.sleep(200);
             waited += 200;
         }
         if (inGame) {
-            out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:card-001");
+            webSocketClient.send("PLAY_CARD:" + currentMatchId + ":card-001");
             System.out.println("[autobot] Play sent immediately after GAME_START");
             Thread.sleep(500);
-            socket.close();
+            webSocketClient.close();
         }
     }
+
     private static void scenarioMidGameDisconnect() throws Exception {
-        out.println("MATCHMAKING:" + playerId + ":ENTER");
+        webSocketClient.send("MATCHMAKING:ENTER");
         int waited = 0;
         while (!inGame && waited < 10000) {
             Thread.sleep(200);
             waited += 200;
         }
         if (inGame) {
-            out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:card-001");
+            webSocketClient.send("PLAY_CARD:" + currentMatchId + ":card-001");
             Thread.sleep(300);
             System.out.println("[autobot] Disconnecting abruptly in the middle of the match");
-            socket.close();
+            webSocketClient.close();
         }
     }
+
     private static void scenarioRaceCondition() throws Exception {
-        out.println("STORE:" + playerId + ":BUY:BASIC");
-        out.println("UPGRADE:" + playerId + ":BASE_ATTACK");
+        webSocketClient.send("STORE:BUY:BASIC");
+        webSocketClient.send("UPGRADE:BASE_ATTACK");
         Thread.sleep(500);
-        socket.close();
+        webSocketClient.close();
     }
 
     private static void scenarioDefault() throws Exception {
         System.out.println("[autobot] Character created. Entering matchmaking queue...");
-        out.println("MATCHMAKING:" + playerId + ":ENTER");
-
-        // Mantém o bot ativo por tempo suficiente para a partida ser criada e o teste rodar.
-        // Aumentado para 20 segundos para evitar a race condition com o script de teste.
+        webSocketClient.send("MATCHMAKING:ENTER");
         Thread.sleep(20000);
-
         System.out.println("[autobot] Test time elapsed, exiting...");
-        socket.close();
+        webSocketClient.close();
     }
 
     private static void runMaliciousBot() {
         try {
-            out.println("MATCHMAKING:" + playerId);
+            webSocketClient.send("MATCHMAKING"); // Malformed
             Thread.sleep(200);
-            out.println("STORE:" + playerId + ":BUY:BASIC:EXTRA_PARAM");
+            webSocketClient.send("STORE:BUY:BASIC:EXTRA_PARAM"); // Malformed
             Thread.sleep(200);
-            out.println("GAME:PLAY_CARD:card-001");
+            webSocketClient.send("PLAY_CARD:card-001"); // Malformed
             Thread.sleep(200);
-            out.println("INVALIDCOMMAND");
+            webSocketClient.send("INVALIDCOMMAND");
             Thread.sleep(200);
             System.out.println("[maliciousbot] Malformed messages sent. Exiting...");
-            socket.close();
+            webSocketClient.close();
         } catch (Exception e) {
             System.err.println("[maliciousbot] Error: " + e.getMessage());
         }
@@ -244,144 +230,121 @@ public class GameClient {
     // CLIENT ACTION METHODS
     private static void setupCharacter(Scanner scanner) {
         System.out.println("\n=== CHARACTER SETUP ===");
-        System.out.println("Available races: Elf, Dwarf, Human, Orc");
         System.out.print("Choose your race: ");
         String race = scanner.nextLine().trim();
-
-        System.out.println("Available classes: Warrior, Mage, Archer, Rogue");
         System.out.print("Choose your class: ");
         String playerClass = scanner.nextLine().trim();
-
-        out.println("CHARACTER_SETUP:" + playerId + ":" + race + ":" + playerClass);
+        webSocketClient.send("CHARACTER_SETUP:" + race + ":" + playerClass);
     }
 
     private static void enterMatchmaking() {
         System.out.println("\nEntering matchmaking queue...");
-        out.println("MATCHMAKING:" + playerId + ":ENTER");
+        webSocketClient.send("MATCHMAKING:ENTER");
     }
 
     private static void buyCardPack(Scanner scanner) {
-        System.out.println("\n=== CARD STORE ===");
-        System.out.println("Package types: BASIC, PREMIUM, LEGENDARY");
-        System.out.print("Which package do you want to buy? ");
+        System.out.print("Which package do you want to buy? (BASIC, PREMIUM, LEGENDARY): ");
         String packType = scanner.nextLine().trim().toUpperCase();
-
-        out.println("STORE:" + playerId + ":BUY:" + packType);
+        webSocketClient.send("STORE:BUY:" + packType);
     }
 
     private static void playCard(Scanner scanner) {
         System.out.print("Card ID to play: ");
         String cardId = scanner.nextLine().trim();
-
-        out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:" + cardId);
+        webSocketClient.send("PLAY_CARD:" + currentMatchId + ":" + cardId);
     }
 
     private static void upgradeAttributes(Scanner scanner) {
-        System.out.println("\n=== ATTRIBUTE UPGRADE ===");
-        System.out.println("Available attributes to upgrade:");
-        System.out.println("BASE_ATTACK - Cost: 5 points");
-        System.out.print("Which attribute do you want to upgrade? ");
+        System.out.print("Which attribute do you want to upgrade? (BASE_ATTACK): ");
         String attribute = scanner.nextLine().trim().toUpperCase();
-
-        out.println("UPGRADE:" + playerId + ":" + attribute);
+        webSocketClient.send("UPGRADE:" + attribute);
     }
 
     public static void checkPing() {
+        // UDP Ping logic remains the same
         try (DatagramSocket datagramSocket = new DatagramSocket()) {
             InetAddress address = InetAddress.getByName(SERVER_ADDRESS);
-
             long startTime = System.currentTimeMillis();
             String message = String.valueOf(startTime);
             byte[] buffer = message.getBytes();
-
             DatagramPacket request = new DatagramPacket(buffer, buffer.length, address, UDP_PORT);
             datagramSocket.send(request);
-
             DatagramPacket response = new DatagramPacket(new byte[buffer.length], buffer.length);
             datagramSocket.setSoTimeout(1000);
             datagramSocket.receive(response);
-
             long endTime = System.currentTimeMillis();
             long latency = endTime - startTime;
             System.out.println("\nPing: " + latency + " ms");
-            printFullMenu(); // Redisplay menu
-
+            printFullMenu();
         } catch (IOException e) {
             System.err.println("\nPing failed: " + e.getMessage());
-            printFullMenu(); // Redisplay menu
+            printFullMenu();
         }
     }
 
-    // INNER CLASS TO RECEIVE MESSAGES
-    static class ServerMessageReceiver implements Runnable {
-        private Socket socket;
+    private static void processServerMessage(String message) {
+        String[] parts = message.split(":");
+        String type = parts[0];
 
-        public ServerMessageReceiver(Socket socket) {
-            this.socket = socket;
+        System.out.println(); 
+
+        if ("UPDATE".equals(type)) {
+            String subType = parts[1];
+            switch (subType) {
+                case "GAME_START":
+                    currentMatchId = parts[2];
+                    inGame = true;
+                    System.out.println(">> Match found against: " + parts[3]);
+                    System.out.println(">> Match ID: " + currentMatchId);
+                    break;
+                case "GAME_OVER":
+                    inGame = false;
+                    currentMatchId = null;
+                    System.out.println(">> GAME OVER: You " + (parts[2].equals("VICTORY") ? "WON!" : "LOST!"));
+                    break;
+                // Other cases...
+                default:
+                    System.out.println("\nServer: " + message);
+                    break;
+            }
+        } else if ("SUCCESS".equals(type)) {
+            System.out.println("[SUCCESS] \u2713 " + message.substring(8));
+        } else if ("ERROR".equals(type)) {
+            System.out.println("[ERROR] \u2718 " + message.substring(6));
+        } else {
+            System.out.println("\nServer: " + message);
+        }
+
+        printFullMenu();
+    }
+
+    // INNER CLASS FOR WEBSOCKET CLIENT
+    public static class MyWebSocketClient extends WebSocketClient {
+        public MyWebSocketClient(URI serverUri) {
+            super(serverUri);
         }
 
         @Override
-        public void run() {
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-                String response;
-                while ((response = in.readLine()) != null) {
-                    processServerMessage(response);
-                }
-            } catch (IOException e) {
-                // Only display error message if exit was NOT intentional
-                if (!isExiting) {
-                    System.err.println("\nConnection to server lost: " + e.getMessage());
-                }
+        public void onOpen(ServerHandshake handshakedata) {
+            System.out.println("Connected to WebSocket server.");
+        }
+
+        @Override
+        public void onMessage(String message) {
+            processServerMessage(message);
+        }
+
+        @Override
+        public void onClose(int code, String reason, boolean remote) {
+            if (!isExiting) {
+                System.err.println("\nConnection to server lost. Code: " + code + ", Reason: " + reason);
+                isExiting = true;
             }
         }
 
-        private void processServerMessage(String message) {
-            String[] parts = message.split(":");
-            String type = parts[0];
-
-            System.out.println(); // Add a blank line for spacing
-
-            if ("UPDATE".equals(type)) {
-                String subType = parts[1];
-                switch (subType) {
-                    case "GAME_START":
-                        currentMatchId = parts[2];
-                        inGame = true;
-                        System.out.println("=========================================");
-                        System.out.println(">> Match found against: " + parts[3]);
-                        System.out.println(">> Match ID: " + currentMatchId);
-                        System.out.println("=========================================");
-                        break;
-                    case "GAME_OVER":
-                        inGame = false;
-                        currentMatchId = null;
-                        System.out.println("=========================================");
-                        System.out.println(">> GAME OVER: You " + (parts[2].equals("VICTORY") ? "WON!" : "LOST!"));
-                        System.out.println("=========================================");
-                        break;
-                    case "ACTION":
-                        System.out.println("[ACTION] >> " + parts[2]);
-                        break;
-                    case "HEALTH":
-                        System.out.println("[HEALTH] >> " + parts[2] + " now has " + parts[3] + " health points");
-                        break;
-                    case "DRAW_CARDS":
-                        System.out.println("[CARDS] >> Cards received: " + parts[2]);
-                        break;
-                    default:
-                        System.out.println("\nServer: " + message);
-                        break;
-                }
-            } else if ("SUCCESS".equals(type)) {
-                System.out.println("[SUCCESS] ✓ " + message.substring(8)); // Remove "SUCCESS:" prefix
-            } else if ("ERROR".equals(type)) {
-                System.out.println("[ERROR] ✗ " + message.substring(6)); // Remove "ERROR:" prefix
-            } else {
-                System.out.println("\nServer: " + message);
-            }
-
-            // After each server message, redisplay the menu for new input
-            printFullMenu();
+        @Override
+        public void onError(Exception ex) {
+            System.err.println("WebSocket error: " + ex.getMessage());
         }
     }
 }
