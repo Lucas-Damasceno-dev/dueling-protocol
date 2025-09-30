@@ -174,37 +174,72 @@ public class GameFacade {
     }
 
     public void processGameCommand(String[] command) {
-        if (command.length < 2) { 
-            logger.warn("Invalid GAME command: {}", String.join(":", command));
+        if (command.length < 3) { // e.g., GAME:playerId:ACTION...
+            logger.warn("Invalid command structure: {}", String.join(":", command));
             return;
         }
         String playerId = command[1];
+        String action = command[2];
 
-        if (command.length < 3) {
-            logger.warn("Invalid GAME command: {}", String.join(":", command));
-            notifyPlayer(playerId, "ERROR:Invalid GAME command.");
+        // Find player, create if it's a setup command
+        Player player = playerRepository.findById(playerId).orElse(null);
+        if (player == null && !"CHARACTER_SETUP".equals(action)) {
+            notifyPlayer(playerId, "ERROR:Player not found. Please set up your character first.");
             return;
         }
-        
-        String subAction = command[2];
-        if ("PLAY_CARD".equals(subAction)) {
-            if (command.length < 5) {
-                logger.warn("Incomplete PLAY_CARD command");
-                notifyPlayer(playerId, "ERROR:Incomplete PLAY_CARD command.");
-                return;
-            }
+
+        switch (action) {
+            case "CHARACTER_SETUP":
+                if (command.length < 5) {
+                    notifyPlayer(playerId, "ERROR:Incomplete character setup command.");
+                    return;
+                }
+                Player newPlayer = new Player(playerId, command[3]); // Assuming nickname is part of setup
+                // In a real scenario, you'd set race/class etc.
+                playerRepository.save(newPlayer);
+                notifyPlayer(playerId, "SUCCESS:Character created.");
+                break;
+
+            case "MATCHMAKING":
+                if (command.length > 3 && "ENTER".equals(command[3])) {
+                    enterMatchmaking(player);
+                    notifyPlayer(playerId, "SUCCESS:Entered matchmaking queue.");
+                }
+                break;
+
+            case "PLAY_CARD":
+                if (command.length < 5) {
+                    notifyPlayer(playerId, "ERROR:Incomplete PLAY_CARD command.");
+                    return;
+                }
+                String matchId = command[3];
+                String cardId = command[4];
+                GameSession session = activeGames.get(matchId);
+                if (session != null && session.playCard(playerId, cardId)) {
+                    logger.info("Player {} played card {} in match {}", playerId, cardId, matchId);
+                    notifyPlayer(playerId, "SUCCESS:Move executed.");
+                } else {
+                    logger.warn("Invalid move or player on cooldown. Player: {}, Card: {}, Match: {}", 
+                               playerId, cardId, matchId);
+                    notifyPlayer(playerId, "ERROR:Invalid move or player on cooldown.");
+                }
+                break;
             
-            String matchId = command[3];
-            String cardId = command[4];
-            GameSession session = activeGames.get(matchId);
-            if (session != null && session.playCard(playerId, cardId)) {
-                logger.info("Player {} played card {} in match {}", playerId, cardId, matchId);
-                notifyPlayer(playerId, "SUCCESS:Move executed.");
-            } else {
-                logger.warn("Invalid move or player on cooldown. Player: {}, Card: {}, Match: {}", 
-                           playerId, cardId, matchId);
-                notifyPlayer(playerId, "ERROR:Invalid move or player on cooldown.");
-            }
+            case "STORE":
+                if (command.length > 4 && "BUY".equals(command[3])) {
+                    String packType = command[4];
+                    PurchaseResult result = buyPack(player, packType);
+                    if (result.isSuccess()) {
+                        notifyPlayer(playerId, "SUCCESS:Pack purchased. You got " + result.getCards().size() + " cards.");
+                    } else {
+                        notifyPlayer(playerId, "ERROR:Purchase failed: " + result.getStatus());
+                    }
+                }
+                break;
+
+            default:
+                notifyPlayer(playerId, "ERROR:Unknown command '" + action + "'.");
+                break;
         }
     }
 
