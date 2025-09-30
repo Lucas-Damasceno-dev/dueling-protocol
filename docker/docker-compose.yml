@@ -1,37 +1,72 @@
-# Docker Compose configuration for the Dueling Protocol application
-# Defines a server and client service that communicate over TCP/UDP
+version: '3.8'
 services:
-  server:
-    build: 
+  server-1:
+    build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
+    container_name: server-1
     ports:
-      - "7777:7777/tcp"  # TCP port for reliable communication
-      - "7778:7778/udp"  # UDP port for faster communication
+      - "8081:8080"
+      - "7778:7778/udp"
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_NAME=server-1
     networks:
       - dueling-network
 
-  client:
-    build: 
+  server-2:
+    build:
       context: ..
-      dockerfile: docker/Dockerfile
-    # Custom startup script with delay to ensure server is ready
+      dockerfile: Dockerfile
+    container_name: server-2
+    ports:
+      - "8082:8080"
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_NAME=server-2
+    networks:
+      - dueling-network
+
+  client-1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
     command: >
       sh -c '
-        echo "Waiting for server..."
-        sleep 5
-        echo "Starting client in mode: ${BOT_MODE} with scenario: ${BOT_SCENARIO}"
-        java -cp app.jar GameClient ${BOT_MODE} ${BOT_SCENARIO}
+        echo "Waiting for servers..."
+        sleep 8
+        echo "Starting client-1..."
+        java -jar app.jar client.GameClient autobot
       '
     depends_on:
-      - server  # Start server before client
+      - server-1
+      - server-2
     environment:
-      - SERVER_HOST=server               # Server hostname for client connection
-      - BOT_MODE=${BOT_MODE:-autobot}    # Bot mode (autobot if not specified)
-      - BOT_SCENARIO=${BOT_SCENARIO}     # Bot scenario (can be blank)
+      - SERVER_HOST=localhost
+      - SERVER_PORT=8081
+    networks:
+      - dueling-network
+
+  client-2:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: >
+      sh -c '
+        echo "Waiting for servers..."
+        sleep 10
+        echo "Starting client-2..."
+        java -jar app.jar client.GameClient autobot
+      '
+    depends_on:
+      - server-1
+      - server-2
+    environment:
+      - SERVER_HOST=localhost
+      - SERVER_PORT=8082
     networks:
       - dueling-network
 
 networks:
   dueling-network:
-    driver: bridge  # Bridge network for container communication
+    driver: bridge
