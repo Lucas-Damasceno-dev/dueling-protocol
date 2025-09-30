@@ -3,12 +3,17 @@ package api;
 import api.registry.ServerRegistry;
 import controller.GameFacade;
 import model.Player;
+import model.TradeProposal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import repository.PlayerRepository;
+import service.election.LeaderElectionService;
+import service.lock.LockService;
 import service.matchmaking.MatchmakingService;
+import service.trade.TradeService;
 
 import java.util.Set;
 
@@ -20,16 +25,25 @@ public class ServerSynchronizationController {
     private final ServerRegistry serverRegistry;
     private final PlayerRepository localPlayerRepository;
     private final MatchmakingService matchmakingService;
+    private final LeaderElectionService leaderElectionService;
+    private final LockService lockService;
+    private final TradeService tradeService;
 
     @Autowired
     public ServerSynchronizationController(GameFacade gameFacade,
                                            ServerRegistry serverRegistry,
                                            @Qualifier("playerRepositoryJson") PlayerRepository localPlayerRepository,
-                                           MatchmakingService matchmakingService) {
+                                           MatchmakingService matchmakingService,
+                                           LeaderElectionService leaderElectionService,
+                                           LockService lockService,
+                                           TradeService tradeService) {
         this.gameFacade = gameFacade;
         this.serverRegistry = serverRegistry;
         this.localPlayerRepository = localPlayerRepository;
         this.matchmakingService = matchmakingService;
+        this.leaderElectionService = leaderElectionService;
+        this.lockService = lockService;
+        this.tradeService = tradeService;
     }
 
     @PostMapping("/servers/register")
@@ -98,5 +112,26 @@ public class ServerSynchronizationController {
         }
         lockService.release();
         return ResponseEntity.ok("Lock released.");
+    }
+
+    @PostMapping("/trades/propose")
+    public ResponseEntity<TradeProposal> proposeTrade(@RequestBody TradeProposal proposal) {
+        tradeService.createTrade(proposal);
+        
+        String targetPlayerId = proposal.getTargetPlayerId();
+        String notification = "UPDATE:TRADE_PROPOSAL:" + proposal.getTradeId() + ":" + proposal.getProposingPlayerId();
+        gameFacade.notifyPlayer(targetPlayerId, notification);
+        
+        return ResponseEntity.ok(proposal);
+    }
+
+    @PostMapping("/trades/{tradeId}/accept")
+    public ResponseEntity<String> acceptTrade(@PathVariable String tradeId) {
+        boolean success = gameFacade.executeTrade(tradeId);
+        if (success) {
+            return ResponseEntity.ok("Trade accepted and executed.");
+        } else {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Trade failed.");
+        }
     }
 }

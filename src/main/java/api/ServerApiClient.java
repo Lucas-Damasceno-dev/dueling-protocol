@@ -62,4 +62,9 @@ public class ServerApiClient {
         String url = leaderUrl + "/api/lock/release";
         restTemplate.postForEntity(url, null, String.class);
     }
+
+    public void proposeTrade(String serverUrl, model.TradeProposal proposal) {
+        String url = serverUrl + "/api/trades/propose";
+        restTemplate.postForEntity(url, proposal, model.TradeProposal.class);
+    }
 }
