@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pubsub.EventManager;
+import repository.CardRepository;
 import repository.PlayerRepository;
 import service.election.LeaderElectionService;
 import service.matchmaking.MatchmakingService;
@@ -30,6 +31,7 @@ public class GameFacade {
     private final ServerApiClient serverApiClient;
     private final TradeService tradeService;
     private final LeaderElectionService leaderElectionService;
+    private final CardRepository cardRepository;
 
     @Value("${server.name:server-1}")
     private String serverName;
@@ -44,7 +46,8 @@ public class GameFacade {
     public GameFacade(MatchmakingService matchmakingService, StoreService storeService,
                       PlayerRepository playerRepository, EventManager eventManager,
                       ServerRegistry serverRegistry, ServerApiClient serverApiClient,
-                      TradeService tradeService, LeaderElectionService leaderElectionService) {
+                      TradeService tradeService, LeaderElectionService leaderElectionService,
+                      CardRepository cardRepository) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
@@ -53,6 +56,7 @@ public class GameFacade {
         this.serverApiClient = serverApiClient;
         this.tradeService = tradeService;
         this.leaderElectionService = leaderElectionService;
+        this.cardRepository = cardRepository;
     }
 
     private String getSelfUrl() {
