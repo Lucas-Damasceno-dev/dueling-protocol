@@ -144,7 +144,7 @@ public class GameSession {
             Player target = playerId.equals(player1.getId()) ? player2 : player1;
             
             for (String cardId : entry.getValue()) {
-                Optional<Card> cardOpt = CardRepository.findById(cardId);
+                Optional<Card> cardOpt = cardRepository.findById(cardId);
                 if (cardOpt.isEmpty()) {
                     logger.warn("Card {} not found in repository", cardId);
                     continue;
