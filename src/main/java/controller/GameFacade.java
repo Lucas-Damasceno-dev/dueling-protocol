@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.context.annotation.Profile;
 
-@Profile("server")
 @Service
 public class GameFacade {
     private final MatchmakingService matchmakingService;
