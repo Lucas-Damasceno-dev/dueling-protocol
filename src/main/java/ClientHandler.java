@@ -8,6 +8,7 @@ import model.Player;
 import repository.PlayerRepository;
 import repository.PlayerRepositoryJson;
 import service.store.PurchaseResult;
+import pubsub.EventManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,10 +21,11 @@ public class ClientHandler implements Runnable {
     private final Socket clientSocket;
     private final GameFacade gameFacade;
     private final PlayerRepository playerRepository;
-    private Player player; // Stores the player for this session
+    private Player player; 
+    private final EventManager eventManager;
     
     private static final Logger logger = LoggerFactory.getLogger(ClientHandler.class);
-    private static final long INACTIVITY_TIMEOUT_MS = 300000; // 5 minutes
+    private static final long INACTIVITY_TIMEOUT_MS = 300000;
     private volatile long lastActivityTime;
 
     /**
@@ -37,6 +39,7 @@ public class ClientHandler implements Runnable {
         this.gameFacade = facade;
         this.playerRepository = new PlayerRepositoryJson();
         this.lastActivityTime = System.currentTimeMillis();
+        this.eventManager = facade.getEventManager();
     }
 
     /**
@@ -53,7 +56,7 @@ public class ClientHandler implements Runnable {
             Thread timeoutThread = new Thread(() -> {
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
-                        Thread.sleep(30000); // Check every 30 seconds
+                        Thread.sleep(30000);
                         if (System.currentTimeMillis() - lastActivityTime > INACTIVITY_TIMEOUT_MS) {
                             logger.warn("Client {} disconnected due to inactivity timeout", 
                                        player != null ? player.getId() : "unknown");
@@ -74,17 +77,25 @@ public class ClientHandler implements Runnable {
             
             String inputLine;
             while ((inputLine = in.readLine()) != null) {
-                lastActivityTime = System.currentTimeMillis(); // Update last activity time
+                lastActivityTime = System.currentTimeMillis();
                 logger.debug("Command received: {}", inputLine);
                 String[] command = inputLine.split(":");
+                
+                String playerId = command.length > 1 ? command[1] : null;
+                if (this.player == null && playerId != null) {
+                    this.player = getOrCreatePlayer(playerId);
+                    eventManager.subscribe(playerId, out); 
+                }
+                
                 processCommand(command, out);
             }
             
-            timeoutThread.interrupt(); // Stop timeout thread when main loop ends
+            timeoutThread.interrupt();
         } catch (Exception e) {
             logger.warn("Connection with client lost: {}", e.getMessage(), e);
         } finally {
             if (player != null) {
+                // Desinscreve o cliente ao desconectar
                 gameFacade.removeClientAndCleanUp(player.getId());
                 logger.info("Client {} from {} disconnected", player.getId(), clientSocket.getInetAddress().getHostAddress());
             } else {

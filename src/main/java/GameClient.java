@@ -13,16 +13,16 @@ public class GameClient {
     private static final String SERVER_ADDRESS = System.getenv().getOrDefault("SERVER_HOST", "172.16.201.6");
     private static final int TCP_PORT = 7777;
     private static final int UDP_PORT = 7778;
-    
+
     private static Socket socket;
     private static PrintWriter out;
     private static String playerId;
     private static String currentMatchId;
     private static boolean inGame = false;
-    
+
     // Variable to control intentional exit and avoid error message
     private static volatile boolean isExiting = false;
-    
+
     /**
      * Main method that starts the game client.
      * Establishes connection to the server, initializes the message receiver thread,
@@ -77,7 +77,7 @@ public class GameClient {
         System.out.println("7. Exit");
         System.out.print("Choose an option: ");
     }
-    
+
     /**
      * Handles user input in a loop. Menu display is handled by other methods.
      */
@@ -85,7 +85,7 @@ public class GameClient {
         Scanner scanner = new Scanner(System.in);
         while (!isExiting) {
             String input = scanner.nextLine().trim();
-            
+
             switch (input) {
                 case "1":
                     setupCharacter(scanner);
@@ -126,7 +126,7 @@ public class GameClient {
             }
         }
     }
-    
+
     // AUTOBOT MODE AND SCENARIOS
     private static void runAutobot(String scenario) {
         try {
@@ -209,10 +209,19 @@ public class GameClient {
         Thread.sleep(500);
         socket.close();
     }
+
     private static void scenarioDefault() throws Exception {
-        System.out.println("[autobot] Test completed, exiting...");
+        System.out.println("[autobot] Character created. Entering matchmaking queue...");
+        out.println("MATCHMAKING:" + playerId + ":ENTER");
+
+        // Mantém o bot ativo por tempo suficiente para a partida ser criada e o teste rodar.
+        // Aumentado para 20 segundos para evitar a race condition com o script de teste.
+        Thread.sleep(20000);
+
+        System.out.println("[autobot] Test time elapsed, exiting...");
         socket.close();
     }
+
     private static void runMaliciousBot() {
         try {
             out.println("MATCHMAKING:" + playerId);
@@ -229,63 +238,63 @@ public class GameClient {
             System.err.println("[maliciousbot] Error: " + e.getMessage());
         }
     }
-    
+
     // CLIENT ACTION METHODS
     private static void setupCharacter(Scanner scanner) {
         System.out.println("\n=== CHARACTER SETUP ===");
         System.out.println("Available races: Elf, Dwarf, Human, Orc");
         System.out.print("Choose your race: ");
         String race = scanner.nextLine().trim();
-        
+
         System.out.println("Available classes: Warrior, Mage, Archer, Rogue");
         System.out.print("Choose your class: ");
         String playerClass = scanner.nextLine().trim();
-        
+
         out.println("CHARACTER_SETUP:" + playerId + ":" + race + ":" + playerClass);
     }
-    
+
     private static void enterMatchmaking() {
         System.out.println("\nEntering matchmaking queue...");
         out.println("MATCHMAKING:" + playerId + ":ENTER");
     }
-    
+
     private static void buyCardPack(Scanner scanner) {
         System.out.println("\n=== CARD STORE ===");
         System.out.println("Package types: BASIC, PREMIUM, LEGENDARY");
         System.out.print("Which package do you want to buy? ");
         String packType = scanner.nextLine().trim().toUpperCase();
-        
+
         out.println("STORE:" + playerId + ":BUY:" + packType);
     }
-    
+
     private static void playCard(Scanner scanner) {
         System.out.print("Card ID to play: ");
         String cardId = scanner.nextLine().trim();
-        
+
         out.println("GAME:" + playerId + ":" + currentMatchId + ":PLAY_CARD:" + cardId);
     }
-    
+
     private static void upgradeAttributes(Scanner scanner) {
         System.out.println("\n=== ATTRIBUTE UPGRADE ===");
         System.out.println("Available attributes to upgrade:");
         System.out.println("BASE_ATTACK - Cost: 5 points");
         System.out.print("Which attribute do you want to upgrade? ");
         String attribute = scanner.nextLine().trim().toUpperCase();
-        
+
         out.println("UPGRADE:" + playerId + ":" + attribute);
     }
-    
+
     public static void checkPing() {
         try (DatagramSocket datagramSocket = new DatagramSocket()) {
             InetAddress address = InetAddress.getByName(SERVER_ADDRESS);
-            
+
             long startTime = System.currentTimeMillis();
             String message = String.valueOf(startTime);
             byte[] buffer = message.getBytes();
 
             DatagramPacket request = new DatagramPacket(buffer, buffer.length, address, UDP_PORT);
             datagramSocket.send(request);
-            
+
             DatagramPacket response = new DatagramPacket(new byte[buffer.length], buffer.length);
             datagramSocket.setSoTimeout(1000);
             datagramSocket.receive(response);
@@ -300,15 +309,15 @@ public class GameClient {
             printFullMenu(); // Redisplay menu
         }
     }
-    
+
     // INNER CLASS TO RECEIVE MESSAGES
     static class ServerMessageReceiver implements Runnable {
         private Socket socket;
-        
+
         public ServerMessageReceiver(Socket socket) {
             this.socket = socket;
         }
-        
+
         @Override
         public void run() {
             try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
@@ -323,7 +332,7 @@ public class GameClient {
                 }
             }
         }
-        
+
         private void processServerMessage(String message) {
             String[] parts = message.split(":");
             String type = parts[0];
