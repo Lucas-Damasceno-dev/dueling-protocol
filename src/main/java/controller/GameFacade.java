@@ -35,10 +35,8 @@ public class GameFacade {
     private final LeaderElectionService leaderElectionService;
     private final CardRepository cardRepository;
 
-    @Value("${server.name:server-1}")
-    private String serverName;
-    @Value("${server.port:8080}")
-    private String serverPort;
+    private String serverName = "server-1";
+    private String serverPort = "8080";
     private String selfUrl;
 
     private static final Logger logger = LoggerFactory.getLogger(GameFacade.class);
