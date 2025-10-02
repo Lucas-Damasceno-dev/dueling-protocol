@@ -1,0 +1,37 @@
+# Docker Compose configuration for the Dueling Protocol application
+# Defines a server and client service that communicate over TCP/UDP
+services:
+  server:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "7777:7777/tcp"  # TCP port for reliable communication
+      - "7778:7778/udp"  # UDP port for faster communication
+    networks:
+      - dueling-network
+
+  client:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    # Custom startup script with delay to ensure server is ready
+    command: >
+      sh -c '
+        echo "Waiting for server..."
+        sleep 5
+        echo "Starting client in mode: ${BOT_MODE} with scenario: ${BOT_SCENARIO}"
+        java -cp app.jar GameClient ${BOT_MODE} ${BOT_SCENARIO}
+      '
+    depends_on:
+      - server  # Start server before client
+    environment:
+      - SERVER_HOST=server               # Server hostname for client connection
+      - BOT_MODE=${BOT_MODE:-autobot}    # Bot mode (autobot if not specified)
+      - BOT_SCENARIO=${BOT_SCENARIO}     # Bot scenario (can be blank)
+    networks:
+      - dueling-network
+
+networks:
+  dueling-network:
+    driver: bridge  # Bridge network for container communication

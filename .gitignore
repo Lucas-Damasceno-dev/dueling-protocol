@@ -46,8 +46,3 @@ dependency-reduced-pom.xml
 # Temporary files
 *.tmp
 *.temp
-
-# Script directories
-scripts/
-docker/
-test_scripts/
