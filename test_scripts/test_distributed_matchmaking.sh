@@ -17,11 +17,14 @@ cleanup() {
 
 trap cleanup EXIT
 
+echo ">>> Building project JAR..."
+(cd "$PROJECT_ROOT" && mvn clean package)
+
 echo ">>> Building and starting services..."
 docker-compose -f "$DOCKER_COMPOSE_FILE" up --build -d
 
 echo ">>> Waiting for clients to run and matchmaking to occur..."
-sleep 15 
+sleep 20 
 
 echo ">>> Verifying distributed matchmaking..."
 
