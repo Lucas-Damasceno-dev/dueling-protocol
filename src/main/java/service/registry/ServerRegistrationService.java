@@ -15,6 +15,9 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Profile;
 
 @Profile("server")
+import org.springframework.context.annotation.Profile;
+
+@Profile("server")
 @Service
 public class ServerRegistrationService implements ApplicationListener<ApplicationReadyEvent> {
 
