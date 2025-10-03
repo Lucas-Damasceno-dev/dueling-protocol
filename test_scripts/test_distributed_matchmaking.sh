@@ -28,7 +28,9 @@ sleep 20
 
 echo ">>> Verifying distributed matchmaking..."
 
-if docker-compose -f "$DOCKER_COMPOSE_FILE" logs | grep "New match created between"; then
+docker-compose -f "$DOCKER_COMPOSE_FILE" logs > matchmaking_logs.txt
+
+if grep "New match created" matchmaking_logs.txt; then
   echo ">>> SUCCESS: Distributed match creation message found in logs."
   docker-compose -f "$DOCKER_COMPOSE_FILE" logs
 else
