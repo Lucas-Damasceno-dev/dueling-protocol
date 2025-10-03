@@ -6,6 +6,7 @@ import model.Player;
 import model.TradeProposal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,13 +17,6 @@ import service.matchmaking.MatchmakingService;
 import service.trade.TradeService;
 
 import java.util.Set;
-
-import org.springframework.context.annotation.Profile;
-
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
-import org.springframework.context.annotation.Profile;
 
 @Profile("server")
 @RestController
