@@ -40,12 +40,15 @@ public class GameClient {
             System.out.println(">> Your player ID is: " + playerId);
 
             if (args.length > 0) {
+                System.out.println(">>>>>>>>> AUTOBOT MODE DETECTED <<<<<<<<<");
                 switch (args[0]) {
                     case "autobot":
                         runAutobot(args.length > 1 ? args[1] : "");
+                        System.out.println(">>>>>>>>> AUTOBOT FINISHED, EXITING MAIN <<<<<<<<<");
                         return;
                     case "maliciousbot":
                         runMaliciousBot();
+                        System.out.println(">>>>>>>>> AUTOBOT FINISHED, EXITING MAIN <<<<<<<<<");
                         return;
                 }
             }
