@@ -122,7 +122,9 @@ public class GameFacade {
             Player p1 = localPlayerOpt.get();
             
             List<String> remoteServers = new ArrayList<>(serverRegistry.getRegisteredServers());
+            logger.info("All registered servers: {}", remoteServers);
             remoteServers.remove(getSelfUrl()); 
+            logger.info("Attempting to find partner on remote servers: {}", remoteServers); 
 
             for (String serverUrl : remoteServers) {
                 try {
