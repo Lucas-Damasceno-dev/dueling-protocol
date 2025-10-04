@@ -33,7 +33,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: java -cp app.jar client.GameClient autobot
+    command: sh -c "java -cp app.jar client.GameClient autobot"
     depends_on:
       - server-1
       - server-2
@@ -47,7 +47,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: java -cp app.jar client.GameClient autobot
+    command: sh -c "java -cp app.jar client.GameClient autobot"
     depends_on:
       - server-1
       - server-2
