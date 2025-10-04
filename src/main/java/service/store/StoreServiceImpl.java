@@ -13,6 +13,9 @@ import service.election.LeaderElectionService;
 import api.ServerApiClient;
 
 @Profile("server")
+import org.springframework.context.annotation.Profile;
+
+@Profile("server")
 @Service
 public class StoreServiceImpl implements StoreService {
     

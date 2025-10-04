@@ -8,11 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
-
-import org.springframework.context.annotation.Profile;
-
-import org.springframework.context.annotation.Profile;
 
 @Profile("server")
 import org.springframework.context.annotation.Profile;
@@ -23,9 +20,11 @@ public class ServerRegistrationService implements ApplicationListener<Applicatio
 
     private static final Logger logger = LoggerFactory.getLogger(ServerRegistrationService.class);
 
-    private String serverName = "server-1";
+    @Value("${server.name}")
+    private String serverName;
 
-    private int serverPort = 8080;
+    @Value("${server.port}")
+    private int serverPort;
 
     @Autowired
     private ServerApiClient serverApiClient;
@@ -38,8 +37,6 @@ public class ServerRegistrationService implements ApplicationListener<Applicatio
         String selfUrl = "http://" + serverName + ":" + serverPort;
         serverRegistry.registerServer(selfUrl);
 
-        // In a real system, you'd get a list of peers from a config server or DNS.
-        // For this project, we hardcode the peer based on the server name.
         String peerName = "server-1".equals(serverName) ? "server-2" : "server-1";
         String peerUrl = "http://" + peerName + ":8080";
         
