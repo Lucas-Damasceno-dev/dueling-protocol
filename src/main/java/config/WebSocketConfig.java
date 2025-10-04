@@ -9,9 +9,6 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 import websocket.GameWebSocketHandler;
 
 @Profile("server")
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
 @Configuration
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {

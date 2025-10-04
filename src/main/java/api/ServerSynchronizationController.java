@@ -19,9 +19,6 @@ import service.trade.TradeService;
 import java.util.Set;
 
 @Profile("server")
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
 @RestController
 @RequestMapping("/api")
 public class ServerSynchronizationController {

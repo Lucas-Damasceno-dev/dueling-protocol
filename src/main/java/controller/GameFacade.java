@@ -23,9 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Profile("server")
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
 @Service
 public class GameFacade {
     private final MatchmakingService matchmakingService;
@@ -112,20 +109,16 @@ public class GameFacade {
     public void tryToCreateMatch() {
         Optional<Match> localMatch = matchmakingService.findMatch();
         if (localMatch.isPresent()) {
-            logger.info("Found local match.");
             startMatch(localMatch.get());
             return;
         }
 
-        logger.info("No local match found, seeking remote partner...");
         Optional<Player> localPlayerOpt = matchmakingService.findAndLockPartner();
         if (localPlayerOpt.isPresent()) {
             Player p1 = localPlayerOpt.get();
             
             List<String> remoteServers = new ArrayList<>(serverRegistry.getRegisteredServers());
-            logger.info("All registered servers: {}", remoteServers);
             remoteServers.remove(getSelfUrl()); 
-            logger.info("Attempting to find partner on remote servers: {}", remoteServers);
 
             for (String serverUrl : remoteServers) {
                 try {

@@ -19,9 +19,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Profile("server")
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
 @Component
 public class GameWebSocketHandler extends TextWebSocketHandler {
 
@@ -126,6 +123,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                     }
                 }
             } catch (IOException e) {
+                // Using a proper logger is better, but System.err is fine for this context
                 System.err.println("Error sending message via WebSocket for session " + session.getId() + ": " + e.getMessage());
             }
         }

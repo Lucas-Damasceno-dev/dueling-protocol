@@ -11,9 +11,6 @@ import java.util.Collections;
 import java.util.List;
 
 @Profile("server")
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
 @Service
 public class LeaderElectionService {
 
