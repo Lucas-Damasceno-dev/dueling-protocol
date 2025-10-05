@@ -1,0 +1,21 @@
+server:
+  port: ${SERVER_PORT:8080}
+  name: ${SERVER_NAME:localhost}
+
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:default}
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    org.springframework.web.socket: DEBUG
+    service.matchmaking: DEBUG
+    api: DEBUG
+    websocket: DEBUG
+
+# Configuration for clients
+client:
+  default-host: ${SERVER_HOST:localhost}
+  default-port: ${SERVER_PORT:8080}
