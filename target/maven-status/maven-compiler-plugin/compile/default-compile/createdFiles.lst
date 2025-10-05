@@ -4,10 +4,13 @@ model/Match.class
 model/EquipmentEffect.class
 repository/PlayerRepositoryPostgreSQL.class
 service/store/StoreServiceImpl.class
+controller/AuthController.class
+security/SecurityConfig.class
 service/store/PurchaseResult$PurchaseStatus.class
 repository/InMemoryPlayerRepository.class
 model/DefenseEffect.class
 service/store/LegendaryCardPack.class
+security/JwtUtil.class
 service/lock/LockService.class
 model/TradeProposal$Status.class
 model/Card$CardType.class
@@ -20,9 +23,11 @@ model/TradeProposal.class
 api/registry/ServerRegistry.class
 service/store/StoreService.class
 repository/DistributedPlayerRepository.class
+security/CustomUserDetailsService.class
 service/store/PurchaseResult.class
 config/AppConfig.class
 model/AttributeEffect.class
+repository/UserRepository.class
 repository/JpaPlayerRepository.class
 service/store/CardPackFactory.class
 model/CardPack.class
@@ -37,6 +42,7 @@ model/MagicEffect.class
 repository/PlayerRepository.class
 pubsub/RedisMessageListener.class
 websocket/GameWebSocketHandler.class
+security/JwtRequestFilter.class
 model/Card.class
 service/matchmaking/MatchmakingService.class
 service/store/BasicCardPack.class
@@ -50,9 +56,11 @@ model/AttackEffect.class
 config/RedisConfig.class
 model/ScenarioEffect.class
 controller/DuelingProtocolApplication.class
+service/auth/AuthenticationService.class
 service/store/PurchaseStatus.class
 pubsub/IEventManager.class
 model/GameSession.class
+model/User.class
 config/WebSocketConfig.class
 service/matchmaking/ConcurrentMatchmakingService.class
 pubsub/RedisEventManager.class

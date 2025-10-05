@@ -1,6 +1,7 @@
 package websocket;
 
 import controller.GameFacade;
+import model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,8 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import pubsub.IEventManager;
+import repository.UserRepository;
+import security.JwtUtil;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -25,26 +28,49 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     private static final Logger logger = LoggerFactory.getLogger(GameWebSocketHandler.class);
     private final GameFacade gameFacade;
     private final IEventManager eventManager;
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
     
     private final Map<String, String> sessionToPlayerId = new ConcurrentHashMap<>();
     private final Map<String, PrintWriter> playerWriters = new ConcurrentHashMap<>();
 
     @Autowired
-    public GameWebSocketHandler(GameFacade gameFacade) {
+    public GameWebSocketHandler(GameFacade gameFacade, UserRepository userRepository, JwtUtil jwtUtil) {
         this.gameFacade = gameFacade;
         this.eventManager = gameFacade.getEventManager();
+        this.userRepository = userRepository;
+        this.jwtUtil = jwtUtil;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String playerId = getPlayerIdFromSession(session);
-        if (playerId == null) {
-            logger.error("PlayerId not found in WebSocket URI. Closing session {}.", session.getId());
-            session.close(CloseStatus.BAD_DATA.withReason("PlayerId is required"));
+        // Extract JWT token from the connection parameters
+        String token = getJwtTokenFromSession(session);
+        if (token == null) {
+            logger.error("JWT token not found in WebSocket URI. Closing session {}.", session.getId());
+            session.close(CloseStatus.BAD_DATA.withReason("Authentication token is required"));
             return;
         }
 
-        logger.info("WebSocket connection established for player {}: session {}", playerId, session.getId());
+        // Validate the JWT token
+        if (!jwtUtil.validateToken(token)) {
+            logger.error("Invalid JWT token for session {}.", session.getId());
+            session.close(CloseStatus.BAD_DATA.withReason("Invalid authentication token"));
+            return;
+        }
+
+        String username = jwtUtil.getUsernameFromToken(token);
+        
+        // Find user by username to get their playerId
+        User user = userRepository.findByUsername(username).orElse(null);
+        if (user == null) {
+            logger.error("User not found for username: {} in session {}.", username, session.getId());
+            session.close(CloseStatus.BAD_DATA.withReason("User not found"));
+            return;
+        }
+
+        String playerId = user.getPlayerId();
+        logger.info("WebSocket connection established for player {} (user: {}): session {}", playerId, username, session.getId());
         sessionToPlayerId.put(session.getId(), playerId);
 
         PrintWriter writer = new PrintWriter(new WebSocketWriter(session));
@@ -92,12 +118,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private String getPlayerIdFromSession(WebSocketSession session) {
+    private String getJwtTokenFromSession(WebSocketSession session) {
         String query = session.getUri().getQuery();
         if (query != null) {
             for (String param : query.split("&")) {
                 String[] pair = param.split("=");
-                if (pair.length == 2 && "playerId".equals(pair[0])) {
+                if (pair.length == 2 && "token".equals(pair[0])) {
                     return pair[1];
                 }
             }
