@@ -4,7 +4,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: java -jar app.jar --spring.profiles.active=server,distributed
+    command: java -jar app.jar --spring.profiles.active=server,distributed,distributed-db
     container_name: server-1
     ports:
       - "8081:8080"
@@ -14,6 +14,13 @@ services:
       - SERVER_NAME=server-1
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=dueling_db
+      - POSTGRES_USER=dueling_user
+      - POSTGRES_PASSWORD=dueling_password
+    depends_on:
+      - postgres
     networks:
       - dueling-network
 
@@ -21,7 +28,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: java -jar app.jar --spring.profiles.active=server,distributed
+    command: java -jar app.jar --spring.profiles.active=server,distributed,distributed-db
     container_name: server-2
     ports:
       - "8082:8080"
@@ -30,6 +37,13 @@ services:
       - SERVER_NAME=server-2
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=dueling_db
+      - POSTGRES_USER=dueling_user
+      - POSTGRES_PASSWORD=dueling_password
+    depends_on:
+      - postgres
     networks:
       - dueling-network
 
@@ -69,6 +83,23 @@ services:
       - "6379:6379"
     networks:
       - dueling-network
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=dueling_db
+      - POSTGRES_USER=dueling_user
+      - POSTGRES_PASSWORD=dueling_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dueling-network
+
+volumes:
+  postgres_data:
 
 networks:
   dueling-network:

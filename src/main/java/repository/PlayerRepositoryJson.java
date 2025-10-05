@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
  * JSON-based implementation of the PlayerRepository interface.
  * This class persists player data to individual JSON files in a "players" directory.
  */
+@org.springframework.context.annotation.Profile("!distributed-db") // Use this when NOT using distributed-db profile
 @Repository
 public class PlayerRepositoryJson implements PlayerRepository {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();

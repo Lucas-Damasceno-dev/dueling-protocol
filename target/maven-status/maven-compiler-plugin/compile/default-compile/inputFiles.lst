@@ -14,6 +14,7 @@
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/pubsub/IEventManager.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/election/LeaderElectionService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/api/registry/ServerRegistry.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/health/HealthCheckService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/DistributedPlayerRepository.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/api/ServerApiClient.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/trade/TradeService.java
@@ -38,8 +39,10 @@
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/store/CardPackFactory.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/registry/ServerRegistrationService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/pubsub/RedisMessageListener.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/PlayerRepositoryPostgreSQL.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/controller/DuelingProtocolApplication.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/AttackEffect.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/JpaPlayerRepository.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/config/AppConfig.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/CardRepository.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/store/StoreServiceImpl.java

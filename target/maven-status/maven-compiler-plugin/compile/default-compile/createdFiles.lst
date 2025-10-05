@@ -2,6 +2,7 @@ pubsub/RedisMessageSubscriber.class
 api/ServerApiClient.class
 model/Match.class
 model/EquipmentEffect.class
+repository/PlayerRepositoryPostgreSQL.class
 service/store/StoreServiceImpl.class
 service/store/PurchaseResult$PurchaseStatus.class
 repository/InMemoryPlayerRepository.class
@@ -22,6 +23,7 @@ repository/DistributedPlayerRepository.class
 service/store/PurchaseResult.class
 config/AppConfig.class
 model/AttributeEffect.class
+repository/JpaPlayerRepository.class
 service/store/CardPackFactory.class
 model/CardPack.class
 repository/CardRepository.class
@@ -41,6 +43,7 @@ service/store/BasicCardPack.class
 service/trade/TradeService.class
 controller/GameFacade.class
 repository/PlayerRepositoryJson.class
+service/health/HealthCheckService.class
 model/Player.class
 service/registry/ServerRegistrationService.class
 model/AttackEffect.class

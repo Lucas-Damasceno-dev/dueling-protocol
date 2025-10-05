@@ -34,7 +34,7 @@ public class ServerSynchronizationController {
     @Autowired
     public ServerSynchronizationController(GameFacade gameFacade,
                                            ServerRegistry serverRegistry,
-                                           @Qualifier("playerRepositoryJson") PlayerRepository localPlayerRepository,
+                                           PlayerRepository localPlayerRepository,
                                            MatchmakingService matchmakingService,
                                            LeaderElectionService leaderElectionService,
                                            LockService lockService,

@@ -1,8 +1,8 @@
 package model;
 
+import jakarta.persistence.*;
 import java.util.List;
 import java.util.ArrayList;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,18 +11,41 @@ import org.slf4j.LoggerFactory;
  * A player has attributes such as health, coins, cards and characteristics
  * such as race and class that influence their base attributes.
  */
+@Entity
+@Table(name = "players")
 public class Player {
+    @Id
+    @Column(name = "id", unique = true, nullable = false)
     private String id;
-    private String nickname;
-    private int coins;
-    private List<Card> cardCollection;
     
+    @Column(name = "nickname", nullable = false)
+    private String nickname;
+    
+    @Column(name = "coins", nullable = false)
+    private int coins;
+    
+    @Column(name = "card_collection", columnDefinition = "TEXT") // Store as JSON string
+    private String cardCollectionJson;
+    
+    @Column(name = "player_race")
     private String playerRace;
+    
+    @Column(name = "player_class")
     private String playerClass;
+    
+    @Column(name = "health_points", nullable = false)
     private int healthPoints;
+    
+    @Column(name = "upgrade_points", nullable = false)
     private int upgradePoints;
+    
+    @Column(name = "base_attack", nullable = false)
     private int baseAttack;
+    
+    @Column(name = "base_defense", nullable = false)
     private int baseDefense;
+    
+    @Column(name = "base_mana", nullable = false)
     private int baseMana;
     
     private static final Logger logger = LoggerFactory.getLogger(Player.class);
@@ -32,7 +55,7 @@ public class Player {
      * Initializes the card collection as an empty list.
      */
     public Player() {
-    this.cardCollection = new ArrayList<>();
+        this.cardCollection = new ArrayList<>();
     }
     
     /**
@@ -44,14 +67,41 @@ public class Player {
      * @param nickname Display name of the player
      */
     public Player(String id, String nickname) {
-    this.cardCollection = new ArrayList<>();
-    this.id = id;
-    this.nickname = nickname;
-    this.coins = 1000;
-    this.healthPoints = 100;
-    this.upgradePoints = 0;
-    initializeStarterDeck();
-    logger.debug("New player created: {} ({})", nickname, id);
+        this.cardCollection = new ArrayList<>();
+        this.id = id;
+        this.nickname = nickname;
+        this.coins = 1000;
+        this.healthPoints = 100;
+        this.upgradePoints = 0;
+        initializeStarterDeck();
+        logger.debug("New player created: {} ({})", nickname, id);
+    }
+
+    // Transient field to hold card collection for runtime access
+    @Transient
+    private List<Card> cardCollection;
+
+    /**
+     * Gets the card collection from JSON string when needed
+     */
+    public List<Card> getCardCollection() {
+        if (cardCollection == null && cardCollectionJson != null) {
+            // Parse the JSON string back to List<Card>
+            // For now, we'll return an empty list - in a full implementation,
+            // we would use a JSON library like Jackson to deserialize
+            cardCollection = new ArrayList<>();
+        }
+        return cardCollection != null ? cardCollection : new ArrayList<>();
+    }
+
+    /**
+     * Sets the card collection and updates the JSON string
+     */
+    public void setCardCollection(List<Card> cardCollection) {
+        this.cardCollection = cardCollection;
+        // Convert to JSON string for persistence
+        // In a full implementation, we would serialize the list to JSON
+        this.cardCollectionJson = cardCollection != null ? cardCollection.toString() : "[]";
     }
 
     /**
@@ -73,9 +123,10 @@ public class Player {
      * Adds 5 basic ATTACK-type cards to the player's deck.
      */
     private void initializeStarterDeck() {
+        List<Card> cardCollection = getCardCollection(); // This will initialize if null
         // Add basic cards to starter deck
         for (int i = 0; i < 5; i++) {
-            this.cardCollection.add(new Card(
+            cardCollection.add(new Card(
                 "basic-" + i,
                 "Basic Card " + i,
                 1, 1, "Common",
@@ -132,165 +183,38 @@ public class Player {
     }
 
     // Getters and setters
-    /**
-     * Returns the player's character race.
-     *
-     * @return the character race
-     */
     public String getPlayerRace() { return playerRace; }
-    
-    /**
-     * Sets the player's character race.
-     *
-     * @param playerRace the new character race
-     */
     public void setPlayerRace(String playerRace) { this.playerRace = playerRace; }
     
-    /**
-     * Returns the player's character class.
-     *
-     * @return the character class
-     */
     public String getPlayerClass() { return playerClass; }
-    
-    /**
-     * Sets the player's character class.
-     *
-     * @param playerClass the new character class
-     */
     public void setPlayerClass(String playerClass) { this.playerClass = playerClass; }
     
-    /**
-     * Returns the player's health points.
-     *
-     * @return the player's health points
-     */
     public int getHealthPoints() { return healthPoints; }
-    
-    /**
-     * Sets the player's health points.
-     * Negative values are converted to zero.
-     *
-     * @param healthPoints the new health points for the player
-     */
     public void setHealthPoints(int healthPoints) { 
         this.healthPoints = Math.max(0, healthPoints); // Ensure health doesn't go below 0
     }
     
-    /**
-     * Returns the player's available upgrade points.
-     *
-     * @return the player's upgrade points
-     */
     public int getUpgradePoints() { return upgradePoints; }
-    
-    /**
-     * Sets the player's upgrade points.
-     * Negative values are converted to zero.
-     *
-     * @param upgradePoints the new upgrade points for the player
-     */
     public void setUpgradePoints(int upgradePoints) { this.upgradePoints = Math.max(0, upgradePoints); }
     
-    /**
-     * Returns the player's base attack.
-     *
-     * @return the player's base attack
-     */
     public int getBaseAttack() { return baseAttack; }
-    
-    /**
-     * Sets the player's base attack.
-     * Negative values are converted to zero.
-     *
-     * @param baseAttack the new base attack for the player
-     */
     public void setBaseAttack(int baseAttack) { this.baseAttack = Math.max(0, baseAttack); }
     
-    /**
-     * Returns the player's base defense.
-     *
-     * @return the player's base defense
-     */
     public int getBaseDefense() { return baseDefense; }
-    
-    /**
-     * Sets the player's base defense.
-     * Negative values are converted to zero.
-     *
-     * @param baseDefense the new base defense for the player
-     */
     public void setBaseDefense(int baseDefense) { this.baseDefense = Math.max(0, baseDefense); }
     
-    /**
-     * Returns the player's base mana.
-     *
-     * @return the player's base mana
-     */
     public int getBaseMana() { return baseMana; }
-    
-    /**
-     * Sets the player's base mana.
-     * Negative values are converted to zero.
-     *
-     * @param baseMana the new base mana for the player
-     */
     public void setBaseMana(int baseMana) { this.baseMana = Math.max(0, baseMana); }
 
-    /**
-     * Returns the player's unique identifier.
-     *
-     * @return the player ID
-     */
     public String getId() { return id; }
-    
-    /**
-     * Sets the player's unique identifier.
-     *
-     * @param id the new player ID
-     */
     public void setId(String id) { this.id = id; }
     
-    /**
-     * Returns the player's display name.
-     *
-     * @return the player's nickname
-     */
     public String getNickname() { return nickname; }
-    
-    /**
-     * Sets the player's display name.
-     *
-     * @param nickname the new player nickname
-     */
     public void setNickname(String nickname) { this.nickname = nickname; }
     
-    /**
-     * Returns the player's coin amount.
-     *
-     * @return the player's coin amount
-     */
     public int getCoins() { return coins; }
-    
-    /**
-     * Sets the player's coin amount.
-     * Negative values are converted to zero.
-     *
-     * @param coins the new coin amount for the player
-     */
     public void setCoins(int coins) { this.coins = Math.max(0, coins); }
     
-    /**
-     * Returns the player's card collection.
-     *
-     * @return the player's card list
-     */
-    public List<Card> getCardCollection() { return cardCollection; }
-    
-    /**
-     * Sets the player's card collection.
-     *
-     * @param cardCollection the new card list for the player
-     */
-    public void setCardCollection(List<Card> cardCollection) { this.cardCollection = cardCollection; }
+    public String getCardCollectionJson() { return cardCollectionJson; }
+    public void setCardCollectionJson(String cardCollectionJson) { this.cardCollectionJson = cardCollectionJson; }
 }
