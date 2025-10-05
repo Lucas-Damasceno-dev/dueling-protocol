@@ -1,3 +1,4 @@
+pubsub/RedisMessageSubscriber.class
 api/ServerApiClient.class
 model/Match.class
 model/EquipmentEffect.class
@@ -24,6 +25,7 @@ model/AttributeEffect.class
 service/store/CardPackFactory.class
 model/CardPack.class
 repository/CardRepository.class
+pubsub/RedisMessageListener$MessageHandler.class
 pubsub/EventManager.class
 model/CardEffect.class
 service/store/PremiumCardPack.class
@@ -31,6 +33,7 @@ model/GameSession$1.class
 client/GameClient$MyWebSocketClient.class
 model/MagicEffect.class
 repository/PlayerRepository.class
+pubsub/RedisMessageListener.class
 websocket/GameWebSocketHandler.class
 model/Card.class
 service/matchmaking/MatchmakingService.class
@@ -41,9 +44,12 @@ repository/PlayerRepositoryJson.class
 model/Player.class
 service/registry/ServerRegistrationService.class
 model/AttackEffect.class
+config/RedisConfig.class
 model/ScenarioEffect.class
 controller/DuelingProtocolApplication.class
 service/store/PurchaseStatus.class
+pubsub/IEventManager.class
 model/GameSession.class
 config/WebSocketConfig.class
 service/matchmaking/ConcurrentMatchmakingService.class
+pubsub/RedisEventManager.class

@@ -10,7 +10,7 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-import pubsub.EventManager;
+import pubsub.IEventManager;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -24,7 +24,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GameWebSocketHandler.class);
     private final GameFacade gameFacade;
-    private final EventManager eventManager;
+    private final IEventManager eventManager;
     
     private final Map<String, String> sessionToPlayerId = new ConcurrentHashMap<>();
     private final Map<String, PrintWriter> playerWriters = new ConcurrentHashMap<>();

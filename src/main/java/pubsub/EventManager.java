@@ -6,6 +6,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
@@ -14,7 +15,8 @@ import org.springframework.stereotype.Component;
  * where topics are identified by player IDs.
  */
 @Component
-public class EventManager {
+@Profile("!distributed") // Use this when NOT in distributed mode
+public class EventManager implements IEventManager {
     private static final Logger logger = LoggerFactory.getLogger(EventManager.class);
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<PrintWriter>> subscribers = new ConcurrentHashMap<>();
 
