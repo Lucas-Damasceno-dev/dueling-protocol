@@ -261,10 +261,49 @@ public class GameFacade {
                     notifyPlayer(playerId, "ERROR:Invalid trade command format or action.");
                 }
                 break;
+                
+            case "PRIVATE_MESSAGE":
+                if (command.length < 4) {
+                    notifyPlayer(playerId, "ERROR:Incomplete PRIVATE_MESSAGE command.");
+                    return;
+                }
+                
+                String recipientId = command[3];
+                String messageContent = String.join(":", java.util.Arrays.copyOfRange(command, 4, command.length));
+                
+                handlePrivateMessage(playerId, recipientId, messageContent);
+                break;
 
             default:
                 notifyPlayer(playerId, "ERROR:Unknown command '" + action + "'.");
                 break;
+        }
+    }
+    
+    /**
+     * Handle sending a private message from one player to another
+     */
+    private void handlePrivateMessage(String senderId, String recipientId, String content) {
+        // Validate that sender and recipient are friends (optional, can be configured based on requirements)
+        // For now, we'll allow any player to send a message to any other player
+        // In a more robust system, you could verify friendship status here
+        
+        // Send the private message using the event manager
+        if (eventManager instanceof pubsub.RedisEventManager) {
+            pubsub.RedisEventManager redisEventManager = (pubsub.RedisEventManager) eventManager;
+            redisEventManager.sendPrivateMessage(senderId, recipientId, content);
+            
+            // Confirm to the sender that the message was sent
+            notifyPlayer(senderId, "PRIVATE_MESSAGE_SENT:" + recipientId + ":" + content);
+        } else {
+            // Fallback to regular publish if not using RedisEventManager
+            // In this case, we'll use a private message channel
+            String channel = "private-messages:" + recipientId;
+            String message = "PRIVATE:" + senderId + ":" + content;
+            eventManager.publish(channel, message);
+            
+            // Confirm to the sender
+            notifyPlayer(senderId, "PRIVATE_MESSAGE_SENT:" + recipientId + ":" + content);
         }
     }
 

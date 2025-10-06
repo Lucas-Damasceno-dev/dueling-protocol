@@ -1,5 +1,8 @@
 package pubsub;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import model.PrivateMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,14 +25,18 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RedisMessageSubscriber implements MessageListener {
     
     private static final Logger logger = LoggerFactory.getLogger(RedisMessageSubscriber.class);
+    private static final String PRIVATE_MESSAGE_CHANNEL_PREFIX = "private-messages:";
     
     private final Map<String, PrintWriter> sessionHandlers = new ConcurrentHashMap<>();
+    private final Map<String, PrivateMessageHandler> privateMessageHandlers = new ConcurrentHashMap<>();
     
     @Autowired
     private StringRedisTemplate redisTemplate;
     
     @Autowired
     private RedisMessageListenerContainer redisMessageListenerContainer;
+    
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     /**
      * Register a WebSocket handler for a specific topic
@@ -45,6 +52,33 @@ public class RedisMessageSubscriber implements MessageListener {
     }
     
     /**
+     * Register a private message handler for a specific player
+     */
+    public void registerPrivateMessageHandler(String playerId, PrivateMessageHandler handler) {
+        String channel = PRIVATE_MESSAGE_CHANNEL_PREFIX + playerId;
+        privateMessageHandlers.put(playerId, handler);
+        
+        // Subscribe to the private message channel
+        ChannelTopic channelTopic = new ChannelTopic(channel);
+        redisMessageListenerContainer.addMessageListener((message, pattern) -> {
+            String messageBody = new String(message.getBody());
+            try {
+                PrivateMessage privateMessage = objectMapper.readValue(messageBody, PrivateMessage.class);
+                PrivateMessageHandler privateHandler = privateMessageHandlers.get(playerId);
+                if (privateHandler != null) {
+                    privateHandler.handleMessage(privateMessage);
+                }
+            } catch (JsonProcessingException e) {
+                logger.error("Error deserializing private message: {}", e.getMessage());
+            } catch (Exception e) {
+                logger.error("Error processing private message: {}", e.getMessage());
+            }
+        }, channelTopic);
+        
+        logger.info("Registered private message handler for player: {}", playerId);
+    }
+    
+    /**
      * Remove a WebSocket handler for a specific topic
      */
     public void unregisterHandler(String topic) {
@@ -53,11 +87,26 @@ public class RedisMessageSubscriber implements MessageListener {
     }
     
     /**
-     * Handle incoming Redis messages
+     * Remove a private message handler for a specific player
+     */
+    public void unregisterPrivateMessageHandler(String playerId) {
+        privateMessageHandlers.remove(playerId);
+        logger.info("Unregistered private message handler for player: {}", playerId);
+    }
+    
+    /**
+     * Handle incoming Redis messages for regular topics
      */
     @Override
     public void onMessage(Message message, byte[] pattern) {
         String topic = new String(message.getChannel());
+        
+        // Check if this is a private message channel
+        if (topic.startsWith(PRIVATE_MESSAGE_CHANNEL_PREFIX)) {
+            // This should be handled by the private message listener
+            return;
+        }
+        
         String messageBody = new String(message.getBody());
         
         // Use the topic as the key to get the appropriate PrintWriter handler
@@ -69,5 +118,13 @@ public class RedisMessageSubscriber implements MessageListener {
         } else {
             logger.warn("No handler found for topic: {}", topic);
         }
+    }
+    
+    /**
+     * Interface for handling incoming private messages
+     */
+    @FunctionalInterface
+    public interface PrivateMessageHandler {
+        void handleMessage(PrivateMessage message);
     }
 }

@@ -79,6 +79,16 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         gameFacade.registerPlayer(playerId);
         eventManager.subscribe(playerId, writer);
         
+        // Subscribe to private messages for this player
+        if (eventManager instanceof pubsub.RedisEventManager) {
+            pubsub.RedisEventManager redisEventManager = (pubsub.RedisEventManager) eventManager;
+            redisEventManager.subscribeToPrivateMessages(playerId, privateMessage -> {
+                String message = "PRIVATE_MESSAGE:" + privateMessage.getSenderId() + ":" + privateMessage.getContent();
+                writer.println(message);
+                writer.flush();
+            });
+        }
+        
         writer.println("SUCCESS:CONNECTED");
         writer.flush();
     }
@@ -112,6 +122,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             PrintWriter writer = playerWriters.remove(playerId);
             if (writer != null) {
                 eventManager.unsubscribe(playerId, writer);
+                
+                // Unsubscribe from private messages for this player
+                if (eventManager instanceof pubsub.RedisEventManager) {
+                    pubsub.RedisEventManager redisEventManager = (pubsub.RedisEventManager) eventManager;
+                    redisEventManager.unsubscribeFromPrivateMessages(playerId);
+                }
             }
 
             gameFacade.unregisterPlayer(playerId);

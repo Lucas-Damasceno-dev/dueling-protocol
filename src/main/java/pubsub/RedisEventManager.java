@@ -1,5 +1,6 @@
 package pubsub;
 
+import model.PrivateMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,37 @@ public class RedisEventManager implements IEventManager {
     private RedisMessageSubscriber redisMessageSubscriber;
     
     private final ConcurrentHashMap<String, PrintWriter> subscribers = new ConcurrentHashMap<>();
+    
+    /**
+     * Subscribe to private messages for a specific player
+     */
+    public void subscribeToPrivateMessages(String playerId, RedisMessageSubscriber.PrivateMessageHandler handler) {
+        redisMessageSubscriber.registerPrivateMessageHandler(playerId, handler);
+    }
+    
+    /**
+     * Unsubscribe from private messages for a specific player
+     */
+    public void unsubscribeFromPrivateMessages(String playerId) {
+        redisMessageSubscriber.unregisterPrivateMessageHandler(playerId);
+    }
+    
+    /**
+     * Send a private message to a specific player
+     */
+    public void sendPrivateMessage(String senderId, String recipientId, String content) {
+        try {
+            PrivateMessage message = new PrivateMessage(senderId, recipientId, content);
+            String messageJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(message);
+            
+            String channel = "private-messages:" + recipientId;
+            redisTemplate.convertAndSend(channel, messageJson);
+            
+            logger.debug("Private message sent from {} to {}: {}", senderId, recipientId, content);
+        } catch (Exception e) {
+            logger.error("Error sending private message: {}", e.getMessage());
+        }
+    }
 
     /**
      * Subscribes a client's PrintWriter to a specific topic (player ID).
