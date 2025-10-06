@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import pubsub.IEventManager;
 import repository.FriendshipRepository;
 import repository.UserRepository;
 
@@ -29,6 +30,9 @@ public class FriendController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private IEventManager eventManager;
 
     /**
      * Send a friend request to another user
@@ -69,6 +73,11 @@ public class FriendController {
         // Create new friendship request (PENDING status)
         Friendship friendship = new Friendship(sender.getPlayerId(), target.getPlayerId(), Friendship.Status.PENDING);
         friendshipRepository.save(friendship);
+
+        // Send real-time notification to the target user
+        String notificationChannel = "user-notifications:" + target.getPlayerId();
+        String notification = "FRIEND_REQUEST:" + sender.getPlayerId() + ":" + sender.getUsername();
+        eventManager.publish(notificationChannel, notification);
 
         Map<String, String> response = new HashMap<>();
         response.put("message", "Friend request sent successfully");
@@ -125,6 +134,11 @@ public class FriendController {
         friendship.setStatus(Friendship.Status.ACCEPTED);
         friendshipRepository.save(friendship);
 
+        // Send real-time notification to the sender that the request was accepted
+        String notificationChannel = "user-notifications:" + sender.getPlayerId();
+        String notification = "FRIEND_REQUEST_ACCEPTED:" + receiver.getPlayerId() + ":" + receiver.getUsername();
+        eventManager.publish(notificationChannel, notification);
+
         Map<String, String> response = new HashMap<>();
         response.put("message", "Friend request accepted successfully");
         return ResponseEntity.ok(response);
@@ -179,6 +193,11 @@ public class FriendController {
         // Update the friendship status to REJECTED
         friendship.setStatus(Friendship.Status.REJECTED);
         friendshipRepository.save(friendship);
+
+        // Send real-time notification to the sender that the request was rejected
+        String notificationChannel = "user-notifications:" + sender.getPlayerId();
+        String notification = "FRIEND_REQUEST_REJECTED:" + receiver.getPlayerId() + ":" + receiver.getUsername();
+        eventManager.publish(notificationChannel, notification);
 
         Map<String, String> response = new HashMap<>();
         response.put("message", "Friend request rejected successfully");

@@ -87,6 +87,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 writer.println(message);
                 writer.flush();
             });
+            
+            // Subscribe to user notifications for this player
+            String notificationChannel = "user-notifications:" + playerId;
+            redisEventManager.subscribe(notificationChannel, writer);
         }
         
         writer.println("SUCCESS:CONNECTED");
@@ -127,6 +131,13 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 if (eventManager instanceof pubsub.RedisEventManager) {
                     pubsub.RedisEventManager redisEventManager = (pubsub.RedisEventManager) eventManager;
                     redisEventManager.unsubscribeFromPrivateMessages(playerId);
+                }
+                
+                // Unsubscribe from user notifications for this player
+                if (eventManager instanceof pubsub.RedisEventManager) {
+                    pubsub.RedisEventManager redisEventManager = (pubsub.RedisEventManager) eventManager;
+                    String notificationChannel = "user-notifications:" + playerId;
+                    redisEventManager.unsubscribe(notificationChannel, writer);
                 }
             }
 
