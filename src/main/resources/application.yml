@@ -26,6 +26,18 @@ jwt:
   secret: ${JWT_SECRET:mySecretKeyForDuelingProtocolThatShouldBeLongerThan256Bits}
   expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus  # Expose health, metrics, and prometheus endpoints
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: dueling-protocol
+
 logging:
   level:
     root: INFO
