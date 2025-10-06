@@ -35,7 +35,13 @@ public class FriendController {
     private IEventManager eventManager;
 
     /**
-     * Send a friend request to another user
+     * Sends a friend request from the authenticated user to a target user.
+     * The request is stored with a PENDING status.
+     *
+     * @param request A map containing the "targetUsername" of the user to send the request to.
+     * @return A {@link ResponseEntity} indicating the success or failure of the friend request.
+     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
+     *         or 400 Bad Request for invalid input or if a friendship already exists/is pending.
      */
     @PostMapping("/request")
     public ResponseEntity<Map<String, String>> sendFriendRequest(@RequestBody Map<String, String> request) {
@@ -85,7 +91,13 @@ public class FriendController {
     }
 
     /**
-     * Accept a friend request
+     * Accepts a pending friend request.
+     * The authenticated user must be the recipient of the request.
+     *
+     * @param request A map containing the "senderUsername" of the user whose request is being accepted.
+     * @return A {@link ResponseEntity} indicating the success or failure of accepting the request.
+     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
+     *         or 400 Bad Request for invalid input or if no pending request is found.
      */
     @PostMapping("/accept")
     public ResponseEntity<Map<String, String>> acceptFriendRequest(@RequestBody Map<String, String> request) {
@@ -145,7 +157,13 @@ public class FriendController {
     }
 
     /**
-     * Reject a friend request
+     * Rejects a pending friend request.
+     * The authenticated user must be the recipient of the request.
+     *
+     * @param request A map containing the "senderUsername" of the user whose request is being rejected.
+     * @return A {@link ResponseEntity} indicating the success or failure of rejecting the request.
+     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
+     *         or 400 Bad Request for invalid input or if no pending request is found.
      */
     @PostMapping("/reject")
     public ResponseEntity<Map<String, String>> rejectFriendRequest(@RequestBody Map<String, String> request) {
@@ -205,7 +223,12 @@ public class FriendController {
     }
 
     /**
-     * Get list of friends for the authenticated user
+     * Retrieves a list of all accepted friends for the authenticated user.
+     *
+     * @return A {@link ResponseEntity} containing a map with a list of friends and their count.
+     *         Each friend is represented by a map containing their playerId and username.
+     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
+     *         or 400 Bad Request if the authenticated user is not found.
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getFriends() {
@@ -244,7 +267,12 @@ public class FriendController {
     }
 
     /**
-     * Get pending friend requests received by the authenticated user
+     * Retrieves a list of pending friend requests received by the authenticated user.
+     *
+     * @return A {@link ResponseEntity} containing a map with a list of pending requests and their count.
+     *         Each request is represented by a map containing the sender's playerId and username.
+     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
+     *         or 400 Bad Request if the authenticated user is not found.
      */
     @GetMapping("/requests")
     public ResponseEntity<Map<String, Object>> getFriendRequests() {
@@ -283,7 +311,10 @@ public class FriendController {
     }
 
     /**
-     * Helper method to get the currently authenticated username
+     * Helper method to retrieve the username of the currently authenticated user.
+     *
+     * @return The username of the authenticated user, or {@code null} if no user is authenticated
+     *         or if the authenticated user is an anonymous user.
      */
     private String getCurrentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

@@ -23,6 +23,29 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+/**
+ * Central coordinator for game operations in the Dueling Protocol system.
+ * 
+ * <p>This class acts as the main entry point for all game-related functionality,
+ * coordinating between different services like matchmaking, store, trading, etc.
+ * It also manages active game sessions and player registrations.</p>
+ * 
+ * <p>The GameFacade is responsible for:</p>
+ * <ul>
+ *   <li>Managing player registration and unregistration</li>
+ *   <li>Coordinating matchmaking between players</li>
+ *   <li>Handling game session creation and management</li>
+ *   <li>Processing game commands from clients</li>
+ *   <li>Managing trading between players</li>
+ *   <li>Distributing daily rewards to active players</li>
+ * </ul>
+ * 
+ * <p>This class is annotated with {@code @Profile("server")} to ensure it only runs
+ * in server mode, and with {@code @Service} to register it as a Spring service bean.</p>
+ * 
+ * @author Dueling Protocol Team
+ * @since 1.0
+ */
 @Profile("server")
 @Service
 public class GameFacade {
@@ -64,6 +87,12 @@ public class GameFacade {
         this.cardRepository = cardRepository;
     }
 
+    /**
+     * Constructs and returns the URL of the current server instance.
+     * The URL is built using the configured server name and port.
+     *
+     * @return The full URL of the current server (e.g., "http://localhost:8080").
+     */
     private String getSelfUrl() {
         if (selfUrl == null) {
             selfUrl = "http://" + serverName + ":" + serverPort;
@@ -71,14 +100,36 @@ public class GameFacade {
         return selfUrl;
     }
 
+    /**
+     * Retrieves the event manager instance used by the game facade.
+     *
+     * @return The {@link IEventManager} instance for publishing and subscribing to game events.
+     */
     public IEventManager getEventManager() {
         return this.eventManager;
     }
 
+    /**
+     * Registers a player in the game facade.
+     * 
+     * <p>This method is called when a new player connects to the WebSocket server.
+     * It logs the player registration and prepares the player for game interactions.</p>
+     * 
+     * @param playerId the unique identifier of the player to register
+     */
     public void registerPlayer(String playerId) {
         logger.info("Player registered in facade: {}", playerId);
     }
     
+    /**
+     * Unregisters a player from the game facade and cleans up associated game sessions.
+     * 
+     * <p>This method is called when a player disconnects from the WebSocket server.
+     * It removes the player from any active games and notifies their opponents
+     * about the disconnection.</p>
+     * 
+     * @param playerId the unique identifier of the player to unregister
+     */
     public void unregisterPlayer(String playerId) {
         List<String> gamesToRemove = new ArrayList<>();
         for (Map.Entry<String, GameSession> entry : activeGames.entrySet()) {
@@ -103,12 +154,25 @@ public class GameFacade {
         logger.info("Player unregistered and games cleaned up: {}", playerId);
     }
 
+    /**
+     * Enters a player into the matchmaking queue to find an opponent for a duel.
+     * 
+     * <p>This method adds the player to the matchmaking queue and attempts to create
+     * a match immediately. If a suitable opponent is found, a new game session is started.</p>
+     * 
+     * @param player the player to enter into matchmaking
+     */
     public void enterMatchmaking(Player player) {
         matchmakingService.addPlayerToQueue(player);
         logger.info("Player {} added to matchmaking queue", player.getId());
         tryToCreateMatch();
     }
 
+    /**
+     * Attempts to create a match by looking for players in the local matchmaking queue
+     * and, if necessary, requesting a partner from other registered servers.
+     * If a match is found or a remote partner is successfully locked, a new game session is started.
+     */
     public void tryToCreateMatch() {
         Optional<Match> localMatch = matchmakingService.findMatch();
         if (localMatch.isPresent()) {
@@ -141,6 +205,13 @@ public class GameFacade {
         }
     }
 
+    /**
+     * Initiates a new game session for the given match.
+     * This involves creating a {@link GameSession}, distributing initial cards,
+     * and notifying both players about the game start.
+     *
+     * @param match The {@link Match} object containing the two players for the game.
+     */
     private void startMatch(Match match) {
         Player p1 = match.getPlayer1();
         Player p2 = match.getPlayer2();
@@ -162,22 +233,51 @@ public class GameFacade {
         notifyPlayer(p2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
     }
 
+    /**
+     * Notifies a specific player with a given message.
+     * This method uses the {@link IEventManager} to publish the message to the player's channel.
+     *
+     * @param playerId The unique identifier of the player to notify.
+     * @param message The message to send to the player.
+     */
     public void notifyPlayer(String playerId, String message) {
         eventManager.publish(playerId, message);
     }
 
+    /**
+     * Notifies a list of players with a given message.
+     * This method iterates through the provided player IDs and calls {@link #notifyPlayer(String, String)}
+     * for each player.
+     *
+     * @param playerIds A list of unique identifiers of the players to notify.
+     * @param message The message to send to all specified players.
+     */
     public void notifyPlayers(List<String> playerIds, String message) {
         for (String playerId : playerIds) {
             notifyPlayer(playerId, message);
         }
     }
 
+    /**
+     * Extracts and concatenates the IDs of a list of cards into a single comma-separated string.
+     *
+     * @param cards The list of {@link Card} objects from which to extract IDs.
+     * @return A comma-separated string of card IDs, or an empty string if the list is empty.
+     */
     private String getCardIds(List<Card> cards) {
         StringBuilder sb = new StringBuilder();
         cards.forEach(c -> sb.append(c.getId()).append(","));
         return sb.length() > 0 ? sb.substring(0, sb.length() - 1) : "";
     }
 
+    /**
+     * Processes a game command received from a player.
+     * This method parses the command array and delegates to appropriate handlers
+     * based on the action specified in the command.
+     *
+     * @param command A string array representing the parsed game command.
+     *                Expected format: ["COMMAND_TYPE", "PLAYER_ID", "ACTION", ...]
+     */
     public void processGameCommand(String[] command) {
         if (command.length < 3) {
             logger.warn("Invalid command structure: {}", String.join(":", command));
@@ -309,10 +409,24 @@ public class GameFacade {
         }
     }
 
+    /**
+     * Finds a player by their unique identifier.
+     *
+     * @param playerId The unique identifier of the player to find.
+     * @return The {@link Player} object if found, otherwise {@code null}.
+     */
     public Player findPlayerById(String playerId) {
         return playerRepository.findById(playerId).orElse(null);
     }
 
+    /**
+     * Allows a player to purchase a card pack from the store.
+     * The player's card collection and coin balance are updated upon successful purchase.
+     *
+     * @param player The {@link Player} attempting to buy the pack.
+     * @param packType The type of card pack to purchase (e.g., "STARTER", "PREMIUM").
+     * @return A {@link PurchaseResult} indicating the outcome of the purchase, including any cards received.
+     */
     public PurchaseResult buyPack(Player player, String packType) {
         PurchaseResult result = storeService.purchaseCardPack(player, packType);
         if (result.isSuccess()) {
@@ -322,6 +436,15 @@ public class GameFacade {
         return result;
     }
 
+    /**
+     * Concludes a game session, updates player scores, and notifies participants.
+     * The active game session is removed, the winner receives upgrade points,
+     * and both players are informed of the game's outcome.
+     *
+     * @param matchId The ID of the match that is finishing.
+     * @param winnerId The ID of the player who won the match.
+     * @param loserId The ID of the player who lost the match.
+     */
     public void finishGame(String matchId, String winnerId, String loserId) {
         if (activeGames.remove(matchId) == null) {
             logger.warn("Attempt to finish non-existent match: {}", matchId);
@@ -343,6 +466,15 @@ public class GameFacade {
         logger.info("Match {} finished. Winner: {}, Loser: {}", matchId, winnerId, loserId);
     }
 
+    /**
+     * Executes a trade proposal that has been accepted.
+     * This method handles the atomic exchange of cards between two players,
+     * ensuring both players have the cards they are offering/requesting.
+     * It also involves acquiring and releasing a distributed lock to ensure data consistency.
+     *
+     * @param tradeId The unique identifier of the trade proposal to execute.
+     * @return {@code true} if the trade was executed successfully, {@code false} otherwise.
+     */
     public boolean executeTrade(String tradeId) {
         Optional<TradeProposal> proposalOpt = tradeService.findTradeById(tradeId);
         if (proposalOpt.isEmpty()) {
@@ -541,6 +673,11 @@ public class GameFacade {
         logger.info("Trade {} rejected by player {}", tradeId, playerId);
     }
     
+    /**
+     * Periodically attempts to create matches from the matchmaking queue.
+     * This method is scheduled to run at a fixed rate (e.g., every 2 seconds)
+     * to continuously process pending matchmaking requests.
+     */
     @Scheduled(fixedRate = 2000) // Try to create matches every 2 seconds
     public void scheduledMatchmaking() {
         tryToCreateMatch(); // Attempt to create matches periodically
@@ -548,6 +685,12 @@ public class GameFacade {
     
     /**
      * Daily reward task that runs once per day to award active players
+     */
+    /**
+     * Awards daily rewards to all active players.
+     * This method is scheduled to run once every day at midnight.
+     * It iterates through all registered players, grants them a daily coin reward,
+     * and notifies them about the reward.
      */
     @Scheduled(cron = "0 0 0 * * ?") // Run at midnight every day
     public void awardDailyRewards() {

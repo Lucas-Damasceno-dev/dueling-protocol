@@ -14,8 +14,8 @@ public class ServerApiClient {
     private final RestTemplate restTemplate;
 
     @Autowired
-    public ServerApiClient(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+    public ServerApiClient(RestTemplate aRestTemplate) {
+        this.restTemplate = aRestTemplate;
     }
 
     public void registerWithServer(String targetServerUrl, String selfUrl) {

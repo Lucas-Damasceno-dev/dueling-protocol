@@ -6,6 +6,15 @@ import java.time.LocalDateTime;
 
 /**
  * Entity representing a friendship relationship between users.
+ * 
+ * <p>This class models the relationship between two users in a social network,
+ * supporting different states of the relationship such as pending, accepted, etc.</p>
+ * 
+ * <p>The entity supports bidirectional relationships where one user is the
+ * requester (userA) and the other is the recipient (userB).</p>
+ * 
+ * @author Dueling Protocol Team
+ * @since 1.0
  */
 @Entity
 @Table(name = "friendships")
@@ -100,17 +109,32 @@ public class Friendship {
         this.updatedAt = updatedAt;
     }
 
-    // Helper methods to check if users are friends
+        /**
+     * Checks if the friendship status is ACCEPTED.
+     *
+     * @return {@code true} if the friendship status is {@link Status#ACCEPTED}, {@code false} otherwise.
+     */
     public boolean isFriends() {
         return status == Status.ACCEPTED;
     }
 
-    // Check if friendship is with a specific user
+    /**
+     * Checks if the friendship involves a specific user.
+     *
+     * @param userId The unique identifier of the user to check for.
+     * @return {@code true} if the specified user is part of this friendship, {@code false} otherwise.
+     */
     public boolean isWithUser(String userId) {
         return userAId.equals(userId) || userBId.equals(userId);
     }
 
-    // Get the other user in the friendship
+    /**
+     * Gets the other user in the friendship relationship.
+     *
+     * @param userId The unique identifier of one user in the relationship.
+     * @return The unique identifier of the other user in the friendship, or {@code null} 
+     *         if the provided userId is not part of this friendship.
+     */
     public String getOtherUser(String userId) {
         if (userAId.equals(userId)) {
             return userBId;
