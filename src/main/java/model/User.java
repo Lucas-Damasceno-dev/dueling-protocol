@@ -1,12 +1,18 @@
 package model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * Entity representing a user in the system with authentication credentials.
  */
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+    @Index(name = "idx_username", columnList = "username"),
+    @Index(name = "idx_player_id", columnList = "player_id")
+})
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 public class User {
     
     @Id

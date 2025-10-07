@@ -3,11 +3,13 @@ package client;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Scanner;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -75,8 +77,8 @@ public final class GameClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.error("Main thread interrupted: {}", e.getMessage());
-        } catch (IOException | URISyntaxException e) {
-            logger.error("Connection or URI error in main: {}", e.getMessage(), e);
+        } catch (URISyntaxException e) {
+            logger.error("URI error in main: {}", e.getMessage(), e);
         } finally {
             if (webSocketClient != null) {
                 webSocketClient.close();
@@ -167,8 +169,6 @@ public final class GameClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.error("[autobot] Interrupted during autobot execution: {}", e.getMessage());
-        } catch (IOException e) {
-            logger.error("[autobot] IO error during autobot execution: {}", e.getMessage(), e);
         }
     }
 
@@ -263,8 +263,6 @@ public final class GameClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.error("[maliciousbot] Interrupted during malicious bot execution: {}", e.getMessage());
-        } catch (IOException e) {
-            logger.error("[maliciousbot] IO error during malicious bot execution: {}", e.getMessage(), e);
         }
     }
 
@@ -319,8 +317,14 @@ public final class GameClient {
             long latency = endTime - startTime;
             logger.info("\nPing: {} ms", latency);
             printFullMenu();
-        } catch (IOException e) {
-            logger.error("\nPing failed: {}", e.getMessage());
+        } catch (SocketException e) {
+            logger.error("\nSocket error during ping: {}", e.getMessage());
+            printFullMenu();
+        } catch (UnknownHostException e) {
+            logger.error("\nCould not resolve host during ping: {}", e.getMessage());
+            printFullMenu();
+        } catch (java.io.IOException e) {
+            logger.error("\nNetwork error during ping: {}", e.getMessage());
             printFullMenu();
         }
     }

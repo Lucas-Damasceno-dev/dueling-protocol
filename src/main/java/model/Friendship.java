@@ -1,6 +1,8 @@
 package model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import java.time.LocalDateTime;
 
@@ -17,7 +19,13 @@ import java.time.LocalDateTime;
  * @since 1.0
  */
 @Entity
-@Table(name = "friendships")
+@Table(name = "friendships", indexes = {
+    @Index(name = "idx_user_a_id", columnList = "user_a_id"),
+    @Index(name = "idx_user_b_id", columnList = "user_b_id"),
+    @Index(name = "idx_status", columnList = "status"),
+    @Index(name = "idx_user_a_b_status", columnList = "user_a_id, user_b_id, status") // composite index for common queries
+})
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 public class Friendship {
 
     @Id

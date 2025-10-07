@@ -1,6 +1,8 @@
 package model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 import java.util.List;
 import java.util.ArrayList;
 import org.slf4j.Logger;
@@ -12,7 +14,10 @@ import org.slf4j.LoggerFactory;
  * such as race and class that influence their base attributes.
  */
 @Entity
-@Table(name = "players")
+@Table(name = "players", indexes = {
+    @Index(name = "idx_nickname", columnList = "nickname")
+})
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 public class Player {
     @Id
     @Column(name = "id", unique = true, nullable = false)
