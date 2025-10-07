@@ -30,16 +30,15 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     private final IEventManager eventManager;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
-    
-    private final Map<String, String> sessionToPlayerId = new ConcurrentHashMap<>();
-    private final Map<String, PrintWriter> playerWriters = new ConcurrentHashMap<>();
+    private final WebSocketSessionManager sessionManager;
 
     @Autowired
-    public GameWebSocketHandler(GameFacade gameFacade, UserRepository userRepository, JwtUtil jwtUtil) {
+    public GameWebSocketHandler(GameFacade gameFacade, UserRepository userRepository, JwtUtil jwtUtil, WebSocketSessionManager sessionManager) {
         this.gameFacade = gameFacade;
         this.eventManager = gameFacade.getEventManager();
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
+        this.sessionManager = sessionManager;
     }
 
     @Override
@@ -69,12 +68,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        String playerId = user.getPlayerId();
+        String playerId = sessionManager.getPlayerIdBySessionId(session.getId());
         logger.info("WebSocket connection established for player {} (user: {}): session {}", playerId, username, session.getId());
-        sessionToPlayerId.put(session.getId(), playerId);
 
         PrintWriter writer = new PrintWriter(new WebSocketWriter(session));
-        playerWriters.put(playerId, writer);
+        sessionManager.storePlayerWriter(playerId, writer);
 
         gameFacade.registerPlayer(playerId);
         eventManager.subscribe(playerId, writer);
@@ -99,7 +97,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        String playerId = sessionToPlayerId.get(session.getId());
+        String playerId = sessionManager.getPlayerIdBySessionId(session.getId());
         if (playerId == null) {
             logger.warn("Received message from unknown session: {}", session.getId());
             return;
@@ -119,11 +117,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
-        String playerId = sessionToPlayerId.remove(session.getId());
+        String playerId = sessionManager.removeSessionMapping(session.getId());
         if (playerId != null) {
             logger.info("WebSocket connection closed for player {}: session {} with status {}", playerId, session.getId(), status);
             
-            PrintWriter writer = playerWriters.remove(playerId);
+            PrintWriter writer = sessionManager.removePlayerWriter(playerId);
             if (writer != null) {
                 eventManager.unsubscribe(playerId, writer);
                 

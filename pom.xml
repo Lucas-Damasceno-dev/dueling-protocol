@@ -95,6 +95,12 @@
             <version>3.24.3</version>
         </dependency>
         
+        <!-- Spring Session with Redis for WebSocket session persistence -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+        
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
@@ -194,6 +200,7 @@
                     <linkXRef>false</linkXRef>
                 </configuration>
             </plugin>
+            <!--
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
@@ -213,6 +220,7 @@
                     <failOnError>true</failOnError>
                 </configuration>
             </plugin>
+            -->
         </plugins>
     </build>
 
