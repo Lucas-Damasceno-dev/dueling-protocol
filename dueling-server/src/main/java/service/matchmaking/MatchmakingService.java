@@ -17,6 +17,14 @@ public interface MatchmakingService {
     void addPlayerToQueue(Player player);
     
     /**
+     * Adds a player to the matchmaking queue with their selected deck.
+     *
+     * @param player the player to add to the queue
+     * @param deckId the ID of the deck the player wants to use
+     */
+    void addPlayerToQueueWithDeck(Player player, String deckId);
+    
+    /**
      * Attempts to find a match between players in the queue.
      *
      * @return an Optional containing a Match if two players are available, or empty if not enough players

@@ -12,7 +12,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import pubsub.IEventManager;
 import repository.CardRepository;
+import repository.DeckRepository;
 import repository.PlayerRepository;
+import service.deck.DeckService;
 import service.election.LeaderElectionService;
 import service.matchmaking.MatchmakingService;
 import service.store.PurchaseResult;
@@ -59,6 +61,7 @@ public class GameFacade {
     private final TradeService tradeService;
     private final LeaderElectionService leaderElectionService;
     private final CardRepository cardRepository;
+    private final DeckService deckService;
 
     @Value("${server.name}")
     private String serverName;
@@ -74,7 +77,7 @@ public class GameFacade {
                       PlayerRepository playerRepository, repository.JpaPlayerRepository jpaPlayerRepository,
                       IEventManager eventManager, ServerRegistry serverRegistry, ServerApiClient serverApiClient,
                       TradeService tradeService, LeaderElectionService leaderElectionService,
-                      CardRepository cardRepository) {
+                      CardRepository cardRepository, DeckService deckService) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
@@ -85,6 +88,7 @@ public class GameFacade {
         this.tradeService = tradeService;
         this.leaderElectionService = leaderElectionService;
         this.cardRepository = cardRepository;
+        this.deckService = deckService;
     }
 
     /**
@@ -167,6 +171,22 @@ public class GameFacade {
         logger.info("Player {} added to matchmaking queue", player.getId());
         tryToCreateMatch();
     }
+    
+    /**
+     * Enters a player into the matchmaking queue to find an opponent for a duel, with a specific deck.
+     * 
+     * <p>This method adds the player to the matchmaking queue with a specific deck and attempts to create
+     * a match immediately. If a suitable opponent is found, a new game session is started using the specified deck.</p>
+     * 
+     * @param player the player to enter into matchmaking
+     * @param deckId the ID of the deck to use in the game
+     */
+    public void enterMatchmaking(Player player, String deckId) {
+        // Create a matchmaking entry that includes the deck selection
+        matchmakingService.addPlayerToQueueWithDeck(player, deckId);
+        logger.info("Player {} added to matchmaking queue with deck {}", player.getId(), deckId);
+        tryToCreateMatch();
+    }
 
     /**
      * Attempts to create a match by looking for players in the local matchmaking queue
@@ -217,6 +237,7 @@ public class GameFacade {
         Player p2 = match.getPlayer2();
 
         String matchId = UUID.randomUUID().toString();
+        // Use default deck if available, otherwise use the full card collection
         List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
         List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
 
@@ -231,6 +252,83 @@ public class GameFacade {
 
         notifyPlayer(p1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
         notifyPlayer(p2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
+    }
+    
+    /**
+     * Initiates a new game session for the given match with specific decks.
+     * This involves creating a {@link GameSession}, distributing initial cards from the selected decks,
+     * and notifying both players about the game start.
+     *
+     * @param match The {@link Match} object containing the two players for the game.
+     * @param deckId1 The ID of the deck to use for player 1
+     * @param deckId2 The ID of the deck to use for player 2
+     */
+    private void startMatchWithDecks(Match match, String deckId1, String deckId2) {
+        Player p1 = match.getPlayer1();
+        Player p2 = match.getPlayer2();
+
+        String matchId = UUID.randomUUID().toString();
+        
+        // Get cards from the specified decks
+        List<Card> deckP1 = getDeckCards(p1.getId(), deckId1);
+        List<Card> deckP2 = getDeckCards(p2.getId(), deckId2);
+        
+        // If deck not found or invalid, fallback to default deck or full collection
+        if (deckP1 == null) {
+            deckP1 = getDefaultDeckCards(p1.getId());
+            if (deckP1 == null) {
+                deckP1 = new ArrayList<>(p1.getCardCollection()); // Fallback to full collection
+            }
+        }
+        
+        if (deckP2 == null) {
+            deckP2 = getDefaultDeckCards(p2.getId());
+            if (deckP2 == null) {
+                deckP2 = new ArrayList<>(p2.getCardCollection()); // Fallback to full collection
+            }
+        }
+
+        GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this, cardRepository);
+        session.startGame();
+        activeGames.put(matchId, session);
+        
+        logger.info("New match created between {} and {} with ID {} using decks {} and {}", 
+                   p1.getId(), p2.getId(), matchId, deckId1, deckId2);
+
+        notifyPlayer(p1.getId(), "UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
+        notifyPlayer(p2.getId(), "UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
+
+        notifyPlayer(p1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
+        notifyPlayer(p2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
+    }
+    
+    /**
+     * Retrieves cards from a specific deck for a player.
+     *
+     * @param playerId The ID of the player
+     * @param deckId The ID of the deck to retrieve
+     * @return List of cards in the specified deck, or null if not found
+     */
+    private List<Card> getDeckCards(String playerId, String deckId) {
+        Optional<model.Deck> deckOpt = deckService.getDeckForPlayer(deckId, playerId);
+        if (deckOpt.isPresent()) {
+            return deckOpt.get().getCards();
+        }
+        return null;
+    }
+    
+    /**
+     * Retrieves cards from the default deck for a player.
+     *
+     * @param playerId The ID of the player
+     * @return List of cards in the default deck, or null if not found
+     */
+    private List<Card> getDefaultDeckCards(String playerId) {
+        Optional<model.Deck> deckOpt = deckService.getDefaultDeck(playerId);
+        if (deckOpt.isPresent()) {
+            return deckOpt.get().getCards();
+        }
+        return null;
     }
 
     /**
@@ -305,8 +403,24 @@ public class GameFacade {
 
             case "MATCHMAKING":
                 if (command.length > 3 && "ENTER".equals(command[3])) {
-                    enterMatchmaking(player);
-                    notifyPlayer(playerId, "SUCCESS:Entered matchmaking queue.");
+                    String deckId = null;
+                    if (command.length > 4) {
+                        deckId = command[4]; // Optional deck ID parameter
+                    }
+                    
+                    if (deckId != null && !deckId.isEmpty()) {
+                        // Verify that the deck belongs to the player and is valid
+                        if (deckService.isValidDeckForGame(deckId, playerId)) {
+                            enterMatchmaking(player, deckId);
+                            notifyPlayer(playerId, "SUCCESS:Entered matchmaking queue with deck: " + deckId);
+                        } else {
+                            notifyPlayer(playerId, "ERROR:Invalid or non-existent deck: " + deckId);
+                        }
+                    } else {
+                        // Use default deck if available, otherwise use full collection
+                        enterMatchmaking(player);
+                        notifyPlayer(playerId, "SUCCESS:Entered matchmaking queue with default deck.");
+                    }
                 }
                 break;
 
