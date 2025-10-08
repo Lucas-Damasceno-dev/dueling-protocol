@@ -1,5 +1,7 @@
 package dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import model.Card;
 
 import java.util.List;
@@ -10,9 +12,17 @@ import java.util.List;
  */
 public class DeckDTO {
     private String id;
+    
+    @NotBlank(message = "Deck name is required")
+    @Size(min = 1, max = 100, message = "Deck name must be between 1 and 100 characters")
     private String name;
+    
+    @Size(max = 500, message = "Deck description must be less than 500 characters")
     private String description;
+    
+    @NotBlank(message = "Player ID is required")
     private String playerId;
+    
     private List<Card> cards;
     private boolean isDefault;
 
