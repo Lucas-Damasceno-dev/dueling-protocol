@@ -620,10 +620,7 @@ public class GameFacade {
                 return false;
             }
 
-            boolean p1HasCards = p1.getCardCollection().stream().map(Card::getId).collect(Collectors.toList()).containsAll(proposal.getOfferedCardIds());
-            boolean p2HasCards = p2.getCardCollection().stream().map(Card::getId).collect(Collectors.toList()).containsAll(proposal.getRequestedCardIds());
-
-            if (!p1HasCards || !p2HasCards) {
+            if (!p1.hasCards(proposal.getOfferedCardIds()) || !p2.hasCards(proposal.getRequestedCardIds())) {
                 logger.warn("Trade {} invalid: one or both players missing cards.", tradeId);
                 notifyPlayer(p1.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
                 notifyPlayer(p2.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
@@ -675,21 +672,17 @@ public class GameFacade {
         }
         
         // Validate that the proposer has the cards they want to offer
-        List<String> proposerCardIds = proposer.getCardCollection().stream().map(Card::getId).collect(Collectors.toList());
-        for (String cardId : offeredCardIds) {
-            if (!proposerCardIds.contains(cardId)) {
-                notifyPlayer(proposerId, "ERROR:Proposer does not have card " + cardId);
-                return;
-            }
+        List<String> offeredCardIdsList = Arrays.asList(offeredCardIds);
+        if (!proposer.hasCards(offeredCardIdsList)) {
+            notifyPlayer(proposerId, "ERROR:Proposer does not have all the offered cards");
+            return;
         }
         
         // Validate that the target has the cards they are requested to give
-        List<String> targetCardIds = target.getCardCollection().stream().map(Card::getId).collect(Collectors.toList());
-        for (String cardId : requestedCardIds) {
-            if (!targetCardIds.contains(cardId)) {
-                notifyPlayer(proposerId, "ERROR:Target player does not have card " + cardId);
-                return;
-            }
+        List<String> requestedCardIdsList = Arrays.asList(requestedCardIds);
+        if (!target.hasCards(requestedCardIdsList)) {
+            notifyPlayer(proposerId, "ERROR:Target player does not have all the requested cards");
+            return;
         }
         
         // Create the trade proposal
