@@ -2,7 +2,6 @@ package integration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
@@ -16,12 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Integration tests for the authentication API endpoints.
  */
-@SpringBootTest(
-    classes = {controller.DuelingProtocolApplication.class, config.TestConfig.class},
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
 @ActiveProfiles("test") // Use test profile to avoid conflicts with development/production configs
-public class AuthControllerIntegrationTest {
+public class AuthControllerIntegrationTest extends AbstractIntegrationTest {
 
     @LocalServerPort
     private int port;
@@ -72,13 +67,8 @@ public class AuthControllerIntegrationTest {
 
     @Test
     public void testLoginUser_Success() {
-        // First register a user
-        Map<String, String> registrationData = new HashMap<>();
-        registrationData.put("username", "loginuser");
-        registrationData.put("password", "loginpass123");
-        registrationData.put("playerId", "player456");
-        
-        restTemplate.postForEntity(baseUrl() + "/register", registrationData, String.class);
+        // First register a user using the helper
+        TestUserHelper.registerUser(restTemplate, "loginuser", "loginpass123", "player456");
 
         // Prepare login data
         Map<String, String> loginData = new HashMap<>();
