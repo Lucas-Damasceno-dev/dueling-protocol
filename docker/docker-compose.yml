@@ -49,30 +49,30 @@ services:
 
   client-1:
     build:
-      context: ..
+      context: ../dueling-client
       dockerfile: Dockerfile
-    command: sh -c "java -cp app.jar client.GameClient autobot"
+    command: autobot
     depends_on:
       - server-1
       - server-2
     environment:
-      - SERVER_HOST=server-1
-      - SERVER_PORT=8080
+      - GATEWAY_HOST=server-1
+      - GATEWAY_PORT=8080
     networks:
       - dueling-network
 
   client-2:
     build:
-      context: ..
+      context: ../dueling-client
       dockerfile: Dockerfile
-    command: sh -c "java -cp app.jar client.GameClient autobot"
+    command: autobot
     depends_on:
       - server-1
       - server-2
       - redis
     environment:
-      - SERVER_HOST=server-2
-      - SERVER_PORT=8080
+      - GATEWAY_HOST=server-2
+      - GATEWAY_PORT=8080
     networks:
       - dueling-network
 
