@@ -1,5 +1,6 @@
 package controller;
 
+import dto.ErrorResponse;
 import model.Friendship;
 import model.User;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,12 +18,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Controller for handling friend-related operations.
  */
 @RestController
 @RequestMapping("/api/friends")
 @CrossOrigin(origins = "*") // Adjust as needed for your frontend
+@Tag(name = "Friends", description = "Endpoints for managing friend relationships between players")
 public class FriendController {
 
     @Autowired
@@ -34,29 +43,50 @@ public class FriendController {
     @Autowired
     private IEventManager eventManager;
 
-    /**
-     * Sends a friend request from the authenticated user to a target user.
-     * The request is stored with a PENDING status.
-     *
-     * @param request A map containing the "targetUsername" of the user to send the request to.
-     * @return A {@link ResponseEntity} indicating the success or failure of the friend request.
-     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
-     *         or 400 Bad Request for invalid input or if a friendship already exists/is pending.
-     */
+    @Operation(
+        summary = "Send a friend request",
+        description = "Sends a friend request from the authenticated user to a target user. The request is stored with a PENDING status."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Friend request sent successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"message\": \"Friend request sent successfully\"}"
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "400", 
+            description = "Bad request - Invalid input or friendship already exists/is pending",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "401", 
+            description = "Unauthorized - User not authenticated",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)
+            )
+        )
+    })
     @PostMapping("/request")
-    public ResponseEntity<Map<String, String>> sendFriendRequest(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> sendFriendRequest(@RequestBody Map<String, String> request) {
         String authenticatedUsername = getCurrentUsername();
         if (authenticatedUsername == null) {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "User not authenticated");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            ErrorResponse errorResponse = new ErrorResponse("User not authenticated", "UNAUTHORIZED");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
         }
 
         String targetUsername = request.get("targetUsername");
         if (targetUsername == null || targetUsername.equals(authenticatedUsername)) {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "Invalid target username");
-            return ResponseEntity.badRequest().body(response);
+            ErrorResponse errorResponse = new ErrorResponse("Invalid target username", "BAD_REQUEST");
+            return ResponseEntity.badRequest().body(errorResponse);
         }
 
         // Get users by username
@@ -64,16 +94,14 @@ public class FriendController {
         User target = userRepository.findByUsername(targetUsername).orElse(null);
 
         if (sender == null || target == null) {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "User not found");
-            return ResponseEntity.badRequest().body(response);
+            ErrorResponse errorResponse = new ErrorResponse("User not found", "BAD_REQUEST");
+            return ResponseEntity.badRequest().body(errorResponse);
         }
 
         // Check if friendship already exists
         if (friendshipRepository.existsBetweenUsers(sender.getPlayerId(), target.getPlayerId())) {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "Friendship already exists or request is pending");
-            return ResponseEntity.badRequest().body(response);
+            ErrorResponse errorResponse = new ErrorResponse("Friendship already exists or request is pending", "CONFLICT");
+            return ResponseEntity.badRequest().body(errorResponse);
         }
 
         // Create new friendship request (PENDING status)
@@ -90,15 +118,40 @@ public class FriendController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Accepts a pending friend request.
-     * The authenticated user must be the recipient of the request.
-     *
-     * @param request A map containing the "senderUsername" of the user whose request is being accepted.
-     * @return A {@link ResponseEntity} indicating the success or failure of accepting the request.
-     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
-     *         or 400 Bad Request for invalid input or if no pending request is found.
-     */
+    @Operation(
+        summary = "Accept a pending friend request",
+        description = "Accepts a pending friend request. The authenticated user must be the recipient of the request."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Friend request accepted successfully",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"message\": \"Friend request accepted successfully\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "Bad request - Invalid input or no pending request found",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"Sender username is required\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "401",
+        description = "Unauthorized - User not authenticated",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"User not authenticated\"}"
+            )
+        )
+    )
     @PostMapping("/accept")
     public ResponseEntity<Map<String, String>> acceptFriendRequest(@RequestBody Map<String, String> request) {
         String authenticatedUsername = getCurrentUsername();
@@ -156,15 +209,40 @@ public class FriendController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Rejects a pending friend request.
-     * The authenticated user must be the recipient of the request.
-     *
-     * @param request A map containing the "senderUsername" of the user whose request is being rejected.
-     * @return A {@link ResponseEntity} indicating the success or failure of rejecting the request.
-     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
-     *         or 400 Bad Request for invalid input or if no pending request is found.
-     */
+    @Operation(
+        summary = "Reject a pending friend request",
+        description = "Rejects a pending friend request. The authenticated user must be the recipient of the request."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Friend request rejected successfully",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"message\": \"Friend request rejected successfully\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "Bad request - Invalid input or no pending request found",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"Sender username is required\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "401",
+        description = "Unauthorized - User not authenticated",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"User not authenticated\"}"
+            )
+        )
+    )
     @PostMapping("/reject")
     public ResponseEntity<Map<String, String>> rejectFriendRequest(@RequestBody Map<String, String> request) {
         String authenticatedUsername = getCurrentUsername();
@@ -222,28 +300,50 @@ public class FriendController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Retrieves a list of all accepted friends for the authenticated user.
-     *
-     * @return A {@link ResponseEntity} containing a map with a list of friends and their count.
-     *         Each friend is represented by a map containing their playerId and username.
-     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
-     *         or 400 Bad Request if the authenticated user is not found.
-     */
+    @Operation(
+        summary = "Retrieve list of accepted friends",
+        description = "Retrieves a list of all accepted friends for the authenticated user."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Friends list retrieved successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"friends\": [{\"playerId\": \"player123\", \"username\": \"friend1\"}], \"count\": 1}"
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "400", 
+            description = "Bad request - Authenticated user not found",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "401", 
+            description = "Unauthorized - User not authenticated",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)
+            )
+        )
+    })
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getFriends() {
+    public ResponseEntity<?> getFriends() {
         String authenticatedUsername = getCurrentUsername();
         if (authenticatedUsername == null) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", "User not authenticated");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            ErrorResponse errorResponse = new ErrorResponse("User not authenticated", "UNAUTHORIZED");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
         }
 
         User currentUser = userRepository.findByUsername(authenticatedUsername).orElse(null);
         if (currentUser == null) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", "User not found");
-            return ResponseEntity.badRequest().body(response);
+            ErrorResponse errorResponse = new ErrorResponse("User not found", "USER_NOT_FOUND");
+            return ResponseEntity.badRequest().body(errorResponse);
         }
 
         // Get all accepted friendships for the user
@@ -266,14 +366,40 @@ public class FriendController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Retrieves a list of pending friend requests received by the authenticated user.
-     *
-     * @return A {@link ResponseEntity} containing a map with a list of pending requests and their count.
-     *         Each request is represented by a map containing the sender's playerId and username.
-     *         Returns 200 OK on success, 401 Unauthorized if the user is not authenticated,
-     *         or 400 Bad Request if the authenticated user is not found.
-     */
+    @Operation(
+        summary = "Retrieve list of pending friend requests",
+        description = "Retrieves a list of pending friend requests received by the authenticated user."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Friend requests list retrieved successfully",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"requests\": [{\"senderPlayerId\": \"sender123\", \"senderUsername\": \"requester\"}], \"count\": 1}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "Bad request - Authenticated user not found",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"User not found\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "401",
+        description = "Unauthorized - User not authenticated",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"User not authenticated\"}"
+            )
+        )
+    )
     @GetMapping("/requests")
     public ResponseEntity<Map<String, Object>> getFriendRequests() {
         String authenticatedUsername = getCurrentUsername();

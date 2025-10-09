@@ -1,6 +1,7 @@
 package controller;
 
 import dto.DeckDTO;
+import dto.ErrorResponse;
 import jakarta.validation.Valid;
 import model.Card;
 import model.Deck;
@@ -17,12 +18,20 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Controller for handling deck-related REST API requests.
  * Manages the creation, retrieval, update, and deletion of decks.
  */
 @RestController
 @RequestMapping("/api/deck")
+@Tag(name = "Decks", description = "Endpoints for managing player decks")
 public class DeckController {
 
     @Autowired
@@ -31,29 +40,68 @@ public class DeckController {
     @Autowired
     private PlayerRepository playerRepository;
 
-    /**
-     * Create a new deck for a player.
-     *
-     * @param playerId The ID of the player creating the deck
-     * @param deckDTO The deck data to create
-     * @return ResponseEntity containing the created deck or an error message
-     */
+    @Operation(
+        summary = "Create a new deck for a player",
+        description = "Creates a new deck for a player with the provided deck data."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Deck created successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = DeckDTO.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "400", 
+            description = "Bad request - Validation error in deck data",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "404", 
+            description = "Not found - Player with the specified ID does not exist",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "409", 
+            description = "Conflict - A deck with the same name already exists for this player",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "500", 
+            description = "Internal server error - Error creating deck",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)
+            )
+        )
+    })
     @PostMapping("/create/{playerId}")
     public ResponseEntity<?> createDeck(@PathVariable String playerId, @Valid @RequestBody DeckDTO deckDTO) {
         try {
             // Validate if player exists
             Optional<Player> playerOpt = playerRepository.findById(playerId);
             if (!playerOpt.isPresent()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Player with ID " + playerId + " not found");
+                ErrorResponse errorResponse = new ErrorResponse("Player with ID " + playerId + " not found", "PLAYER_NOT_FOUND");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
             }
 
             Player player = playerOpt.get();
 
             // Check if a deck with this name already exists for the player
             if (deckRepository.existsByNameAndPlayerId(deckDTO.getName(), playerId)) {
-                return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("A deck with name '" + deckDTO.getName() + "' already exists for this player");
+                ErrorResponse errorResponse = new ErrorResponse("A deck with name '" + deckDTO.getName() + "' already exists for this player", "CONFLICT");
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
             }
 
             // Create a new deck
@@ -77,19 +125,35 @@ public class DeckController {
             DeckDTO savedDeckDTO = convertToDTO(savedDeck);
             return ResponseEntity.ok(savedDeckDTO);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Error creating deck: " + e.getMessage());
+            ErrorResponse errorResponse = new ErrorResponse("Error creating deck: " + e.getMessage(), "INTERNAL_ERROR");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 
-    /**
-     * Get all decks for a specific player.
-     *
-     * @param playerId The ID of the player whose decks to retrieve
-     * @return ResponseEntity containing a list of the player's decks
-     */
+    @Operation(
+        summary = "Get all decks for a specific player",
+        description = "Retrieves all decks belonging to the specified player."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Decks retrieved successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = DeckDTO.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "500", 
+            description = "Internal server error - Error retrieving decks",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ErrorResponse.class)
+            )
+        )
+    })
     @GetMapping("/player/{playerId}")
-    public ResponseEntity<List<DeckDTO>> getPlayerDecks(@PathVariable String playerId) {
+    public ResponseEntity<?> getPlayerDecks(@PathVariable String playerId) {
         try {
             List<Deck> decks = deckRepository.findByPlayerId(playerId);
             List<DeckDTO> deckDTOs = decks.stream()
@@ -97,16 +161,45 @@ public class DeckController {
                 .collect(Collectors.toList());
             return ResponseEntity.ok(deckDTOs);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            ErrorResponse errorResponse = new ErrorResponse("Error retrieving decks: " + e.getMessage(), "INTERNAL_ERROR");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 
-    /**
-     * Get a specific deck by its ID.
-     *
-     * @param deckId The ID of the deck to retrieve
-     * @return ResponseEntity containing the deck or an error message
-     */
+    @Operation(
+        summary = "Get a specific deck by its ID",
+        description = "Retrieves a specific deck by its unique identifier."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Deck retrieved successfully",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"id\": \"deck123\", \"name\": \"My Deck\", \"description\": \"A powerful deck\", \"playerId\": \"player123\", \"cards\": [], \"default\": false}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Not found - Deck with the specified ID does not exist",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"Deck with ID deck123 not found\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "500",
+        description = "Internal server error - Error retrieving deck",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"Error retrieving deck: Database connection failed\"}"
+            )
+        )
+    )
     @GetMapping("/{deckId}")
     public ResponseEntity<?> getDeck(@PathVariable String deckId) {
         try {
@@ -123,13 +216,70 @@ public class DeckController {
         }
     }
 
-    /**
-     * Update an existing deck.
-     *
-     * @param deckId The ID of the deck to update
-     * @param deckDTO The updated deck data
-     * @return ResponseEntity containing the updated deck or an error message
-     */
+    @Operation(
+        summary = "Update an existing deck",
+        description = "Updates an existing deck with the provided deck data."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Deck updated successfully",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"id\": \"deck123\", \"name\": \"Updated Deck\", \"description\": \"An even more powerful deck\", \"playerId\": \"player123\", \"cards\": [], \"default\": false}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "Bad request - Validation error in deck data",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"Validation failed: Name is required\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "403",
+        description = "Forbidden - User is not authorized to update this deck",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"You are not authorized to update this deck\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Not found - Deck with the specified ID does not exist",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"Deck with ID deck123 not found\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Conflict - A deck with the same name already exists for this player",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"A deck with name 'Updated Deck' already exists for this player\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "500",
+        description = "Internal server error - Error updating deck",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"Error updating deck: Database connection failed\"}"
+            )
+        )
+    )
     @PutMapping("/{deckId}")
     public ResponseEntity<?> updateDeck(@PathVariable String deckId, @Valid @RequestBody DeckDTO deckDTO) {
         try {
@@ -179,13 +329,40 @@ public class DeckController {
         }
     }
 
-    /**
-     * Delete a specific deck.
-     *
-     * @param deckId The ID of the deck to delete
-     * @param playerId The ID of the player requesting deletion (for authorization)
-     * @return ResponseEntity indicating success or an error message
-     */
+    @Operation(
+        summary = "Delete a specific deck",
+        description = "Deletes a specific deck by its ID. The player must be authorized to delete the deck."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Deck deleted successfully",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"message\": \"Deck deleted successfully\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Not found - Deck with the specified ID does not exist for the player",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"Deck with ID deck123 not found for player player123\"}"
+            )
+        )
+    )
+    @ApiResponse(
+        responseCode = "500",
+        description = "Internal server error - Error deleting deck",
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(
+                example = "{\"error\": \"Error deleting deck: Database connection failed\"}"
+            )
+        )
+    )
     @DeleteMapping("/{deckId}")
     public ResponseEntity<?> deleteDeck(@PathVariable String deckId, @RequestParam String playerId) {
         try {
