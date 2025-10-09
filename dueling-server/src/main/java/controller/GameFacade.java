@@ -814,4 +814,27 @@ public class GameFacade {
             logger.error("Error during daily reward distribution: {}", e.getMessage(), e);
         }
     }
+
+    /**
+     * Periodically regenerates resources for all active games.
+     * This method is scheduled to run at a fixed rate (e.g., every 2 seconds)
+     * to increment the players' resource pools.
+     */
+    @Scheduled(fixedRate = 2000) // Regenerate resources every 2 seconds
+    public void scheduledResourceRegeneration() {
+        for (GameSession session : activeGames.values()) {
+            session.regenerateResources();
+        }
+    }
+
+    /**
+     * Periodically checks for expired turn timers in active games.
+     * If a timer has expired, it forces the current player to take a default action.
+     */
+    @Scheduled(fixedRate = 1000) // Check every second
+    public void scheduledTurnTimerCheck() {
+        for (GameSession session : activeGames.values()) {
+            session.forceEndTurn();
+        }
+    }
 }
