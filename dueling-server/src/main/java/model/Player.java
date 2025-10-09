@@ -53,6 +53,8 @@ public class Player {
     
     @Column(name = "base_mana", nullable = false)
     private int baseMana;
+
+    
     
     private static final Logger logger = LoggerFactory.getLogger(Player.class);
 
@@ -223,6 +225,8 @@ public class Player {
     
     public String getCardCollectionJson() { return cardCollectionJson; }
     public void setCardCollectionJson(String cardCollectionJson) { this.cardCollectionJson = cardCollectionJson; }
+
+    
     
     /**
      * Checks if the player has all the specified cards.
