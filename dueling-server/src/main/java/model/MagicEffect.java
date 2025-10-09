@@ -1,11 +1,17 @@
 package model;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Implementation of the magic effect for MAGIC-type cards.
  * This effect deals magical damage to the target player, calculated as
  * double the card's attack value.
  */
 public class MagicEffect implements CardEffect {
+    
+    private static final Logger logger = LoggerFactory.getLogger(MagicEffect.class);
+    
     /**
      * {@inheritDoc}
      * Deals magical damage to the target player equal to double the card's attack value.
@@ -19,6 +25,6 @@ public class MagicEffect implements CardEffect {
     public void execute(GameSession session, Player caster, Player target, Card card) {
         int magicDamage = card.getAttack() * 2; // Magic can have a multiplier, for example
         target.setHealthPoints(target.getHealthPoints() - magicDamage);
-        System.out.println(caster.getNickname() + " used '" + card.getName() + "' on " + target.getNickname() + ", dealing " + magicDamage + " magical damage!");
+        logger.info("{} used '{}' on {}, dealing {} magical damage!", caster.getNickname(), card.getName(), target.getNickname(), magicDamage);
     }
 }

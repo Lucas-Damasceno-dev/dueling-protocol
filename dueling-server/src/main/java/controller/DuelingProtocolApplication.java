@@ -11,7 +11,7 @@ import security.JwtProperties;
 
 @SpringBootApplication
 @EnableConfigurationProperties(JwtProperties.class)
-@ComponentScan(basePackages = {"controller", "service", "repository", "api", "pubsub", "websocket", "config", "model", "security"})
+@ComponentScan(basePackages = {"controller", "service", "api", "pubsub", "websocket", "config", "model", "security", "repository"})
 @EntityScan(basePackages = {"model"})
 @EnableScheduling
 public class DuelingProtocolApplication {

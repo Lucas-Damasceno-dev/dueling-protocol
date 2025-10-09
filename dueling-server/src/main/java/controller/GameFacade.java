@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import pubsub.IEventManager;
 import repository.CardRepository;
-import repository.DeckRepository;
+
 import repository.PlayerRepository;
 import service.deck.DeckService;
 import service.election.LeaderElectionService;

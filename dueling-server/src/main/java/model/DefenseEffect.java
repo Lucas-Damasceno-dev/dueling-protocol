@@ -1,10 +1,16 @@
 package model;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Implementation of the defense effect for DEFENSE-type cards.
  * This effect increases the casting player's base defense.
  */
 public class DefenseEffect implements CardEffect {
+    
+    private static final Logger logger = LoggerFactory.getLogger(DefenseEffect.class);
+    
     /**
      * {@inheritDoc}
      * Increases the casting player's base defense by the card's defense value.
@@ -18,6 +24,6 @@ public class DefenseEffect implements CardEffect {
     public void execute(GameSession session, Player caster, Player target, Card card) {
         int defenseBonus = card.getDefense();
         caster.setBaseDefense(caster.getBaseDefense() + defenseBonus);
-        System.out.println(caster.getNickname() + " used '" + card.getName() + "', gaining +" + defenseBonus + " base defense!");
+        logger.info("{} used '{}', gaining +{} base defense!", caster.getNickname(), card.getName(), defenseBonus);
     }
 }

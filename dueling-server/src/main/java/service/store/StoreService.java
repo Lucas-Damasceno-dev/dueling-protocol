@@ -1,7 +1,7 @@
 package service.store;
 
 import model.Player;
-import service.store.PurchaseResult;
+
 
 /**
  * Interface for store services.

@@ -2,7 +2,7 @@ package service.deck;
 
 import model.Card;
 import model.Deck;
-import model.Player;
+
 import repository.DeckRepository;
 import repository.PlayerRepository;
 

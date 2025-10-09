@@ -1,12 +1,19 @@
-# Use an appropriate base image with Java 21
-FROM openjdk:21-jre-slim
-
-# Set the working directory inside the container
+# Stage 1: Build - Uses an image with Maven and JDK 21 to compile the client
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# Copy the client jar from the target directory to the container
-COPY target/dueling-client-1.0-SNAPSHOT.jar app.jar
+# Copy the entire project source
+COPY . .
+
+# Build the client JAR by running package on the specific module
+RUN mvn package -DskipTests -pl dueling-client
+
+# Stage 2: Run - Uses a lightweight image with only Java Runtime 21
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+
+# Copy the client jar from the build stage's correct target directory
+COPY --from=build /app/dueling-client/target/dueling-client-1.0-SNAPSHOT.jar app.jar
 
 # Command to run the client application
-# The main class is client.GameClient
-ENTRYPOINT ["java", "-cp", "app.jar", "client.GameClient"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

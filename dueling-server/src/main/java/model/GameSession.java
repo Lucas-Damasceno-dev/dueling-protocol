@@ -3,15 +3,7 @@ package model;
 import controller.GameFacade;
 import repository.CardRepository;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
-// Import card effects
-import model.AttackEffect;
-import model.DefenseEffect;
-import model.MagicEffect;
-import model.AttributeEffect;
-import model.ScenarioEffect;
-import model.EquipmentEffect;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

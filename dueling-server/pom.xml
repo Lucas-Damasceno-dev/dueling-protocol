@@ -55,18 +55,11 @@
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-jcache</artifactId>
         </dependency>
-        
-        <!-- JCache API -->
+
         <dependency>
-            <groupId>javax.cache</groupId>
-            <artifactId>cache-api</artifactId>
-        </dependency>
-        
-        <!-- Redis based JCache provider -->
-        <dependency>
-            <groupId>com.github.ben-manes.caffeine</groupId>
-            <artifactId>jcache</artifactId>
-            <version>3.1.8</version>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-hibernate-6</artifactId>
+            <version>3.24.3</version>
         </dependency>
         
         <!-- Let's use Redisson for Redis-based JCache -->
@@ -145,11 +138,7 @@
             <version>${javalin.version}</version>
         </dependency>
         
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>${slf4j.version}</version>
-        </dependency>
+        
         
         <!-- Test dependencies -->
         <dependency>
