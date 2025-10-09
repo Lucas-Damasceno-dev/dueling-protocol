@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import model.ResourceType;
 
 /**
  * Represents a player in the Dueling Protocol game.
@@ -226,8 +227,29 @@ public class Player {
     public String getCardCollectionJson() { return cardCollectionJson; }
     public void setCardCollectionJson(String cardCollectionJson) { this.cardCollectionJson = cardCollectionJson; }
 
-    
-    
+    /**
+     * Gets the thematic resource type for the player based on their class.
+     * 
+     * @return The ResourceType enum corresponding to the player's class.
+     */
+    public ResourceType getResourceType() {
+        if (this.playerClass == null) {
+            return ResourceType.MANA; // Default resource
+        }
+        switch (this.playerClass) {
+            case "Mage":
+                return ResourceType.MANA;
+            case "Warrior":
+                return ResourceType.FURIA;
+            case "Rogue":
+                return ResourceType.ENERGIA;
+            case "Archer":
+                return ResourceType.FOCO;
+            default:
+                return ResourceType.MANA; // Fallback for any other class
+        }
+    }
+
     /**
      * Checks if the player has all the specified cards.
      * 

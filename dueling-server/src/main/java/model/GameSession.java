@@ -46,12 +46,30 @@ public class GameSession {
         Collections.shuffle(deckP1);
         Collections.shuffle(deckP2);
         logger.info("Match {} started between {} and {}", matchId, player1.getId(), player2.getId());
+
+        // Notify players about game start with resource types
+        ResourceType resourceTypeP1 = player1.getResourceType();
+        ResourceType resourceTypeP2 = player2.getResourceType();
+
+        String gameStartMsgP1 = String.format("UPDATE:GAME_START:%s:%s:%s:%s:%s:%s",
+                matchId, player2.getNickname(), resourceTypeP1.name(), resourceTypeP2.name(), resourceTypeP1.colorHex, resourceTypeP2.colorHex);
+        gameFacade.notifyPlayer(player1.getId(), gameStartMsgP1);
+
+        String gameStartMsgP2 = String.format("UPDATE:GAME_START:%s:%s:%s:%s:%s:%s",
+                matchId, player1.getNickname(), resourceTypeP2.name(), resourceTypeP1.name(), resourceTypeP2.colorHex, resourceTypeP1.colorHex);
+        gameFacade.notifyPlayer(player2.getId(), gameStartMsgP2);
+
+        // Draw cards and notify
         drawCards(player1, handP1, deckP1, 5);
         drawCards(player2, handP2, deckP2, 5);
         gameFacade.notifyPlayer(player1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(handP1));
         gameFacade.notifyPlayer(player2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(handP2));
         
-        // Randomly select starting player
+        // Notify initial resource state
+        String resourceMessage = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
+        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), resourceMessage);
+
+        // Randomly select starting player and start first turn
         this.currentPlayerId = new Random().nextBoolean() ? player1.getId() : player2.getId();
         startNewTurn();
     }

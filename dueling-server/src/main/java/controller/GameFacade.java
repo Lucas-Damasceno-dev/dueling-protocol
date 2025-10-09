@@ -244,16 +244,11 @@ public class GameFacade {
         List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
 
         GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this, cardRepository);
-        session.startGame();
         activeGames.put(matchId, session);
         
+        session.startGame(); // Session now handles its own start notifications
+        
         logger.info("New match created between {} and {} with ID {}", p1.getId(), p2.getId(), matchId);
-
-        notifyPlayer(p1.getId(), "UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
-        notifyPlayer(p2.getId(), "UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
-
-        notifyPlayer(p1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
-        notifyPlayer(p2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
     }
     
     /**
@@ -291,17 +286,12 @@ public class GameFacade {
         }
 
         GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this, cardRepository);
-        session.startGame();
         activeGames.put(matchId, session);
-        
+
+        session.startGame(); // Session now handles its own start notifications
+
         logger.info("New match created between {} and {} with ID {} using decks {} and {}", 
                    p1.getId(), p2.getId(), matchId, deckId1, deckId2);
-
-        notifyPlayer(p1.getId(), "UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
-        notifyPlayer(p2.getId(), "UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
-
-        notifyPlayer(p1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
-        notifyPlayer(p2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
     }
     
     /**
