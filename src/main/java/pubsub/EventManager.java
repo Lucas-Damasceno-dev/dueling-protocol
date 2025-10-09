@@ -6,12 +6,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 /**
  * Manages event publishing and subscriptions for the game.
  * This class implements an in-memory publisher-subscriber system
  * where topics are identified by player IDs.
  */
+@Component
 public class EventManager {
     private static final Logger logger = LoggerFactory.getLogger(EventManager.class);
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<PrintWriter>> subscribers = new ConcurrentHashMap<>();

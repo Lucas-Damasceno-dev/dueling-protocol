@@ -4,11 +4,8 @@ import model.Card;
 import model.GameSession;
 import model.Player;
 import repository.PlayerRepository;
-import repository.PlayerRepositoryJson;
-import service.matchmaking.ConcurrentMatchmakingService;
 import service.matchmaking.MatchmakingService;
 import service.store.StoreService;
-import service.store.StoreServiceImpl;
 import service.store.PurchaseResult;
 import pubsub.EventManager;
 
@@ -18,29 +15,33 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 /**
  * Facade class that provides a simplified interface for game operations.
  * This class coordinates between different services and manages game sessions,
  * player connections, and game flow.
  */
+@Service
 public class GameFacade {
     private final MatchmakingService matchmakingService;
     private final StoreService storeService;
     private final PlayerRepository playerRepository;
+    private final EventManager eventManager;
+
+    // --- ERROS CORRIGIDOS AQUI ---
+    private static final Logger logger = LoggerFactory.getLogger(GameFacade.class);
     private final Map<String, GameSession> activeGames = new ConcurrentHashMap<>();
     private final Map<String, PrintWriter> activeClients = new ConcurrentHashMap<>();
-    private final EventManager eventManager;
-    
-    private static final Logger logger = LoggerFactory.getLogger(GameFacade.class);
+    // --- FIM DA CORREÇÃO ---
 
-    /**
-     * Constructs a new GameFacade with default implementations for services.
-     */
-    public GameFacade(EventManager eventManager) {
-        this.matchmakingService = ConcurrentMatchmakingService.getInstance();
-        this.storeService = new StoreServiceImpl();
-        this.playerRepository = new PlayerRepositoryJson();
+    @Autowired
+    public GameFacade(MatchmakingService matchmakingService, StoreService storeService, 
+                      PlayerRepository playerRepository, EventManager eventManager) {
+        this.matchmakingService = matchmakingService;
+        this.storeService = storeService;
+        this.playerRepository = playerRepository;
         this.eventManager = eventManager;
     }
 

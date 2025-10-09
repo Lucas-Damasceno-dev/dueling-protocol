@@ -1,38 +1,30 @@
 package api;
 
-import static spark.Spark.*;
-import com.google.gson.Gson;
+import org.springframework.beans.factory.annotation.Autowired; // <-- Import adicionado
+import org.springframework.web.bind.annotation.*;
 import controller.GameFacade;
 import model.Player;
 
-/**
- * Controller for handling REST API endpoints related to server synchronization.
- */
+@RestController
+@RequestMapping("/api/sync")
 public class ServerSynchronizationController {
-    private final GameFacade gameFacade;
-    private final Gson gson = new Gson();
 
+    private final GameFacade gameFacade;
+
+    @Autowired // <-- CORREÇÃO: Anotação adicionada
     public ServerSynchronizationController(GameFacade gameFacade) {
         this.gameFacade = gameFacade;
-        setupRoutes();
     }
 
-    /**
-     * Defines the API routes for synchronization.
-     */
-    private void setupRoutes() {
-        post("/api/sync/matchmaking/enter", (req, res) -> {
-            Player player = gson.fromJson(req.body(), Player.class);
-            gameFacade.enterMatchmaking(player);
-            res.status(200);
-            return "Player " + player.getId() + " added to matchmaking queue.";
-        });
+    @PostMapping("/matchmaking/enter")
+    public String enterMatchmaking(@RequestBody Player player) {
+        gameFacade.enterMatchmaking(player);
+        return "Player " + player.getId() + " added to matchmaking queue.";
+    }
 
-        put("/api/sync/player/:id", (req, res) -> {
-            Player updatedPlayer = gson.fromJson(req.body(), Player.class);
-            // gameFacade.updatePlayerState(updatedPlayer);
-            res.status(200);
-            return "Player " + updatedPlayer.getId() + " state updated.";
-        });
+    @PutMapping("/player/{id}")
+    public String updatePlayer(@PathVariable String id, @RequestBody Player updatedPlayer) {
+        // gameFacade.updatePlayerState(updatedPlayer);
+        return "Player " + updatedPlayer.getId() + " state updated.";
     }
 }
