@@ -16,7 +16,8 @@ public class AttackEffect implements CardEffect {
      */
     @Override
     public void execute(GameSession session, Player caster, Player target, Card card) {
-        int damage = Math.max(0, card.getAttack() - target.getBaseDefense());
+        int bonus = session.consumeNextAttackBonus(caster.getId());
+        int damage = Math.max(0, card.getAttack() + bonus - target.getBaseDefense());
         target.setHealthPoints(target.getHealthPoints() - damage);
     }
 }
