@@ -16,7 +16,9 @@ import java.util.ArrayList;
     @Index(name = "idx_deck_player_id", columnList = "player_id")
 })
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
-public class Deck {
+import java.io.Serializable;
+public class Deck implements Serializable {
+    private static final long serialVersionUID = 1L;
     @Id
     @Column(name = "id", unique = true, nullable = false)
     private String id;

@@ -8,7 +8,9 @@ import org.slf4j.LoggerFactory;
  * This effect increases the casting player's base attributes,
  * including attack, defense, and mana.
  */
-public class AttributeEffect implements CardEffect {
+import java.io.Serializable;
+public class AttributeEffect implements CardEffect, Serializable {
+    private static final long serialVersionUID = 1L;
     
     private static final Logger logger = LoggerFactory.getLogger(AttributeEffect.class);
     

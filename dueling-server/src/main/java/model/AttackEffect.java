@@ -4,7 +4,9 @@ package model;
  * Implementation of the attack effect for ATTACK-type cards.
  * This effect deals damage to the target player equal to the card's attack value.
  */
-public class AttackEffect implements CardEffect {
+import java.io.Serializable;
+public class AttackEffect implements CardEffect, Serializable {
+    private static final long serialVersionUID = 1L;
     /**
      * {@inheritDoc}
      * Deals damage to the target player equal to the card's attack value.

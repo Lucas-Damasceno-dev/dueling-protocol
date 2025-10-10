@@ -8,7 +8,9 @@ import org.slf4j.LoggerFactory;
  * This effect modifies the game scenario, affecting both players.
  * Currently, the effect grants a mana bonus to both players.
  */
-public class ScenarioEffect implements CardEffect {
+import java.io.Serializable;
+public class ScenarioEffect implements CardEffect, Serializable {
+    private static final long serialVersionUID = 1L;
     
     private static final Logger logger = LoggerFactory.getLogger(ScenarioEffect.class);
     

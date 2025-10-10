@@ -5,7 +5,8 @@ package model;
  * All classes that implement card effects must implement
  * this method to define how the effect is applied during a match.
  */
-public interface CardEffect {
+import java.io.Serializable;
+public interface CardEffect extends Serializable {
     /**
      * Executes the card effect in a game session.
      *

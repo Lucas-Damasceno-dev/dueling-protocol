@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory;
  * Implementation of the defense effect for DEFENSE-type cards.
  * This effect increases the casting player's base defense.
  */
-public class DefenseEffect implements CardEffect {
+import java.io.Serializable;
+public class DefenseEffect implements CardEffect, Serializable {
+    private static final long serialVersionUID = 1L;
     
     private static final Logger logger = LoggerFactory.getLogger(DefenseEffect.class);
 

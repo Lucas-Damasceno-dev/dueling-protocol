@@ -1,74 +1,64 @@
 package model;
 
 import controller.GameFacade;
-import repository.CardRepository;
-import java.util.*;
-import java.util.stream.Collectors;
+import model.service.CardEffectService;
+import model.service.PlayerStateManager;
+import model.service.ScenarioManager;
+import model.service.TurnManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import repository.CardRepository;
 
-public class GameSession {
-    private static final int TURN_DURATION_SECONDS = 20;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+
+import java.io.Serializable;
+public class GameSession implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private static final Logger logger = LoggerFactory.getLogger(GameSession.class);
+
     private final String matchId;
     private final GameFacade gameFacade;
     private final CardRepository cardRepository;
-    private final Player player1;
-    private final Player player2;
-    private final List<Card> deckP1;
-    private final List<Card> deckP2;
-    private final List<Card> handP1;
-    private final List<Card> handP2;
-    private int turn;
     private boolean gameEnded = false;
-    private int resourceP1;
-    private int resourceP2;
-    private String currentPlayerId;
-    private long turnEndTime;
-    private int nextAttackBonusP1 = 0;
-    private int nextAttackBonusP2 = 0;
-    private Card activeScenario = null;
-    private int scenarioDuration = 0;
 
-    private static final Logger logger = LoggerFactory.getLogger(GameSession.class);
+    private final PlayerStateManager playerStateManager;
+    private final TurnManager turnManager;
+    private final CardEffectService cardEffectService;
+    private final ScenarioManager scenarioManager;
 
     public GameSession(String matchId, Player p1, Player p2, List<Card> deckP1, List<Card> deckP2, GameFacade facade, CardRepository cardRepository) {
         this.matchId = matchId;
-        this.player1 = p1;
-        this.player2 = p2;
-        this.deckP1 = new ArrayList<>(deckP1);
-        this.deckP2 = new ArrayList<>(deckP2);
-        this.handP1 = new ArrayList<>();
-        this.handP2 = new ArrayList<>();
-        this.turn = 1;
         this.gameFacade = facade;
         this.cardRepository = cardRepository;
-        this.resourceP1 = 3;
-        this.resourceP2 = 3;
+
+        this.playerStateManager = new PlayerStateManager(p1, p2, deckP1, deckP2, facade);
+        this.turnManager = new TurnManager(p1, p2);
+        this.cardEffectService = new CardEffectService();
+        this.scenarioManager = new ScenarioManager();
     }
 
     public synchronized void startGame() {
-        Collections.shuffle(deckP1);
-        Collections.shuffle(deckP2);
-        logger.info("Match {} started between {} and {}", matchId, player1.getId(), player2.getId());
+        playerStateManager.initializeDecks();
+        logger.info("Match {} started between {} and {}", matchId, getPlayer1().getId(), getPlayer2().getId());
 
-        ResourceType resourceTypeP1 = player1.getResourceType();
-        ResourceType resourceTypeP2 = player2.getResourceType();
+        ResourceType resourceTypeP1 = getPlayer1().getResourceType();
+        ResourceType resourceTypeP2 = getPlayer2().getResourceType();
 
         String gameStartMsgP1 = String.format("UPDATE:GAME_START:%s:%s:%s:%s:%s:%s",
-                matchId, player2.getNickname(), resourceTypeP1.name(), resourceTypeP2.name(), resourceTypeP1.colorHex, resourceTypeP2.colorHex);
-        gameFacade.notifyPlayer(player1.getId(), gameStartMsgP1);
+                matchId, getPlayer2().getNickname(), resourceTypeP1.name(), resourceTypeP2.name(), resourceTypeP1.colorHex, resourceTypeP2.colorHex);
+        gameFacade.notifyPlayer(getPlayer1().getId(), gameStartMsgP1);
 
         String gameStartMsgP2 = String.format("UPDATE:GAME_START:%s:%s:%s:%s:%s:%s",
-                matchId, player1.getNickname(), resourceTypeP2.name(), resourceTypeP1.name(), resourceTypeP2.colorHex, resourceTypeP1.colorHex);
-        gameFacade.notifyPlayer(player2.getId(), gameStartMsgP2);
+                matchId, getPlayer1().getNickname(), resourceTypeP2.name(), resourceTypeP1.name(), resourceTypeP2.colorHex, resourceTypeP1.colorHex);
+        gameFacade.notifyPlayer(getPlayer2().getId(), gameStartMsgP2);
 
-        drawCards(player1, 5);
-        drawCards(player2, 5);
-        
-        String resourceMessage = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
-        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), resourceMessage);
+        playerStateManager.drawCards(getPlayer1(), 5);
+        playerStateManager.drawCards(getPlayer2(), 5);
+        playerStateManager.regenerateResources();
 
-        this.currentPlayerId = new Random().nextBoolean() ? player1.getId() : player2.getId();
         startNewTurn();
     }
 
@@ -76,30 +66,30 @@ public class GameSession {
         if (gameEnded) return;
 
         applyAndTickScenario();
-        if (gameEnded) return; // Scenario might end the game
+        if (gameEnded) return;
 
-        this.turnEndTime = System.currentTimeMillis() + (TURN_DURATION_SECONDS * 1000);
-        this.nextAttackBonusP1 = 0;
-        this.nextAttackBonusP2 = 0;
+        turnManager.startNewTurn();
+        playerStateManager.setNextAttackBonus(getPlayer1().getId(), 0);
+        playerStateManager.setNextAttackBonus(getPlayer2().getId(), 0);
 
-        String message = String.format("UPDATE:NEW_TURN:%s:%d", currentPlayerId, turnEndTime);
-        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
-        logger.info("Match {}: Starting turn {} for player {}. Turn ends at {}.", matchId, turn, currentPlayerId, turnEndTime);
+        String message = String.format("UPDATE:NEW_TURN:%s:%d", turnManager.getCurrentPlayerId(), turnManager.getTurnEndTime());
+        gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), message);
+        logger.info("Match {}: Starting turn {} for player {}. Turn ends at {}.", matchId, turnManager.getTurn(), turnManager.getCurrentPlayerId(), turnManager.getTurnEndTime());
     }
 
     private void switchTurn() {
-        turn++;
-        currentPlayerId = currentPlayerId.equals(player1.getId()) ? player2.getId() : player1.getId();
+        turnManager.switchTurn(getPlayer1().getId(), getPlayer2().getId());
         startNewTurn();
     }
 
     public synchronized void forceEndTurn() {
-        if (gameEnded || System.currentTimeMillis() < turnEndTime) return;
+        if (gameEnded || !turnManager.isTurnExpired()) return;
 
+        String currentPlayerId = turnManager.getCurrentPlayerId();
         logger.info("Match {}: Turn timer expired for player {}. Forcing end of turn.", matchId, currentPlayerId);
 
-        List<Card> hand = currentPlayerId.equals(player1.getId()) ? handP1 : handP2;
-        int currentResource = currentPlayerId.equals(player1.getId()) ? resourceP1 : resourceP2;
+        List<Card> hand = playerStateManager.getHand(currentPlayerId);
+        int currentResource = playerStateManager.getResource(currentPlayerId);
 
         Optional<Card> cardToPlay = hand.stream()
             .filter(c -> c.getManaCost() <= currentResource)
@@ -121,15 +111,15 @@ public class GameSession {
     private synchronized void playCard(String playerId, String cardId, boolean isAutoPlay) {
         if (gameEnded) return;
 
-        if (!isAutoPlay && !playerId.equals(currentPlayerId)) {
+        if (!isAutoPlay && !playerId.equals(turnManager.getCurrentPlayerId())) {
             gameFacade.notifyPlayer(playerId, "ERROR:NOT_YOUR_TURN");
             return;
         }
 
-        Player caster = player1.getId().equals(playerId) ? player1 : player2;
-        Player target = player1.getId().equals(playerId) ? player2 : player1;
-        List<Card> hand = player1.getId().equals(playerId) ? handP1 : handP2;
-        int currentResource = player1.getId().equals(playerId) ? resourceP1 : resourceP2;
+        Player caster = getPlayer(playerId);
+        Player target = getOpponent(playerId);
+        List<Card> hand = playerStateManager.getHand(playerId);
+        int currentResource = playerStateManager.getResource(playerId);
 
         Optional<Card> cardToPlayOpt = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst();
         if (cardToPlayOpt.isEmpty()) {
@@ -143,137 +133,127 @@ public class GameSession {
             return;
         }
 
-        if (player1.getId().equals(playerId)) {
-            resourceP1 -= card.getManaCost();
-        } else {
-            resourceP2 -= card.getManaCost();
-        }
+        playerStateManager.spendResource(playerId, card.getManaCost());
+        playerStateManager.removeCardFromHand(playerId, card);
 
-        hand.remove(card);
-
-        CardEffect effect = getCardEffect(card);
+        CardEffect effect = cardEffectService.getCardEffect(card);
         if (effect != null) {
             effect.execute(this, caster, target, card);
         }
         notifyAction(caster, target, card);
         notifyHealthUpdate(caster);
         notifyHealthUpdate(target);
-        String resourceMessage = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
-        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), resourceMessage);
-        
+        playerStateManager.regenerateResources();
+
         checkGameStatus();
         if (!gameEnded) {
             switchTurn();
         }
     }
 
-    public synchronized void regenerateResources() {
-        if (gameEnded) return;
-        boolean updated = false;
-        if (resourceP1 < 10) { resourceP1++; updated = true; }
-        if (resourceP2 < 10) { resourceP2++; updated = true; }
-
-        if (updated) {
-            String message = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
-            gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
-        }
-    }
-
-    public void setNextAttackBonus(String playerId, int bonus) {
-        if (player1.getId().equals(playerId)) {
-            this.nextAttackBonusP1 = bonus;
-        } else {
-            this.nextAttackBonusP2 = bonus;
-        }
-    }
-
-    public int consumeNextAttackBonus(String playerId) {
-        int bonus = 0;
-        if (player1.getId().equals(playerId)) {
-            bonus = this.nextAttackBonusP1;
-            this.nextAttackBonusP1 = 0;
-        } else {
-            bonus = this.nextAttackBonusP2;
-            this.nextAttackBonusP2 = 0;
-        }
-        return bonus;
-    }
-
-    public void setActiveScenario(Card card, int duration) {
-        this.activeScenario = card;
-        this.scenarioDuration = duration;
-        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), "UPDATE:SCENARIO_START:" + card.getName());
-    }
-
     private void applyAndTickScenario() {
-        if (scenarioDuration > 0 && activeScenario != null) {
-            int damage = activeScenario.getAttack();
-            if (damage > 0) {
-                player1.setHealthPoints(player1.getHealthPoints() - damage);
-                player2.setHealthPoints(player2.getHealthPoints() - damage);
-                logger.info("Scenario '{}' deals {} damage to both players.", activeScenario.getName(), damage);
-                notifyHealthUpdate(player1);
-                notifyHealthUpdate(player2);
-            }
+        int damage = scenarioManager.tickScenario();
+        if (damage > 0) {
+            Player p1 = getPlayer1();
+            Player p2 = getPlayer2();
+            p1.setHealthPoints(p1.getHealthPoints() - damage);
+            p2.setHealthPoints(p2.getHealthPoints() - damage);
+            logger.info("Scenario '{}' deals {} damage to both players.", scenarioManager.getActiveScenario().getName(), damage);
+            notifyHealthUpdate(p1);
+            notifyHealthUpdate(p2);
+        }
 
-            scenarioDuration--;
-
-            if (scenarioDuration == 0) {
+        if (!scenarioManager.isScenarioActive()) {
+            Card activeScenario = scenarioManager.getActiveScenario();
+            if (activeScenario != null) {
                 logger.info("Scenario '{}' has ended.", activeScenario.getName());
-                gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), "UPDATE:SCENARIO_END:" + activeScenario.getName());
-                activeScenario = null;
+                gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), "UPDATE:SCENARIO_END:" + activeScenario.getName());
+                scenarioManager.clearScenario();
             }
-            checkGameStatus();
+        }
+        checkGameStatus();
+    }
+
+    public void checkGameStatus() {
+        if (gameEnded) return;
+        if (getPlayer1().getHealthPoints() <= 0) {
+            gameEnded = true;
+            logger.info("Match {} finished. Winner: {}", matchId, getPlayer2().getId());
+            gameFacade.finishGame(matchId, getPlayer2().getId(), getPlayer1().getId());
+        } else if (getPlayer2().getHealthPoints() <= 0) {
+            gameEnded = true;
+            logger.info("Match {} finished. Winner: {}", matchId, getPlayer1().getId());
+            gameFacade.finishGame(matchId, getPlayer1().getId(), getPlayer2().getId());
         }
     }
 
-    public synchronized void drawCards(Player player, int count) {
-        List<Card> hand = player.getId().equals(player1.getId()) ? this.handP1 : this.handP2;
-        List<Card> deck = player.getId().equals(player1.getId()) ? this.deckP1 : this.deckP2;
-        
-        List<Card> drawnCards = new ArrayList<>();
-        for (int i = 0; i < count && !deck.isEmpty(); i++) {
-            Card newCard = deck.remove(0);
-            hand.add(newCard);
-            drawnCards.add(newCard);
-        }
-
-        if (!drawnCards.isEmpty()) {
-            gameFacade.notifyPlayer(player.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(hand));
-            logger.debug("Player {} drew {} cards. {} cards remaining in deck.", player.getId(), drawnCards.size(), deck.size());
-        }
-    }
-
-    private CardEffect getCardEffect(Card card) {
-        switch (card.getCardType()) {
-            case ATTACK: return new AttackEffect();
-            case DEFENSE: return new DefenseEffect();
-            case MAGIC: return new MagicEffect();
-            case ATTRIBUTE: return new AttributeEffect();
-            case SCENARIO: return new ScenarioEffect();
-            case EQUIPMENT: return new EquipmentEffect();
-            default: logger.warn("Effect for {} not implemented", card.getCardType()); return null;
-        }
+    public void notifyHealthUpdate(Player playerToUpdate) {
+        String message = String.format("UPDATE:HEALTH:%s:%d",
+            playerToUpdate.getId(), playerToUpdate.getHealthPoints());
+        gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), message);
     }
 
     private void notifyAction(Player caster, Player target, Card card) {
         String message = String.format("UPDATE:ACTION:%s:used:'''%s''':on:%s",
             caster.getNickname(), card.getName(), target.getNickname());
-        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
+        gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), message);
     }
 
-    private void notifyHealthUpdate(Player playerToUpdate) {
-        String message = String.format("UPDATE:HEALTH:%s:%d",
-            playerToUpdate.getId(), playerToUpdate.getHealthPoints());
-        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
+    public Player getPlayer(String playerId) {
+        return getPlayer1().getId().equals(playerId) ? getPlayer1() : getPlayer2();
     }
 
-    private void checkGameStatus() {
-        if (gameEnded) return;
-        if (player1.getHealthPoints() <= 0) {
-            gameEnded = true;
-            logger.info("Match {} finished. Winner: {}", matchId, player2.getId());
-            gameFacade.finishGame(matchId, player2.getId(), player1.getId());
+    public Player getOpponent(String playerId) {
+        return getPlayer1().getId().equals(playerId) ? getPlayer2() : getPlayer1();
+    }
+    
+    public Player getPlayer1() {
+        return playerStateManager.getPlayer1();
+    }
+
+    public Player getPlayer2() {
+        return playerStateManager.getPlayer2();
+    }
+
+    public String getMatchId() {
+        return matchId;
+    }
+
+    public boolean isGameEnded() {
+        return gameEnded;
+    }
+
+    public PlayerStateManager getPlayerStateManager() {
+        return playerStateManager;
+    }
+
+    public TurnManager getTurnManager() {
+        return turnManager;
+    }
+
+    public ScenarioManager getScenarioManager() {
+        return scenarioManager;
+    }
+
+    // Methods needed by CardEffects
+    public void drawCards(Player player, int count) {
+        playerStateManager.drawCards(player, count);
+    }
+
+    public void setNextAttackBonus(String playerId, int bonus) {
+        playerStateManager.setNextAttackBonus(playerId, bonus);
+    }
+
+    public int consumeNextAttackBonus(String playerId) {
+        return playerStateManager.consumeNextAttackBonus(playerId);
+    }
+
+    public void setActiveScenario(Card card, int duration) {
+        scenarioManager.setActiveScenario(card, duration);
+        gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), "UPDATE:SCENARIO_START:" + card.getName());
+    }
+}
+d, player2.getId(), player1.getId());
         } else if (player2.getHealthPoints() <= 0) {
             gameEnded = true;
             logger.info("Match {} finished. Winner: {}", matchId, player1.getId());
