@@ -14,23 +14,19 @@ public class ScenarioEffect implements CardEffect {
     
     /**
      * {@inheritDoc}
-     * Applies a scenario effect that grants a mana bonus to both players.
+     * Activates a new scenario in the game session. The scenario's duration is determined
+     * by the card's defense value, and its per-turn damage by the card's attack value.
      *
      * @param session the game session where the effect will be applied
      * @param caster the player casting the card
-     * @param target the target player of the card effect
+     * @param target the target player of the card's effect (not used in this effect)
      * @param card the card being played
      */
     @Override
     public void execute(GameSession session, Player caster, Player target, Card card) {
-        // Apply scenario effects - could modify game state or provide special conditions
-        int turnBonus = 2; // Bonus turns or actions
-        
-        // For now, we'll add a bonus to both players' mana as a scenario effect
-        caster.setBaseMana(caster.getBaseMana() + turnBonus);
-        target.setBaseMana(target.getBaseMana() + turnBonus);
-        
-        logger.info("The scenario '{}' affected the battlefield! Both players gained +{} mana!", 
-            card.getName(), turnBonus);
+        int duration = card.getDefense(); // Use defense for duration in turns
+        session.setActiveScenario(card, duration);
+        logger.info("{} played the scenario '{}', which will last for {} turns.", 
+            caster.getNickname(), card.getName(), duration);
     }
 }

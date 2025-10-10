@@ -26,6 +26,8 @@ public class GameSession {
     private long turnEndTime;
     private int nextAttackBonusP1 = 0;
     private int nextAttackBonusP2 = 0;
+    private Card activeScenario = null;
+    private int scenarioDuration = 0;
 
     private static final Logger logger = LoggerFactory.getLogger(GameSession.class);
 
@@ -42,8 +44,6 @@ public class GameSession {
         this.cardRepository = cardRepository;
         this.resourceP1 = 3;
         this.resourceP2 = 3;
-        this.nextAttackBonusP1 = 0;
-        this.nextAttackBonusP2 = 0;
     }
 
     public synchronized void startGame() {
@@ -62,7 +62,6 @@ public class GameSession {
                 matchId, player1.getNickname(), resourceTypeP2.name(), resourceTypeP1.name(), resourceTypeP2.colorHex, resourceTypeP1.colorHex);
         gameFacade.notifyPlayer(player2.getId(), gameStartMsgP2);
 
-        // Draw initial hands
         drawCards(player1, 5);
         drawCards(player2, 5);
         
@@ -75,8 +74,12 @@ public class GameSession {
 
     private void startNewTurn() {
         if (gameEnded) return;
+
+        applyAndTickScenario();
+        if (gameEnded) return; // Scenario might end the game
+
         this.turnEndTime = System.currentTimeMillis() + (TURN_DURATION_SECONDS * 1000);
-        this.nextAttackBonusP1 = 0; // Reset bonus each turn
+        this.nextAttackBonusP1 = 0;
         this.nextAttackBonusP2 = 0;
 
         String message = String.format("UPDATE:NEW_TURN:%s:%d", currentPlayerId, turnEndTime);
@@ -194,6 +197,34 @@ public class GameSession {
             this.nextAttackBonusP2 = 0;
         }
         return bonus;
+    }
+
+    public void setActiveScenario(Card card, int duration) {
+        this.activeScenario = card;
+        this.scenarioDuration = duration;
+        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), "UPDATE:SCENARIO_START:" + card.getName());
+    }
+
+    private void applyAndTickScenario() {
+        if (scenarioDuration > 0 && activeScenario != null) {
+            int damage = activeScenario.getAttack();
+            if (damage > 0) {
+                player1.setHealthPoints(player1.getHealthPoints() - damage);
+                player2.setHealthPoints(player2.getHealthPoints() - damage);
+                logger.info("Scenario '{}' deals {} damage to both players.", activeScenario.getName(), damage);
+                notifyHealthUpdate(player1);
+                notifyHealthUpdate(player2);
+            }
+
+            scenarioDuration--;
+
+            if (scenarioDuration == 0) {
+                logger.info("Scenario '{}' has ended.", activeScenario.getName());
+                gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), "UPDATE:SCENARIO_END:" + activeScenario.getName());
+                activeScenario = null;
+            }
+            checkGameStatus();
+        }
     }
 
     public synchronized void drawCards(Player player, int count) {
