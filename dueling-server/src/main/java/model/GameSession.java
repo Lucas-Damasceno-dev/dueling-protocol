@@ -62,10 +62,9 @@ public class GameSession {
                 matchId, player1.getNickname(), resourceTypeP2.name(), resourceTypeP1.name(), resourceTypeP2.colorHex, resourceTypeP1.colorHex);
         gameFacade.notifyPlayer(player2.getId(), gameStartMsgP2);
 
-        drawCards(player1, handP1, deckP1, 5);
-        drawCards(player2, handP2, deckP2, 5);
-        gameFacade.notifyPlayer(player1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(handP1));
-        gameFacade.notifyPlayer(player2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(handP2));
+        // Draw initial hands
+        drawCards(player1, 5);
+        drawCards(player2, 5);
         
         String resourceMessage = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
         gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), resourceMessage);
@@ -197,11 +196,21 @@ public class GameSession {
         return bonus;
     }
 
-    public synchronized void drawCards(Player player, List<Card> hand, List<Card> deck, int count) {
+    public synchronized void drawCards(Player player, int count) {
+        List<Card> hand = player.getId().equals(player1.getId()) ? this.handP1 : this.handP2;
+        List<Card> deck = player.getId().equals(player1.getId()) ? this.deckP1 : this.deckP2;
+        
+        List<Card> drawnCards = new ArrayList<>();
         for (int i = 0; i < count && !deck.isEmpty(); i++) {
-            hand.add(deck.remove(0));
+            Card newCard = deck.remove(0);
+            hand.add(newCard);
+            drawnCards.add(newCard);
         }
-        logger.debug("Player {} drew {} cards. {} cards remaining in deck.", player.getId(), hand.size(), deck.size());
+
+        if (!drawnCards.isEmpty()) {
+            gameFacade.notifyPlayer(player.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(hand));
+            logger.debug("Player {} drew {} cards. {} cards remaining in deck.", player.getId(), drawnCards.size(), deck.size());
+        }
     }
 
     private CardEffect getCardEffect(Card card) {
