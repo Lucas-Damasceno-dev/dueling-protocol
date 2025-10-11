@@ -10,7 +10,12 @@ import ping.PingServer;
 public class DuelingProtocolApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(DuelingProtocolApplication.class, args);
-        new Thread(new PingServer(7778)).start();
+        String profile = System.getProperty("spring.profiles.active");
+        if ("client".equals(profile)) {
+            client.GameClient.main(args);
+        } else {
+            SpringApplication.run(DuelingProtocolApplication.class, args);
+            new Thread(new PingServer(7778)).start();
+        }
     }
 }
