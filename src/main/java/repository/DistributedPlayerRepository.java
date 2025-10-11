@@ -14,9 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-@Profile("server")
+@Profile({"server", "!distributed-db"}) // Use this when NOT using distributed-db profile
 @Repository
-@Primary
 public class DistributedPlayerRepository implements PlayerRepository {
 
     private final PlayerRepository localRepository;
