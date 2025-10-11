@@ -23,11 +23,9 @@ public class DistributedPlayerRepository implements PlayerRepository {
     private final ServerRegistry serverRegistry;
     private final ServerApiClient serverApiClient;
 
-    @Value("${server.name:server-1}")
-    private String serverName;
+    private String serverName = "server-1";
     
-    @Value("${server.port:8080}")
-    private String serverPort;
+    private String serverPort = "8080";
 
     private String selfUrl;
 
