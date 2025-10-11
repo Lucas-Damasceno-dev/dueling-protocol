@@ -56,7 +56,7 @@ services:
         echo "Waiting for servers..."
         sleep 10
         echo "Starting client-2..."
-        java -jar app.jar client.GameClient autobot
+        java -cp app.jar client.GameClient autobot
       '
     depends_on:
       - server-1
