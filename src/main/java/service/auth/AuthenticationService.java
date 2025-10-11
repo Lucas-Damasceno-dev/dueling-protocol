@@ -37,7 +37,15 @@ public class AuthenticationService {
     private AuthenticationManager authenticationManager;
 
     /**
-     * Register a new user with username, password, and associate with a player ID
+     * Registers a new user in the system.
+     * This method checks for existing usernames and player IDs before creating a new user.
+     * The password is encoded before being stored.
+     *
+     * @param username The desired username for the new user.
+     * @param password The plain-text password for the new user.
+     * @param playerId The unique identifier of the player associated with this user account.
+     * @return {@code true} if the user was successfully registered, {@code false} otherwise
+     *         (e.g., username or player ID already exists, or player does not exist).
      */
     public boolean registerUser(String username, String password, String playerId) {
         // Check if user already exists
@@ -62,7 +70,12 @@ public class AuthenticationService {
     }
 
     /**
-     * Authenticate user with username and password, return JWT token if successful
+     * Authenticates a user with the provided username and password.
+     * If authentication is successful, a JSON Web Token (JWT) is generated and returned.
+     *
+     * @param username The username of the user attempting to authenticate.
+     * @param password The plain-text password of the user.
+     * @return A JWT token string if authentication is successful, otherwise {@code null}.
      */
     public String authenticateUser(String username, String password) {
         try {
@@ -82,7 +95,10 @@ public class AuthenticationService {
     }
 
     /**
-     * Validate a JWT token and return the associated username
+     * Validates a given JWT token and extracts the username from it.
+     *
+     * @param token The JWT token string to validate.
+     * @return The username associated with the token if valid, otherwise {@code null}.
      */
     public String validateTokenAndGetUsername(String token) {
         if (jwtUtil.validateToken(token)) {
@@ -92,14 +108,20 @@ public class AuthenticationService {
     }
 
     /**
-     * Get user by username
+     * Retrieves a user by their username.
+     *
+     * @param username The username of the user to retrieve.
+     * @return An {@link Optional} containing the {@link User} if found, otherwise empty.
      */
     public Optional<User> getUserByUsername(String username) {
         return userRepository.findByUsername(username);
     }
 
     /**
-     * Get user by player ID
+     * Retrieves a user by their associated player ID.
+     *
+     * @param playerId The unique identifier of the player.
+     * @return An {@link Optional} containing the {@link User} if found, otherwise empty.
      */
     public Optional<User> getUserByPlayerId(String playerId) {
         return userRepository.findByPlayerId(playerId);

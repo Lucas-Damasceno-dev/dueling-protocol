@@ -10,8 +10,12 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.util.Scanner;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class GameClient {
+public final class GameClient {
+    private static final Logger logger = LoggerFactory.getLogger(GameClient.class);
+    private GameClient() { }
     private static final String SERVER_ADDRESS = System.getenv().getOrDefault("SERVER_HOST", "localhost");
     private static final String SERVER_PORT = System.getenv().getOrDefault("SERVER_PORT", "8081");
     private static final int UDP_PORT = 7778;
@@ -19,46 +23,60 @@ public class GameClient {
     private static MyWebSocketClient webSocketClient;
     private static String playerId;
     private static String currentMatchId;
-    private static boolean inGame = false;
-    private static volatile boolean isExiting = false;
+    private static boolean inGame;
+    private static volatile boolean isExiting;
+
+    private static final long INITIAL_SERVER_WAIT_TIME_MS = 10000;
+    private static final int PLAYER_ID_SUBSTRING_LENGTH = 8;
 
     public static void main(String[] args) {
+        boolean shouldExit = false;
         try {
-            System.out.println("Waiting for servers to start...");
-            Thread.sleep(10000); // 10-second delay
+            logger.info("Waiting for servers to start...");
+            Thread.sleep(INITIAL_SERVER_WAIT_TIME_MS);
 
-            playerId = "player-" + UUID.randomUUID().toString().substring(0, 8);
+            playerId = "player-" + UUID.randomUUID().toString().substring(0, PLAYER_ID_SUBSTRING_LENGTH);
             String serverUri = "ws://" + SERVER_ADDRESS + ":" + SERVER_PORT + "/ws?playerId=" + playerId;
-            System.out.println("Connecting to server at " + serverUri);
+            logger.info("Connecting to server at {}", serverUri);
 
             webSocketClient = new MyWebSocketClient(new URI(serverUri));
             if (!webSocketClient.connectBlocking()) {
-                System.err.println("Failed to connect to the WebSocket server.");
-                return;
+                logger.error("Failed to connect to the WebSocket server.");
+                shouldExit = true;
             }
 
-            System.out.println(">> Your player ID is: " + playerId);
+            if (!shouldExit) {
+                logger.info(">> Your player ID is: {}", playerId);
 
-            if (args.length > 0) {
-                System.out.println(">>>>>>>>> AUTOBOT MODE DETECTED <<<<<<<<<");
-                switch (args[0]) {
-                    case "autobot":
-                        runAutobot(args.length > 1 ? args[1] : "");
-                        System.out.println(">>>>>>>>> AUTOBOT FINISHED, EXITING MAIN <<<<<<<<<");
-                        return;
-                    case "maliciousbot":
-                        runMaliciousBot();
-                        System.out.println(">>>>>>>>> AUTOBOT FINISHED, EXITING MAIN <<<<<<<<<");
-                        return;
+                if (args.length > 0) {
+                    logger.info(">>>>>>>>> AUTOBOT MODE DETECTED <<<<<<<<<");
+                    switch (args[0]) {
+                        case "autobot":
+                            runAutobot(args.length > 1 ? args[1] : "");
+                            logger.info(">>>>>>>>> AUTOBOT FINISHED, EXITING MAIN <<<<<<<<<");
+                            break;
+                        case "maliciousbot":
+                            runMaliciousBot();
+                            logger.info(">>>>>>>>> AUTOBOT FINISHED, EXITING MAIN <<<<<<<<<");
+                            break;
+                        default:
+                            logger.warn("Unknown autobot scenario: {}", args[0]);
+                            break;
+                    }
+                    shouldExit = true;
                 }
             }
 
-            printFullMenu();
-            handleUserInput();
+            if (!shouldExit) {
+                printFullMenu();
+                handleUserInput();
+            }
 
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("Main thread interrupted: {}", e.getMessage());
+        } catch (IOException | URISyntaxException e) {
+            logger.error("Connection or URI error in main: {}", e.getMessage(), e);
         } finally {
             if (webSocketClient != null) {
                 webSocketClient.close();
@@ -67,15 +85,15 @@ public class GameClient {
     }
 
     private static void printFullMenu() {
-        System.out.println("\n=== GAME MENU ===");
-        System.out.println("1. Set up character");
-        System.out.println("2. Enter matchmaking queue");
-        System.out.println("3. Buy card pack");
-        System.out.println("4. Check ping");
-        System.out.println("5. Play card (during match)");
-        System.out.println("6. Upgrade attributes");
-        System.out.println("7. Exit");
-        System.out.print("Choose an option: ");
+        logger.info("\n=== GAME MENU ===");
+        logger.info("1. Set up character");
+        logger.info("2. Enter matchmaking queue");
+        logger.info("3. Buy card pack");
+        logger.info("4. Check ping");
+        logger.info("5. Play card (during match)");
+        logger.info("6. Upgrade attributes");
+        logger.info("7. Exit");
+        logger.info("Choose an option: ");
     }
 
     private static void handleUserInput() {
@@ -100,7 +118,7 @@ public class GameClient {
                     if (inGame) {
                         playCard(scanner);
                     } else {
-                        System.out.println("\nYou need to be in a match to play cards!");
+                        logger.info("\nYou need to be in a match to play cards!");
                         printFullMenu();
                     }
                     break;
@@ -108,12 +126,12 @@ public class GameClient {
                     upgradeAttributes(scanner);
                     break;
                 case "7":
-                    System.out.println("Exiting...");
+                    logger.info("Exiting...");
                     isExiting = true;
                     webSocketClient.close();
-                    return;
+                    break;
                 default:
-                    System.out.println("\nInvalid option!");
+                    logger.info("\nInvalid option!");
                     printFullMenu();
                     break;
             }
@@ -124,147 +142,166 @@ public class GameClient {
     private static void runAutobot(String scenario) {
         try {
             webSocketClient.send("CHARACTER_SETUP:Elf:Warrior");
-            Thread.sleep(200);
+            Thread.sleep(MALICIOUS_BOT_DELAY_MS);
 
             switch (scenario) {
                 case "matchmaking_disconnect":
                     scenarioMatchmakingDisconnect();
-                    return;
+                    break;
                 case "pre_game_disconnect":
                     scenarioPreGameDisconnect();
-                    return;
+                    break;
                 case "simultaneous_play":
                     scenarioSimultaneousPlay();
-                    return;
+                    break;
                 case "mid_game_disconnect":
                     scenarioMidGameDisconnect();
-                    return;
+                    break;
                 case "race_condition":
                     scenarioRaceCondition();
-                    return;
+                    break;
                 default:
                     scenarioDefault();
-                    return;
+                    break;
             }
-        } catch (Exception e) {
-            System.err.println("[autobot] Error: " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("[autobot] Interrupted during autobot execution: {}", e.getMessage());
+        } catch (IOException e) {
+            logger.error("[autobot] IO error during autobot execution: {}", e.getMessage(), e);
         }
     }
 
-    private static void scenarioMatchmakingDisconnect() throws Exception {
+    private static final long SCENARIO_DELAY_MS = 500;
+
+    private static void scenarioMatchmakingDisconnect() throws InterruptedException {
         webSocketClient.send("MATCHMAKING:ENTER");
-        Thread.sleep(500);
-        System.out.println("[autobot] Disconnecting abruptly in matchmaking queue");
+        Thread.sleep(SCENARIO_DELAY_MS);
+        logger.info("[autobot] Disconnecting abruptly in matchmaking queue");
         webSocketClient.close();
     }
 
-    private static void scenarioPreGameDisconnect() throws Exception {
+    private static final int MAX_WAIT_TIME_MS = 10000;
+    private static final int WAIT_INTERVAL_MS = 200;
+
+    private static void scenarioPreGameDisconnect() throws InterruptedException {
         webSocketClient.send("MATCHMAKING:ENTER");
         int waited = 0;
-        while (!inGame && waited < 10000) {
-            Thread.sleep(200);
-            waited += 200;
+        while (!inGame && waited < MAX_WAIT_TIME_MS) {
+            Thread.sleep(WAIT_INTERVAL_MS);
+            waited += WAIT_INTERVAL_MS;
         }
         if (!inGame) {
-            System.out.println("[autobot] Disconnecting abruptly before GAME_START");
+            logger.info("[autobot] Disconnecting abruptly before GAME_START");
             webSocketClient.close();
         }
     }
 
-    private static void scenarioSimultaneousPlay() throws Exception {
+    private static void scenarioSimultaneousPlay() throws InterruptedException {
         webSocketClient.send("MATCHMAKING:ENTER");
         int waited = 0;
-        while (!inGame && waited < 10000) {
-            Thread.sleep(200);
-            waited += 200;
+        while (!inGame && waited < MAX_WAIT_TIME_MS) {
+            Thread.sleep(WAIT_INTERVAL_MS);
+            waited += WAIT_INTERVAL_MS;
         }
         if (inGame) {
             webSocketClient.send("PLAY_CARD:" + currentMatchId + ":card-001");
-            System.out.println("[autobot] Play sent immediately after GAME_START");
-            Thread.sleep(500);
+            logger.info("[autobot] Play sent immediately after GAME_START");
+            Thread.sleep(SCENARIO_DELAY_MS);
             webSocketClient.close();
         }
     }
 
-    private static void scenarioMidGameDisconnect() throws Exception {
+    private static final long MID_GAME_DISCONNECT_DELAY_MS = 300;
+
+    private static void scenarioMidGameDisconnect() throws InterruptedException {
         webSocketClient.send("MATCHMAKING:ENTER");
         int waited = 0;
-        while (!inGame && waited < 10000) {
-            Thread.sleep(200);
-            waited += 200;
+        while (!inGame && waited < MAX_WAIT_TIME_MS) {
+            Thread.sleep(WAIT_INTERVAL_MS);
+            waited += WAIT_INTERVAL_MS;
         }
         if (inGame) {
             webSocketClient.send("PLAY_CARD:" + currentMatchId + ":card-001");
-            Thread.sleep(300);
-            System.out.println("[autobot] Disconnecting abruptly in the middle of the match");
+            Thread.sleep(MID_GAME_DISCONNECT_DELAY_MS);
+            logger.info("[autobot] Disconnecting abruptly in the middle of the match");
             webSocketClient.close();
         }
     }
 
-    private static void scenarioRaceCondition() throws Exception {
+    private static void scenarioRaceCondition() throws InterruptedException {
         webSocketClient.send("STORE:BUY:BASIC");
         webSocketClient.send("UPGRADE:BASE_ATTACK");
-        Thread.sleep(500);
+        Thread.sleep(SCENARIO_DELAY_MS);
         webSocketClient.close();
     }
 
-    private static void scenarioDefault() throws Exception {
-        System.out.println("[autobot] Character created. Entering matchmaking queue...");
+    private static final long DEFAULT_SCENARIO_TEST_TIME_MS = 20000;
+
+    private static void scenarioDefault() throws InterruptedException {
+        logger.info("[autobot] Character created. Entering matchmaking queue...");
         webSocketClient.send("MATCHMAKING:ENTER");
-        Thread.sleep(20000);
-        System.out.println("[autobot] Test time elapsed, exiting...");
+        Thread.sleep(DEFAULT_SCENARIO_TEST_TIME_MS);
+        logger.info("[autobot] Test time elapsed, exiting...");
         webSocketClient.close();
     }
+
+    private static final long MALICIOUS_BOT_DELAY_MS = 200;
 
     private static void runMaliciousBot() {
         try {
             webSocketClient.send("MATCHMAKING"); // Malformed
-            Thread.sleep(200);
+            Thread.sleep(MALICIOUS_BOT_DELAY_MS);
             webSocketClient.send("STORE:BUY:BASIC:EXTRA_PARAM"); // Malformed
-            Thread.sleep(200);
+            Thread.sleep(MALICIOUS_BOT_DELAY_MS);
             webSocketClient.send("PLAY_CARD:card-001"); // Malformed
-            Thread.sleep(200);
+            Thread.sleep(MALICIOUS_BOT_DELAY_MS);
             webSocketClient.send("INVALIDCOMMAND");
-            Thread.sleep(200);
-            System.out.println("[maliciousbot] Malformed messages sent. Exiting...");
+            Thread.sleep(MALICIOUS_BOT_DELAY_MS);
+            logger.info("[maliciousbot] Malformed messages sent. Exiting...");
             webSocketClient.close();
-        } catch (Exception e) {
-            System.err.println("[maliciousbot] Error: " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("[maliciousbot] Interrupted during malicious bot execution: {}", e.getMessage());
+        } catch (IOException e) {
+            logger.error("[maliciousbot] IO error during malicious bot execution: {}", e.getMessage(), e);
         }
     }
 
     // CLIENT ACTION METHODS
     private static void setupCharacter(Scanner scanner) {
-        System.out.println("\n=== CHARACTER SETUP ===");
-        System.out.print("Choose your race: ");
+        logger.info("\n=== CHARACTER SETUP ===");
+        logger.info("Choose your race: ");
         String race = scanner.nextLine().trim();
-        System.out.print("Choose your class: ");
+        logger.info("Choose your class: ");
         String playerClass = scanner.nextLine().trim();
         webSocketClient.send("CHARACTER_SETUP:" + race + ":" + playerClass);
     }
 
     private static void enterMatchmaking() {
-        System.out.println("\nEntering matchmaking queue...");
+        logger.info("\nEntering matchmaking queue...");
         webSocketClient.send("MATCHMAKING:ENTER");
     }
 
     private static void buyCardPack(Scanner scanner) {
-        System.out.print("Which package do you want to buy? (BASIC, PREMIUM, LEGENDARY): ");
+        logger.info("Which package do you want to buy? (BASIC, PREMIUM, LEGENDARY): ");
         String packType = scanner.nextLine().trim().toUpperCase();
         webSocketClient.send("STORE:BUY:" + packType);
     }
 
     private static void playCard(Scanner scanner) {
-        System.out.print("Card ID to play: ");
+        logger.info("Card ID to play: ");
         String cardId = scanner.nextLine().trim();
         webSocketClient.send("PLAY_CARD:" + currentMatchId + ":" + cardId);
     }
 
     private static void upgradeAttributes(Scanner scanner) {
-        System.out.print("Which attribute do you want to upgrade? (BASE_ATTACK): ");
+        logger.info("Which attribute do you want to upgrade? (BASE_ATTACK): ");
         String attribute = scanner.nextLine().trim().toUpperCase();
         webSocketClient.send("UPGRADE:" + attribute);
     }
+
+    private static final int UDP_SOCKET_TIMEOUT_MS = 1000;
 
     public static void checkPing() {
         // UDP Ping logic remains the same
@@ -276,14 +313,14 @@ public class GameClient {
             DatagramPacket request = new DatagramPacket(buffer, buffer.length, address, UDP_PORT);
             datagramSocket.send(request);
             DatagramPacket response = new DatagramPacket(new byte[buffer.length], buffer.length);
-            datagramSocket.setSoTimeout(1000);
+            datagramSocket.setSoTimeout(UDP_SOCKET_TIMEOUT_MS);
             datagramSocket.receive(response);
             long endTime = System.currentTimeMillis();
             long latency = endTime - startTime;
-            System.out.println("\nPing: " + latency + " ms");
+            logger.info("\nPing: {} ms", latency);
             printFullMenu();
         } catch (IOException e) {
-            System.err.println("\nPing failed: " + e.getMessage());
+            logger.error("\nPing failed: {}", e.getMessage());
             printFullMenu();
         }
     }
@@ -292,7 +329,7 @@ public class GameClient {
         String[] parts = message.split(":");
         String type = parts[0];
 
-        System.out.println(); 
+        logger.info(""); 
 
         if ("UPDATE".equals(type)) {
             String subType = parts[1];
@@ -300,29 +337,35 @@ public class GameClient {
                 case "GAME_START":
                     currentMatchId = parts[2];
                     inGame = true;
-                    System.out.println(">> Match found against: " + parts[3]);
-                    System.out.println(">> Match ID: " + currentMatchId);
+                    logger.info(">> Match found against: {}", parts[GAME_START_OPPONENT_NICKNAME_INDEX]);
+                    logger.info(">> Match ID: {}", currentMatchId);
                     break;
                 case "GAME_OVER":
                     inGame = false;
                     currentMatchId = null;
-                    System.out.println(">> GAME OVER: You " + (parts[2].equals("VICTORY") ? "WON!" : "LOST!"));
+                    logger.info(">> GAME OVER: You {}", 
+                               parts[GAME_OVER_RESULT_INDEX].equals("VICTORY") ? "WON!" : "LOST!");
                     break;
                 // Other cases...
                 default:
-                    System.out.println("\nServer: " + message);
+                    logger.info("\nServer: {}", message);
                     break;
             }
         } else if ("SUCCESS".equals(type)) {
-            System.out.println("[SUCCESS] \u2713 " + message.substring(8));
+            logger.info("[SUCCESS] \u2713 {}", message.substring(SUCCESS_MESSAGE_PREFIX_LENGTH));
         } else if ("ERROR".equals(type)) {
-            System.out.println("[ERROR] \u2718 " + message.substring(6));
+            logger.error("[ERROR] \u2718 {}", message.substring(ERROR_MESSAGE_PREFIX_LENGTH));
         } else {
-            System.out.println("\nServer: " + message);
+            logger.info("\nServer: {}", message);
         }
 
         printFullMenu();
     }
+
+    private static final int SUCCESS_MESSAGE_PREFIX_LENGTH = 8;
+    private static final int ERROR_MESSAGE_PREFIX_LENGTH = 6;
+    private static final int GAME_START_OPPONENT_NICKNAME_INDEX = 3;
+    private static final int GAME_OVER_RESULT_INDEX = 2;
 
     // INNER CLASS FOR WEBSOCKET CLIENT
     public static class MyWebSocketClient extends WebSocketClient {
@@ -332,7 +375,7 @@ public class GameClient {
 
         @Override
         public void onOpen(ServerHandshake handshakedata) {
-            System.out.println("Connected to WebSocket server.");
+            logger.info("Connected to WebSocket server.");
         }
 
         @Override
@@ -343,14 +386,14 @@ public class GameClient {
         @Override
         public void onClose(int code, String reason, boolean remote) {
             if (!isExiting) {
-                System.err.println("\nConnection to server lost. Code: " + code + ", Reason: " + reason);
+                logger.error("\nConnection to server lost. Code: {}, Reason: {}", code, reason);
                 isExiting = true;
             }
         }
 
         @Override
         public void onError(Exception ex) {
-            System.err.println("WebSocket error: " + ex.getMessage());
+            logger.error("WebSocket error: {}", ex.getMessage(), ex);
         }
     }
 }
