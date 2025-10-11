@@ -237,6 +237,30 @@ public class GameFacade {
                     }
                 }
                 break;
+                
+            case "TRADE":
+                if (command.length < 4) {
+                    notifyPlayer(playerId, "ERROR:Incomplete TRADE command.");
+                    return;
+                }
+                
+                String tradeAction = command[3];
+                if ("PROPOSE".equals(tradeAction) && command.length >= 7) {
+                    String targetPlayerId = command[4];
+                    String[] offeredCards = command[5].split(",");
+                    String[] requestedCards = command[6].split(",");
+                    
+                    handleTradeProposal(playerId, targetPlayerId, offeredCards, requestedCards);
+                } else if ("ACCEPT".equals(tradeAction) && command.length >= 5) {
+                    String tradeId = command[4];
+                    handleTradeAcceptance(playerId, tradeId);
+                } else if ("REJECT".equals(tradeAction) && command.length >= 5) {
+                    String tradeId = command[4];
+                    handleTradeRejection(playerId, tradeId);
+                } else {
+                    notifyPlayer(playerId, "ERROR:Invalid trade command format or action.");
+                }
+                break;
 
             default:
                 notifyPlayer(playerId, "ERROR:Unknown command '" + action + "'.");
@@ -285,6 +309,12 @@ public class GameFacade {
             return false;
         }
         TradeProposal proposal = proposalOpt.get();
+        
+        // Check if this is an acceptance of an existing proposal
+        if (proposal.getStatus() != TradeProposal.Status.ACCEPTED) {
+            logger.warn("Trade {} status is not ACCEPTED, cannot execute", tradeId);
+            return false;
+        }
 
         String leader = leaderElectionService.getLeader();
         boolean lockAcquired = false;
@@ -338,6 +368,136 @@ public class GameFacade {
                 serverApiClient.releaseLock(leader);
             }
         }
+    }
+    
+    /**
+     * Handles a trade proposal from one player to another
+     */
+    private void handleTradeProposal(String proposerId, String targetId, String[] offeredCardIds, String[] requestedCardIds) {
+        Player proposer = playerRepository.findById(proposerId).orElse(null);
+        Player target = playerRepository.findById(targetId).orElse(null);
+        
+        if (proposer == null) {
+            notifyPlayer(proposerId, "ERROR:Proposer player not found.");
+            return;
+        }
+        
+        if (target == null) {
+            notifyPlayer(proposerId, "ERROR:Target player not found.");
+            return;
+        }
+        
+        // Validate that the proposer has the cards they want to offer
+        List<String> proposerCardIds = proposer.getCardCollection().stream().map(Card::getId).collect(Collectors.toList());
+        for (String cardId : offeredCardIds) {
+            if (!proposerCardIds.contains(cardId)) {
+                notifyPlayer(proposerId, "ERROR:Proposer does not have card " + cardId);
+                return;
+            }
+        }
+        
+        // Validate that the target has the cards they are requested to give
+        List<String> targetCardIds = target.getCardCollection().stream().map(Card::getId).collect(Collectors.toList());
+        for (String cardId : requestedCardIds) {
+            if (!targetCardIds.contains(cardId)) {
+                notifyPlayer(proposerId, "ERROR:Target player does not have card " + cardId);
+                return;
+            }
+        }
+        
+        // Create the trade proposal
+        TradeProposal proposal = new TradeProposal(proposerId, targetId, 
+                                                 Arrays.asList(offeredCardIds), 
+                                                 Arrays.asList(requestedCardIds));
+        tradeService.createTrade(proposal);
+        
+        // Notify the target player about the trade proposal
+        String tradeMessage = String.format("UPDATE:TRADE_PROPOSAL:%s:%s:%s", 
+                                           proposal.getTradeId(), proposerId, 
+                                           String.join(",", offeredCardIds) + ":" + String.join(",", requestedCardIds));
+        notifyPlayer(targetId, tradeMessage);
+        
+        // Confirm to the proposer that the trade was sent
+        notifyPlayer(proposerId, "SUCCESS:Trade proposal sent to " + target.getNickname());
+        
+        logger.info("Trade proposal created: {} proposes {} for {} with target {}", 
+                   proposerId, Arrays.toString(offeredCardIds), 
+                   Arrays.toString(requestedCardIds), targetId);
+    }
+    
+    /**
+     * Handles trade acceptance by the target player
+     */
+    private void handleTradeAcceptance(String playerId, String tradeId) {
+        Optional<TradeProposal> proposalOpt = tradeService.findTradeById(tradeId);
+        if (proposalOpt.isEmpty()) {
+            notifyPlayer(playerId, "ERROR:Trade proposal not found.");
+            return;
+        }
+        
+        TradeProposal proposal = proposalOpt.get();
+        
+        // Check if the player is the target of the trade
+        if (!proposal.getTargetPlayerId().equals(playerId)) {
+            notifyPlayer(playerId, "ERROR:You are not authorized to accept this trade.");
+            return;
+        }
+        
+        // Check if the trade is still pending
+        if (proposal.getStatus() != TradeProposal.Status.PENDING) {
+            notifyPlayer(playerId, "ERROR:This trade is no longer available for acceptance.");
+            return;
+        }
+        
+        // Update the status to accepted
+        proposal.setStatus(TradeProposal.Status.ACCEPTED);
+        
+        // Notify the proposer that the trade was accepted
+        notifyPlayer(proposal.getProposingPlayerId(), "UPDATE:TRADE_ACCEPTED:" + tradeId);
+        
+        // Execute the trade atomically
+        boolean success = executeTrade(tradeId);
+        
+        if (!success) {
+            // If execution failed, revert the status
+            proposal.setStatus(TradeProposal.Status.PENDING);
+            notifyPlayer(playerId, "ERROR:Trade execution failed.");
+            notifyPlayer(proposal.getProposingPlayerId(), "ERROR:Trade execution failed.");
+        }
+    }
+    
+    /**
+     * Handles trade rejection by the target player
+     */
+    private void handleTradeRejection(String playerId, String tradeId) {
+        Optional<TradeProposal> proposalOpt = tradeService.findTradeById(tradeId);
+        if (proposalOpt.isEmpty()) {
+            notifyPlayer(playerId, "ERROR:Trade proposal not found.");
+            return;
+        }
+        
+        TradeProposal proposal = proposalOpt.get();
+        
+        // Check if the player is the target of the trade
+        if (!proposal.getTargetPlayerId().equals(playerId) && !proposal.getProposingPlayerId().equals(playerId)) {
+            notifyPlayer(playerId, "ERROR:You are not authorized to reject this trade.");
+            return;
+        }
+        
+        // Check if the trade is still pending
+        if (proposal.getStatus() != TradeProposal.Status.PENDING) {
+            notifyPlayer(playerId, "ERROR:This trade is no longer available for rejection.");
+            return;
+        }
+        
+        // Update the status to rejected
+        proposal.setStatus(TradeProposal.Status.REJECTED);
+        
+        // Notify both players that the trade was rejected
+        notifyPlayer(proposal.getTargetPlayerId(), "UPDATE:TRADE_REJECTED:" + tradeId);
+        notifyPlayer(proposal.getProposingPlayerId(), "UPDATE:TRADE_REJECTED_BY_TARGET:" + tradeId);
+        
+        logger.info("Trade {} rejected by player {}", tradeId, playerId);
     }
     
     @Scheduled(fixedRate = 2000) // Try to create matches every 2 seconds
