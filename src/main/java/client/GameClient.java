@@ -24,6 +24,9 @@ public class GameClient {
 
     public static void main(String[] args) {
         try {
+            System.out.println("Waiting for servers to start...");
+            Thread.sleep(10000); // 10-second delay
+
             playerId = "player-" + UUID.randomUUID().toString().substring(0, 8);
             String serverUri = "ws://" + SERVER_ADDRESS + ":" + SERVER_PORT + "/ws?playerId=" + playerId;
             System.out.println("Connecting to server at " + serverUri);
