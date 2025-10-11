@@ -29,6 +29,7 @@ public class GameFacade {
     private final MatchmakingService matchmakingService;
     private final StoreService storeService;
     private final PlayerRepository playerRepository;
+    private final repository.JpaPlayerRepository jpaPlayerRepository;
     private final IEventManager eventManager;
     private final ServerRegistry serverRegistry;
     private final ServerApiClient serverApiClient;
@@ -47,13 +48,14 @@ public class GameFacade {
 
     @Autowired
     public GameFacade(MatchmakingService matchmakingService, StoreService storeService,
-                      PlayerRepository playerRepository, IEventManager eventManager,
-                      ServerRegistry serverRegistry, ServerApiClient serverApiClient,
+                      PlayerRepository playerRepository, repository.JpaPlayerRepository jpaPlayerRepository,
+                      IEventManager eventManager, ServerRegistry serverRegistry, ServerApiClient serverApiClient,
                       TradeService tradeService, LeaderElectionService leaderElectionService,
                       CardRepository cardRepository) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
+        this.jpaPlayerRepository = jpaPlayerRepository;
         this.eventManager = eventManager;
         this.serverRegistry = serverRegistry;
         this.serverApiClient = serverApiClient;
@@ -542,5 +544,36 @@ public class GameFacade {
     @Scheduled(fixedRate = 2000) // Try to create matches every 2 seconds
     public void scheduledMatchmaking() {
         tryToCreateMatch(); // Attempt to create matches periodically
+    }
+    
+    /**
+     * Daily reward task that runs once per day to award active players
+     */
+    @Scheduled(cron = "0 0 0 * * ?") // Run at midnight every day
+    public void awardDailyRewards() {
+        logger.info("Starting daily reward distribution task");
+        
+        try {
+            // Get all existing players
+            List<Player> allPlayers = jpaPlayerRepository.findAll();
+            
+            int dailyReward = 50; // Number of coins to award daily
+            for (Player player : allPlayers) {
+                // Add daily reward to player
+                player.setCoins(player.getCoins() + dailyReward);
+                
+                // Save the updated player
+                playerRepository.save(player);
+                
+                // Notify player about the reward
+                notifyPlayer(player.getId(), "DAILY_REWARD:" + dailyReward + ":Thank you for playing! Daily reward awarded.");
+                
+                logger.debug("Daily reward of {} coins awarded to player {}", dailyReward, player.getId());
+            }
+            
+            logger.info("Completed daily reward distribution for {} players", allPlayers.size());
+        } catch (Exception e) {
+            logger.error("Error during daily reward distribution: {}", e.getMessage(), e);
+        }
     }
 }
