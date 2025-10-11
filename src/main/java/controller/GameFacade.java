@@ -65,7 +65,6 @@ public class GameFacade {
         if (selfUrl == null) {
             selfUrl = "http://" + serverName + ":" + serverPort;
         }
-        logger.info("My self URL is: {}", selfUrl);
         return selfUrl;
     }
 
