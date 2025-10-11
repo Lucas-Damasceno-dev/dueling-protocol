@@ -64,4 +64,10 @@ public class ServerSynchronizationController {
         // In a real implementation, this would trigger the commit phase of 2PC
         return ResponseEntity.ok("Commit transaction processed.");
     }
+
+    @PostMapping("/players")
+    public ResponseEntity<String> savePlayer(@RequestBody Player player) {
+        localPlayerRepository.save(player);
+        return ResponseEntity.ok("Player " + player.getId() + " saved locally.");
+    }
 }

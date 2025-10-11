@@ -40,4 +40,9 @@ public class ServerApiClient {
         ResponseEntity<Player> response = restTemplate.getForEntity(url, Player.class);
         return response.getBody();
     }
+
+    public void savePlayer(String serverUrl, Player player) {
+        String url = serverUrl + "/api/players";
+        restTemplate.postForEntity(url, player, String.class);
+    }
 }
