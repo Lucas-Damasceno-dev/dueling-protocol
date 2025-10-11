@@ -95,6 +95,9 @@ public class Player implements Serializable {
         logger.info("Character set: {} as {} {}", id, race, playerClassParam);
     }
 
+    import java.util.Map;
+import java.util.HashMap;
+
     private void initializeStarterDeck() {
         List<Card> starterDeckCards = getCardCollection();
         for (int i = 0; i < 5; i++) {
@@ -106,6 +109,31 @@ public class Player implements Serializable {
                 "Standard attack", 1
             ));
         }
+
+        // Add a combo card
+        Map<String, String> comboParams = new HashMap<>();
+        comboParams.put("requiredCardName", "Basic Card 1");
+        comboParams.put("bonusDamage", "3");
+        starterDeckCards.add(new Card(
+            "combo-1",
+            "Combo Strike",
+            2, 1, "Rare",
+            Card.CardType.COMBO,
+            "Deals +3 damage if you played 'Basic Card 1' this turn.",
+            2,
+            comboParams
+        ));
+
+        // Add a counter-spell card
+        starterDeckCards.add(new Card(
+            "counter-1",
+            "Counter Spell",
+            0, 0, "Rare",
+            Card.CardType.COUNTER_SPELL,
+            "Counters a magic spell.",
+            3
+        ));
+
         logger.debug("Starter deck created with {} cards for player {}", starterDeckCards.size(), id);
     }
 

@@ -15,19 +15,25 @@ import java.util.List;
 import java.util.Optional;
 
 import java.io.Serializable;
+
 public class GameSession implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final Logger logger = LoggerFactory.getLogger(GameSession.class);
 
     private final String matchId;
-    private final GameFacade gameFacade;
-    private final CardRepository cardRepository;
+    private final transient GameFacade gameFacade;
+    private final transient CardRepository cardRepository;
     private boolean gameEnded = false;
 
     private final PlayerStateManager playerStateManager;
     private final TurnManager turnManager;
     private final CardEffectService cardEffectService;
     private final ScenarioManager scenarioManager;
+
+    private boolean isResponseWindowActive = false;
+    private long responseWindowEndTime;
+    private Card cardToCounter;
+    private Player originalCaster;
 
     public GameSession(String matchId, Player p1, Player p2, List<Card> deckP1, List<Card> deckP2, GameFacade facade, CardRepository cardRepository) {
         this.matchId = matchId;
@@ -111,23 +117,37 @@ public class GameSession implements Serializable {
     private synchronized void playCard(String playerId, String cardId, boolean isAutoPlay) {
         if (gameEnded) return;
 
+        Player caster = getPlayer(playerId);
+        List<Card> hand = playerStateManager.getHand(playerId);
+        Optional<Card> cardToPlayOpt = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst();
+
+        if (cardToPlayOpt.isEmpty()) {
+            if (!isAutoPlay) gameFacade.notifyPlayer(playerId, "ERROR:Card not in hand");
+            return;
+        }
+        Card card = cardToPlayOpt.get();
+
+        // Handle counter spell
+        if (isResponseWindowActive && card.getCardType() == Card.CardType.COUNTER_SPELL) {
+            if (playerId.equals(originalCaster.getId())) {
+                gameFacade.notifyPlayer(playerId, "ERROR:You cannot counter your own spell");
+                return;
+            }
+            playCounterSpell(caster, card);
+            return;
+        }
+
+        if (isResponseWindowActive) {
+            gameFacade.notifyPlayer(playerId, "ERROR:You must wait for the response window to close");
+            return;
+        }
+
         if (!isAutoPlay && !playerId.equals(turnManager.getCurrentPlayerId())) {
             gameFacade.notifyPlayer(playerId, "ERROR:NOT_YOUR_TURN");
             return;
         }
 
-        Player caster = getPlayer(playerId);
-        Player target = getOpponent(playerId);
-        List<Card> hand = playerStateManager.getHand(playerId);
         int currentResource = playerStateManager.getResource(playerId);
-
-        Optional<Card> cardToPlayOpt = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst();
-        if (cardToPlayOpt.isEmpty()) {
-            if (!isAutoPlay) gameFacade.notifyPlayer(playerId, "ERROR:Card not in hand");
-            return;
-        }
-
-        Card card = cardToPlayOpt.get();
         if (currentResource < card.getManaCost()) {
             if (!isAutoPlay) gameFacade.notifyPlayer(playerId, "ERROR:INSUFFICIENT_RESOURCE");
             return;
@@ -135,7 +155,49 @@ public class GameSession implements Serializable {
 
         playerStateManager.spendResource(playerId, card.getManaCost());
         playerStateManager.removeCardFromHand(playerId, card);
+        turnManager.recordPlayedCard(card);
 
+        if (card.getCardType() == Card.CardType.MAGIC) {
+            this.isResponseWindowActive = true;
+            this.responseWindowEndTime = System.currentTimeMillis() + 5000; // 5 second window
+            this.cardToCounter = card;
+            this.originalCaster = caster;
+            gameFacade.notifyPlayer(getOpponent(playerId).getId(), "UPDATE:RESPONSE_WINDOW_OPEN:" + card.getName());
+            logger.info("Response window opened for card {}", card.getName());
+        } else {
+            executeCardEffect(caster, getOpponent(playerId), card);
+        }
+    }
+
+    private void playCounterSpell(Player counterPlayer, Card counterCard) {
+        playerStateManager.spendResource(counterPlayer.getId(), counterCard.getManaCost());
+        playerStateManager.removeCardFromHand(counterPlayer.getId(), counterCard);
+        turnManager.recordPlayedCard(counterCard);
+
+        logger.info("{} countered {} with {}", counterPlayer.getNickname(), cardToCounter.getName(), counterCard.getName());
+        gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), "UPDATE:SPELL_COUNTERED:" + cardToCounter.getName());
+
+        this.isResponseWindowActive = false;
+        this.cardToCounter = null;
+        this.originalCaster = null;
+
+        // It's still the original caster's turn
+        if (!gameEnded) {
+            switchTurn();
+        }
+    }
+
+    public void resolveResponseWindow() {
+        if (isResponseWindowActive && System.currentTimeMillis() >= responseWindowEndTime) {
+            logger.info("Response window for {} closed", cardToCounter.getName());
+            isResponseWindowActive = false;
+            executeCardEffect(originalCaster, getOpponent(originalCaster.getId()), cardToCounter);
+            cardToCounter = null;
+            originalCaster = null;
+        }
+    }
+
+    private void executeCardEffect(Player caster, Player target, Card card) {
         CardEffect effect = cardEffectService.getCardEffect(card);
         if (effect != null) {
             effect.execute(this, caster, target, card);
@@ -252,26 +314,4 @@ public class GameSession implements Serializable {
         scenarioManager.setActiveScenario(card, duration);
         gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), "UPDATE:SCENARIO_START:" + card.getName());
     }
-}
-d, player2.getId(), player1.getId());
-        } else if (player2.getHealthPoints() <= 0) {
-            gameEnded = true;
-            logger.info("Match {} finished. Winner: {}", matchId, player1.getId());
-            gameFacade.finishGame(matchId, player1.getId(), player2.getId());
-        }
-    }
-
-    private String getCardIds(List<Card> cards) {
-        return cards.stream().map(Card::getId).collect(Collectors.joining(","));
-    }
-
-    private String getCardNames(List<Card> cards) {
-        return cards.stream().map(Card::getName).collect(Collectors.joining(", "));
-    }
-
-    public Player getPlayer1() { return player1; }
-    public Player getPlayer2() { return player2; }
-    public List<Card> getHandP1() { return handP1; }
-    public List<Card> getHandP2() { return handP2; }
-    public int getTurn() { return turn; }
 }
