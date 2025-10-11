@@ -86,4 +86,16 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
             return Optional.empty();
         }
     }
+
+    @Override
+    public Optional<Player> findAndLockPartner() {
+        synchronized (lock) {
+            if (!matchmakingQueue.isEmpty()) {
+                Player partner = matchmakingQueue.poll();
+                logger.info("Found and locked partner {} for remote match.", partner.getNickname());
+                return Optional.ofNullable(partner);
+            }
+            return Optional.empty();
+        }
+    }
 }

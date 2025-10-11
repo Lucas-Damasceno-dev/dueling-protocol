@@ -45,4 +45,10 @@ public class ServerApiClient {
         String url = serverUrl + "/api/players";
         restTemplate.postForEntity(url, player, String.class);
     }
+
+    public Player findAndLockPartner(String serverUrl) {
+        String url = serverUrl + "/api/matchmaking/find-and-lock-partner";
+        ResponseEntity<Player> response = restTemplate.postForEntity(url, null, Player.class);
+        return response.getBody();
+    }
 }

@@ -89,30 +89,59 @@ public class GameFacade {
     }
 
     public void tryToCreateMatch() {
-        matchmakingService.findMatch().ifPresent(match -> {
-            Player p1 = match.getPlayer1();
-            Player p2 = match.getPlayer2();
+        // First, try to match locally
+        Optional<Match> localMatch = matchmakingService.findMatch();
+        if (localMatch.isPresent()) {
+            startMatch(localMatch.get());
+            return;
+        }
 
-            // The check for active clients is removed. The WebSocket handler is now the source of truth for connectivity.
-            // A new mechanism will be needed to confirm players are still connected before starting a match.
-            // For now, we proceed assuming they are.
-
-            String matchId = UUID.randomUUID().toString();
-            List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
-            List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
-
-            GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this);
-            session.startGame();
-            activeGames.put(matchId, session);
+        // If no local match, try to find a remote partner for one of our waiting players
+        Optional<Player> localPlayerOpt = matchmakingService.findAndLockPartner(); // Poll one player from our queue
+        if (localPlayerOpt.isPresent()) {
+            Player p1 = localPlayerOpt.get();
             
-            logger.info("New match created between {} and {} with ID {}", p1.getId(), p2.getId(), matchId);
+            List<String> remoteServers = new ArrayList<>(serverRegistry.getRegisteredServers());
+            remoteServers.remove(getSelfUrl()); 
 
-            notifyPlayer(p1.getId(), "UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
-            notifyPlayer(p2.getId(), "UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
+            for (String serverUrl : remoteServers) {
+                try {
+                    Player p2 = serverApiClient.findAndLockPartner(serverUrl);
+                    if (p2 != null) {
+                        logger.info("Found remote partner {} for {} on server {}", p2.getNickname(), p1.getNickname(), serverUrl);
+                        startMatch(new Match(p1, p2));
+                        return; // Match found, exit
+                    }
+                } catch (Exception e) {
+                    logger.warn("Could not request partner from server {}: {}", serverUrl, e.getMessage());
+                }
+            }
 
-            notifyPlayer(p1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
-            notifyPlayer(p2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
-        });
+            // If no remote partner was found, put our player back in the queue
+            logger.info("No remote partner found for {}. Returning to queue.", p1.getNickname());
+            matchmakingService.addPlayerToQueue(p1);
+        }
+    }
+
+    private void startMatch(Match match) {
+        Player p1 = match.getPlayer1();
+        Player p2 = match.getPlayer2();
+
+        String matchId = UUID.randomUUID().toString();
+        List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
+        List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
+
+        GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this);
+        session.startGame();
+        activeGames.put(matchId, session);
+        
+        logger.info("New match created between {} and {} with ID {}", p1.getId(), p2.getId(), matchId);
+
+        notifyPlayer(p1.getId(), "UPDATE:GAME_START:" + matchId + ":" + p2.getNickname());
+        notifyPlayer(p2.getId(), "UPDATE:GAME_START:" + matchId + ":" + p1.getNickname());
+
+        notifyPlayer(p1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP1()));
+        notifyPlayer(p2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(session.getHandP2()));
     }
 
     public void notifyPlayer(String playerId, String message) {

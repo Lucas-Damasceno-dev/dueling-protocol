@@ -22,4 +22,11 @@ public interface MatchmakingService {
      * @return an Optional containing a Match if two players are available, or empty if not enough players
      */
     Optional<Match> findMatch();
+
+    /**
+     * Atomically finds and removes a single player from the queue to be matched remotely.
+     *
+     * @return an Optional containing a Player if one is available, or empty otherwise.
+     */
+    Optional<Player> findAndLockPartner();
 }
