@@ -1,0 +1,81 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        # Route for API requests to game microservices
+        - id: game-create-match
+          uri: lb://GAME-SERVER  # Using service discovery with load balancing
+          predicates:
+            - Path=/api/match/**
+          filters:
+            - JwtAuthenticationFilter  # Custom filter for JWT validation
+            - RewritePath=/api/(?<segment>.*), /${segment}
+        
+        - id: game-move
+          uri: lb://GAME-SERVER
+          predicates:
+            - Path=/api/move/**
+          filters:
+            - JwtAuthenticationFilter
+            - RewritePath=/api/(?<segment>.*), /${segment}
+        
+        - id: game-state
+          uri: lb://GAME-SERVER
+          predicates:
+            - Path=/api/state/**
+          filters:
+            - JwtAuthenticationFilter
+            - RewritePath=/api/(?<segment>.*), /${segment}
+        
+        - id: game-user
+          uri: lb://GAME-SERVER
+          predicates:
+            - Path=/api/user/**
+          filters:
+            - JwtAuthenticationFilter
+            - RewritePath=/api/(?<segment>.*), /${segment}
+        
+        # Route for WebSocket connections
+        - id: websocket-route
+          uri: lb:ws://GAME-SERVER  # Using WebSocket protocol with load balancing
+          predicates:
+            - Path=/ws/**
+          filters:
+            - JwtAuthenticationFilter  # Custom filter for JWT validation
+            - RewritePath=/ws/(?<segment>.*), /${segment}
+      
+      # Global filters configuration
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+
+      # Gateway loadbalancer configuration
+      loadbalancer:
+        cache:
+          enabled: true
+          
+    # Load balancer configuration
+    loadbalancer:
+      cache:
+        enabled: true
+      ribbon:
+        enabled: false  # Use Reactor LoadBalancer instead of Ribbon
+      instance:
+        response-time:
+          cache:
+            max-capacity: 1000
+            eviction-interval: 600000  # 10 minutes in milliseconds
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:mySecretKeyForDuelingProtocol}  # Default secret, should be overridden in production
+  expiration: 86400000  # 24 hours in milliseconds
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web.reactive: DEBUG
