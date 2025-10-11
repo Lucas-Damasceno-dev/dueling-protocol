@@ -4,7 +4,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: java -jar app.jar --spring.profiles.active=server
+    command: java -jar app.jar --spring.profiles.active=server,distributed
     container_name: server-1
     ports:
       - "8081:8080"
@@ -12,6 +12,8 @@ services:
     environment:
       - SERVER_PORT=8080
       - SERVER_NAME=server-1
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     networks:
       - dueling-network
 
@@ -19,13 +21,15 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: java -jar app.jar --spring.profiles.active=server
+    command: java -jar app.jar --spring.profiles.active=server,distributed
     container_name: server-2
     ports:
       - "8082:8080"
     environment:
       - SERVER_PORT=8080
       - SERVER_NAME=server-2
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     networks:
       - dueling-network
 
@@ -51,9 +55,18 @@ services:
     depends_on:
       - server-1
       - server-2
+      - redis
     environment:
       - SERVER_HOST=server-2
       - SERVER_PORT=8080
+    networks:
+      - dueling-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
     networks:
       - dueling-network
 

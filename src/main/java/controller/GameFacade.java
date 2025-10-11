@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import pubsub.EventManager;
+import pubsub.IEventManager;
 import repository.CardRepository;
 import repository.PlayerRepository;
 import service.election.LeaderElectionService;
@@ -29,7 +29,7 @@ public class GameFacade {
     private final MatchmakingService matchmakingService;
     private final StoreService storeService;
     private final PlayerRepository playerRepository;
-    private final EventManager eventManager;
+    private final IEventManager eventManager;
     private final ServerRegistry serverRegistry;
     private final ServerApiClient serverApiClient;
     private final TradeService tradeService;
@@ -47,7 +47,7 @@ public class GameFacade {
 
     @Autowired
     public GameFacade(MatchmakingService matchmakingService, StoreService storeService,
-                      PlayerRepository playerRepository, EventManager eventManager,
+                      PlayerRepository playerRepository, IEventManager eventManager,
                       ServerRegistry serverRegistry, ServerApiClient serverApiClient,
                       TradeService tradeService, LeaderElectionService leaderElectionService,
                       CardRepository cardRepository) {
@@ -69,7 +69,7 @@ public class GameFacade {
         return selfUrl;
     }
 
-    public EventManager getEventManager() {
+    public IEventManager getEventManager() {
         return this.eventManager;
     }
 
