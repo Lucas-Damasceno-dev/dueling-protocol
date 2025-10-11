@@ -10,6 +10,9 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Service;
 
+import org.springframework.context.annotation.Profile;
+
+@Profile("server")
 @Service
 public class ServerRegistrationService implements ApplicationListener<ApplicationReadyEvent> {
 

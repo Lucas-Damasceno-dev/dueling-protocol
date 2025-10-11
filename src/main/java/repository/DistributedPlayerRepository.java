@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
+
+@Profile("server")
 @Repository
 @Primary
 public class DistributedPlayerRepository implements PlayerRepository {
