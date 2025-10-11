@@ -82,31 +82,42 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
      *
      * @return an Optional containing a Match if two players are available, or empty if not enough players
      */
+    private static final int MAX_ELO_DIFFERENCE = 100; // Define a suitable Elo difference
+
     @Override
     public Optional<Match> findMatch() {
         synchronized (lock) {
-            if (matchmakingQueue.size() >= 2) {
-                PlayerWithDeck playerWithDeck1 = matchmakingQueue.poll();
-                PlayerWithDeck playerWithDeck2 = matchmakingQueue.poll();
+            if (matchmakingQueue.size() < 2) {
+                return Optional.empty();
+            }
 
-                if (playerWithDeck1 != null && playerWithDeck2 != null) {
-                    logger.info("Match found: {} vs {}", 
-                                playerWithDeck1.getPlayer().getNickname(), 
-                                playerWithDeck2.getPlayer().getNickname());
-                    Match match = new Match(playerWithDeck1.getPlayer(), playerWithDeck2.getPlayer());
+            PlayerWithDeck playerWithDeck1 = matchmakingQueue.poll();
+            if (playerWithDeck1 == null) {
+                return Optional.empty();
+            }
+
+            Player player1 = playerWithDeck1.getPlayer();
+            int player1Elo = player1.getPlayerRanking().getEloRating();
+
+            // Iterate through the queue to find a suitable opponent
+            for (PlayerWithDeck playerWithDeck2 : matchmakingQueue) {
+                Player player2 = playerWithDeck2.getPlayer();
+                int player2Elo = player2.getPlayerRanking().getEloRating();
+
+                if (Math.abs(player1Elo - player2Elo) <= MAX_ELO_DIFFERENCE) {
+                    // Found a suitable match, remove player2 from the queue
+                    matchmakingQueue.remove(playerWithDeck2);
+                    logger.info("Match found (Elo-based): {} ({}) vs {} ({})",
+                                player1.getNickname(), player1Elo,
+                                player2.getNickname(), player2Elo);
+                    Match match = new Match(player1, player2);
                     return Optional.of(match);
-                } else {
-                    // This case can happen if a player disconnects right after being polled
-                    logger.warn("Error forming match: one or both players are null after polling from queue.");
-                    // Re-queue the non-null player if one exists
-                    if (playerWithDeck1 != null) {
-                        matchmakingQueue.offer(playerWithDeck1);
-                    }
-                    if (playerWithDeck2 != null) {
-                        matchmakingQueue.offer(playerWithDeck2);
-                    }
                 }
             }
+
+            // If no suitable match is found, re-add player1 to the queue
+            matchmakingQueue.offer(playerWithDeck1);
+            logger.debug("No suitable Elo-based match found for {}. Re-adding to queue.", player1.getNickname());
             return Optional.empty();
         }
     }

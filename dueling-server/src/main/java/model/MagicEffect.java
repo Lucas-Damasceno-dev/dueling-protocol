@@ -28,3 +28,4 @@ public class MagicEffect implements CardEffect, Serializable {
         logger.info("{} used '{}', drawing a card!", caster.getNickname(), card.getName());
         session.drawCards(caster, 1);
     }
+}

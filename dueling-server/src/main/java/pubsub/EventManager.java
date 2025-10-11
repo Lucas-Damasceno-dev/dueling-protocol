@@ -59,4 +59,23 @@ public class EventManager implements IEventManager {
             }
         }
     }
+
+    @Override
+    public void sendGroupMessage(String groupName, String senderId, String content) {
+        // Not implemented for in-memory EventManager
+        logger.warn("sendGroupMessage not implemented for in-memory EventManager");
+    }
+
+    @Override
+    public void sendInGameMessage(String matchId, String senderId, String content) {
+        // Not implemented for in-memory EventManager
+        logger.warn("sendInGameMessage not implemented for in-memory EventManager");
+    }
+
+    @Override
+    public void sendEmote(String channelType, String channelId, String senderId, String emoteId) {
+        logger.info("Emote received: channelType={}, channelId={}, senderId={}, emoteId={}", channelType, channelId, senderId, emoteId);
+        // For in-memory, we might publish to a generic channel or directly to players if they are subscribed to a 'channelId' topic
+        // For simplicity, just logging for now.
+    }
 }

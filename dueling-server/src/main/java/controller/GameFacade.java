@@ -25,8 +25,10 @@ import service.store.PurchaseResult;
 import service.store.StoreService;
 import service.trade.TradeService;
 
+import service.ranking.RankingService;
+import service.achievement.AchievementService;
+
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Profile("server")
@@ -47,6 +49,8 @@ public class GameFacade {
     private final RedissonClient redissonClient;
     private final InGameChatService inGameChatService;
     private final EmoteService emoteService;
+    private final RankingService rankingService;
+    private final AchievementService achievementService;
 
     @Value("${server.name}")
     private String serverName;
@@ -82,6 +86,8 @@ public class GameFacade {
         this.inGameChatService = inGameChatService;
         this.chatGroupService = chatGroupService;
         this.emoteService = emoteService;
+        this.rankingService = rankingService;
+        this.achievementService = achievementService;
     }
 
     private String getSelfUrl() {
