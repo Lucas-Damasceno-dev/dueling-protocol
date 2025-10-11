@@ -53,6 +53,7 @@ public class EventManager {
             logger.debug("Publishing to topic {}: {}", topic, message);
             for (PrintWriter subscriber : subscribers.get(topic)) {
                 subscriber.println(message);
+                subscriber.flush();
             }
         }
     }
