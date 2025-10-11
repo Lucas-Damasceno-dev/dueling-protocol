@@ -136,4 +136,9 @@ public class ServerSynchronizationController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Trade failed.");
         }
     }
+    
+    @GetMapping("/health")
+    public ResponseEntity<String> healthCheck() {
+        return ResponseEntity.ok("Server is healthy");
+    }
 }
