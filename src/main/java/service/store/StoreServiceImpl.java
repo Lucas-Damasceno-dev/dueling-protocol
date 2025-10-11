@@ -14,6 +14,9 @@ import api.ServerApiClient;
 import org.springframework.context.annotation.Profile;
 
 @Profile("server")
+import org.springframework.context.annotation.Profile;
+
+@Profile("server")
 @Service
 public class StoreServiceImpl implements StoreService {
     
