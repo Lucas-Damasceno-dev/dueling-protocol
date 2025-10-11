@@ -107,9 +107,12 @@ public class GameFacade {
     public void tryToCreateMatch() {
         Optional<Match> localMatch = matchmakingService.findMatch();
         if (localMatch.isPresent()) {
+            logger.info("Found local match.");
             startMatch(localMatch.get());
             return;
         }
+
+        logger.info("No local match found, seeking remote partner...");
 
         Optional<Player> localPlayerOpt = matchmakingService.findAndLockPartner();
         if (localPlayerOpt.isPresent()) {
