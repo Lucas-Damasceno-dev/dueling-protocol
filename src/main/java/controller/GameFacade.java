@@ -1,21 +1,24 @@
 package controller;
 
-import model.Card;
-import model.GameSession;
-import model.Player;
-import repository.PlayerRepository;
-import service.matchmaking.MatchmakingService;
-import service.store.StoreService;
-import service.store.PurchaseResult;
-import pubsub.EventManager;
-
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
+import api.ServerApiClient;
+import api.registry.ServerRegistry;
+import model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import pubsub.EventManager;
+import repository.PlayerRepository;
+import service.election.LeaderElectionService;
+import service.matchmaking.MatchmakingService;
+import service.store.PurchaseResult;
+import service.store.StoreService;
+import service.trade.TradeService;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Service
 public class GameFacade {
@@ -23,42 +26,51 @@ public class GameFacade {
     private final StoreService storeService;
     private final PlayerRepository playerRepository;
     private final EventManager eventManager;
+    private final ServerRegistry serverRegistry;
+    private final ServerApiClient serverApiClient;
+    private final TradeService tradeService;
+    private final LeaderElectionService leaderElectionService;
+
+    @Value("${server.name:server-1}")
+    private String serverName;
+    @Value("${server.port:8080}")
+    private String serverPort;
+    private String selfUrl;
 
     private static final Logger logger = LoggerFactory.getLogger(GameFacade.class);
     private final Map<String, GameSession> activeGames = new ConcurrentHashMap<>();
 
     @Autowired
-    public GameFacade(MatchmakingService matchmakingService, StoreService storeService, 
-                      PlayerRepository playerRepository, EventManager eventManager) {
+    public GameFacade(MatchmakingService matchmakingService, StoreService storeService,
+                      PlayerRepository playerRepository, EventManager eventManager,
+                      ServerRegistry serverRegistry, ServerApiClient serverApiClient,
+                      TradeService tradeService, LeaderElectionService leaderElectionService) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
         this.eventManager = eventManager;
+        this.serverRegistry = serverRegistry;
+        this.serverApiClient = serverApiClient;
+        this.tradeService = tradeService;
+        this.leaderElectionService = leaderElectionService;
+    }
+
+    private String getSelfUrl() {
+        if (selfUrl == null) {
+            selfUrl = "http://" + serverName + ":" + serverPort;
+        }
+        return selfUrl;
     }
 
     public EventManager getEventManager() {
         return this.eventManager;
     }
 
-    /**
-     * Registers a player with the system, preparing them to receive notifications.
-     *
-     * @param playerId the unique identifier of the player
-     */
     public void registerPlayer(String playerId) {
-        // The EventManager is responsible for handling subscriptions.
-        // We just need to ensure the player is known to the system.
         logger.info("Player registered in facade: {}", playerId);
     }
     
-    /**
-     * Unregisters a player and cleans up any active games they were involved in.
-     *
-     * @param playerId the unique identifier of the player
-     */
     public void unregisterPlayer(String playerId) {
-        // EventManager handles unsubscriptions.
-        
         List<String> gamesToRemove = new ArrayList<>();
         for (Map.Entry<String, GameSession> entry : activeGames.entrySet()) {
             GameSession session = entry.getValue();
@@ -89,15 +101,13 @@ public class GameFacade {
     }
 
     public void tryToCreateMatch() {
-        // First, try to match locally
         Optional<Match> localMatch = matchmakingService.findMatch();
         if (localMatch.isPresent()) {
             startMatch(localMatch.get());
             return;
         }
 
-        // If no local match, try to find a remote partner for one of our waiting players
-        Optional<Player> localPlayerOpt = matchmakingService.findAndLockPartner(); // Poll one player from our queue
+        Optional<Player> localPlayerOpt = matchmakingService.findAndLockPartner();
         if (localPlayerOpt.isPresent()) {
             Player p1 = localPlayerOpt.get();
             
@@ -110,14 +120,13 @@ public class GameFacade {
                     if (p2 != null) {
                         logger.info("Found remote partner {} for {} on server {}", p2.getNickname(), p1.getNickname(), serverUrl);
                         startMatch(new Match(p1, p2));
-                        return; // Match found, exit
+                        return;
                     }
                 } catch (Exception e) {
                     logger.warn("Could not request partner from server {}: {}", serverUrl, e.getMessage());
                 }
             }
 
-            // If no remote partner was found, put our player back in the queue
             logger.info("No remote partner found for {}. Returning to queue.", p1.getNickname());
             matchmakingService.addPlayerToQueue(p1);
         }
@@ -160,13 +169,8 @@ public class GameFacade {
         return sb.length() > 0 ? sb.substring(0, sb.length() - 1) : "";
     }
 
-    /**
-     * Processes a game command from a player.
-     *
-     * @param command the command array received from the client
-     */
     public void processGameCommand(String[] command) {
-        if (command.length < 2) { // e.g., GAME:playerId:ACTION...
+        if (command.length < 2) { 
             logger.warn("Invalid GAME command: {}", String.join(":", command));
             return;
         }
@@ -207,7 +211,7 @@ public class GameFacade {
     public PurchaseResult buyPack(Player player, String packType) {
         PurchaseResult result = storeService.purchaseCardPack(player, packType);
         if (result.isSuccess()) {
-            playerRepository.save(player); // Save player state after purchase
+            playerRepository.save(player); 
             logger.info("Player {} bought pack of type {}", player.getId(), packType);
         }
         return result;
@@ -228,10 +232,71 @@ public class GameFacade {
             logger.info("Match {} finished. {} won {} points!", matchId, winner.getNickname(), pointsEarned);
         }
 
-        // Notify players using the EventManager
         notifyPlayer(winnerId, "UPDATE:GAME_OVER:VICTORY");
         notifyPlayer(loserId, "UPDATE:GAME_OVER:DEFEAT");
         
         logger.info("Match {} finished. Winner: {}, Loser: {}", matchId, winnerId, loserId);
+    }
+
+    public boolean executeTrade(String tradeId) {
+        Optional<TradeProposal> proposalOpt = tradeService.findTradeById(tradeId);
+        if (proposalOpt.isEmpty()) {
+            logger.warn("Attempted to execute non-existent trade: {}", tradeId);
+            return false;
+        }
+        TradeProposal proposal = proposalOpt.get();
+
+        String leader = leaderElectionService.getLeader();
+        boolean lockAcquired = false;
+        try {
+            lockAcquired = serverApiClient.acquireLock(leader);
+            if (!lockAcquired) {
+                logger.warn("Could not acquire lock to execute trade {}", tradeId);
+                return false;
+            }
+
+            Player p1 = playerRepository.findById(proposal.getProposingPlayerId()).orElse(null);
+            Player p2 = playerRepository.findById(proposal.getTargetPlayerId()).orElse(null);
+
+            if (p1 == null || p2 == null) {
+                logger.error("Could not find one or both players for trade {}", tradeId);
+                return false;
+            }
+
+            boolean p1HasCards = p1.getCardCollection().stream().map(Card::getId).collect(Collectors.toList()).containsAll(proposal.getOfferedCardIds());
+            boolean p2HasCards = p2.getCardCollection().stream().map(Card::getId).collect(Collectors.toList()).containsAll(proposal.getRequestedCardIds());
+
+            if (!p1HasCards || !p2HasCards) {
+                logger.warn("Trade {} invalid: one or both players missing cards.", tradeId);
+                notifyPlayer(p1.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
+                notifyPlayer(p2.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
+                return false;
+            }
+
+            List<Card> p1OfferedCards = p1.getCardCollection().stream().filter(c -> proposal.getOfferedCardIds().contains(c.getId())).collect(Collectors.toList());
+            List<Card> p2RequestedCards = p2.getCardCollection().stream().filter(c -> proposal.getRequestedCardIds().contains(c.getId())).collect(Collectors.toList());
+
+            p1.getCardCollection().removeAll(p1OfferedCards);
+            p1.getCardCollection().addAll(p2RequestedCards);
+            
+            p2.getCardCollection().removeAll(p2RequestedCards);
+            p2.getCardCollection().addAll(p1OfferedCards);
+
+            playerRepository.save(p1);
+            playerRepository.save(p2);
+
+            proposal.setStatus(TradeProposal.Status.COMPLETED);
+            logger.info("Trade {} executed successfully.", tradeId);
+            
+            notifyPlayer(p1.getId(), "UPDATE:TRADE_COMPLETE:SUCCESS");
+            notifyPlayer(p2.getId(), "UPDATE:TRADE_COMPLETE:SUCCESS");
+            
+            return true;
+
+        } finally {
+            if (lockAcquired) {
+                serverApiClient.releaseLock(leader);
+            }
+        }
     }
 }
