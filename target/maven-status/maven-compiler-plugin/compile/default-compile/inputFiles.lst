@@ -13,6 +13,7 @@
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/Card.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/store/StoreService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/ScenarioEffect.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/config/RedissonConfig.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/pubsub/EventManager.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/store/PurchaseResult.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/TradeProposal.java
