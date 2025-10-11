@@ -3,18 +3,12 @@ package service.election;
 import api.registry.ServerRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import org.springframework.context.annotation.Profile;
-
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
-import org.springframework.context.annotation.Profile;
 
 @Profile("server")
 @Service
@@ -22,9 +16,11 @@ public class LeaderElectionService {
 
     private final ServerRegistry serverRegistry;
 
-    private String serverName = "server-1";
+    @Value("${server.name}")
+    private String serverName;
     
-    private String serverPort = "8080";
+    @Value("${server.port}")
+    private String serverPort;
 
     private String selfUrl;
 
@@ -44,7 +40,7 @@ public class LeaderElectionService {
         List<String> servers = new ArrayList<>(serverRegistry.getRegisteredServers());
         servers.add(getSelfUrl());
         Collections.sort(servers);
-        if (servers.isEmpty()) return null; // Should not happen
+        if (servers.isEmpty()) return null;
         return servers.get(0);
     }
 
