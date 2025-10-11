@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import pubsub.EventManager;
 import repository.CardRepository;
@@ -21,13 +22,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import org.springframework.context.annotation.Profile;
-
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
-import org.springframework.context.annotation.Profile;
-
 @Profile("server")
 @Service
 public class GameFacade {
@@ -41,8 +35,10 @@ public class GameFacade {
     private final LeaderElectionService leaderElectionService;
     private final CardRepository cardRepository;
 
-    private String serverName = "server-1";
-    private String serverPort = "8080";
+    @Value("${server.name}")
+    private String serverName;
+    @Value("${server.port}")
+    private String serverPort;
     private String selfUrl;
 
     private static final Logger logger = LoggerFactory.getLogger(GameFacade.class);
@@ -69,6 +65,7 @@ public class GameFacade {
         if (selfUrl == null) {
             selfUrl = "http://" + serverName + ":" + serverPort;
         }
+        logger.info("My self URL is: {}", selfUrl);
         return selfUrl;
     }
 
@@ -119,7 +116,6 @@ public class GameFacade {
         }
 
         logger.info("No local match found, seeking remote partner...");
-
         Optional<Player> localPlayerOpt = matchmakingService.findAndLockPartner();
         if (localPlayerOpt.isPresent()) {
             Player p1 = localPlayerOpt.get();
@@ -127,7 +123,7 @@ public class GameFacade {
             List<String> remoteServers = new ArrayList<>(serverRegistry.getRegisteredServers());
             logger.info("All registered servers: {}", remoteServers);
             remoteServers.remove(getSelfUrl()); 
-            logger.info("Attempting to find partner on remote servers: {}", remoteServers); 
+            logger.info("Attempting to find partner on remote servers: {}", remoteServers);
 
             for (String serverUrl : remoteServers) {
                 try {
@@ -185,14 +181,13 @@ public class GameFacade {
     }
 
     public void processGameCommand(String[] command) {
-        if (command.length < 3) { // e.g., GAME:playerId:ACTION...
+        if (command.length < 3) {
             logger.warn("Invalid command structure: {}", String.join(":", command));
             return;
         }
         String playerId = command[1];
         String action = command[2];
 
-        // Find player, create if it's a setup command
         Player player = playerRepository.findById(playerId).orElse(null);
         if (player == null && !"CHARACTER_SETUP".equals(action)) {
             notifyPlayer(playerId, "ERROR:Player not found. Please set up your character first.");
@@ -205,8 +200,7 @@ public class GameFacade {
                     notifyPlayer(playerId, "ERROR:Incomplete character setup command.");
                     return;
                 }
-                Player newPlayer = new Player(playerId, command[3]); // Assuming nickname is part of setup
-                // In a real scenario, you'd set race/class etc.
+                Player newPlayer = new Player(playerId, command[3]);
                 playerRepository.save(newPlayer);
                 notifyPlayer(playerId, "SUCCESS:Character created.");
                 break;

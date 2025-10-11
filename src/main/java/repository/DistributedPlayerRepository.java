@@ -7,18 +7,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
-import org.springframework.context.annotation.Profile;
-
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
-import org.springframework.context.annotation.Profile;
 
 @Profile("server")
 @Repository
@@ -29,9 +23,11 @@ public class DistributedPlayerRepository implements PlayerRepository {
     private final ServerRegistry serverRegistry;
     private final ServerApiClient serverApiClient;
 
-    private String serverName = "server-1";
+    @Value("${server.name}")
+    private String serverName;
     
-    private String serverPort = "8080";
+    @Value("${server.port}")
+    private String serverPort;
 
     private String selfUrl;
 
