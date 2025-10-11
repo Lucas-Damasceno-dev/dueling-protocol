@@ -109,7 +109,7 @@ public class CardRepository {
      * @param rarity the rarity of the card to retrieve (e.g., "Common", "Rare", "Legendary")
      * @return an Optional containing a random card of the specified rarity, or empty if none available
      */
-    public static synchronized Optional<Card> getRandomCardByRarity(String rarity) {
+    public synchronized Optional<Card> getRandomCardByRarity(String rarity) {
         List<String> availableCards = allCards.values().stream()
             .filter(c -> c.getRarity().equalsIgnoreCase(rarity) && cardStock.getOrDefault(c.getId(), 0) > 0)
             .map(Card::getId)
