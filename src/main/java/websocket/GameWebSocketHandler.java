@@ -19,9 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.context.annotation.Profile;
 
-import org.springframework.context.annotation.Profile;
-
-@Profile("server")
 @Component
 public class GameWebSocketHandler extends TextWebSocketHandler {
 
