@@ -18,6 +18,7 @@ model/TradeProposal$Status.class
 model/Card$CardType.class
 api/ServerSynchronizationController.class
 ping/PingServer.class
+config/SessionConfig.class
 websocket/GameWebSocketHandler$WebSocketWriter.class
 service/election/LeaderElectionService.class
 client/GameClient.class
@@ -41,6 +42,7 @@ pubsub/RedisMessageListener$MessageHandler.class
 pubsub/EventManager.class
 model/CardEffect.class
 service/store/PremiumCardPack.class
+websocket/WebSocketSessionManager.class
 model/GameSession$1.class
 client/GameClient$MyWebSocketClient.class
 model/MagicEffect.class

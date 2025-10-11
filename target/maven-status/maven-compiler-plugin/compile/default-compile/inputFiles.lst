@@ -12,6 +12,7 @@
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/matchmaking/ConcurrentMatchmakingService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/Card.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/store/StoreService.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/config/SessionConfig.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/ScenarioEffect.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/config/RedissonConfig.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/pubsub/EventManager.java
@@ -41,6 +42,7 @@
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/election/LeaderElectionService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/DistributedPlayerRepository.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/trade/TradeService.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/websocket/WebSocketSessionManager.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/PlayerRepositoryJson.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/FriendshipRepository.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/websocket/GameWebSocketHandler.java
