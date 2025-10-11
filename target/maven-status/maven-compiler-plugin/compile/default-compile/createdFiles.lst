@@ -4,6 +4,7 @@ model/Match.class
 model/EquipmentEffect.class
 repository/PlayerRepositoryPostgreSQL.class
 service/store/StoreServiceImpl.class
+model/Friendship$Status.class
 controller/AuthController.class
 security/SecurityConfig.class
 service/store/PurchaseResult$PurchaseStatus.class
@@ -11,6 +12,7 @@ repository/InMemoryPlayerRepository.class
 model/DefenseEffect.class
 service/store/LegendaryCardPack.class
 security/JwtUtil.class
+controller/FriendController.class
 service/lock/LockService.class
 model/TradeProposal$Status.class
 model/Card$CardType.class
@@ -25,11 +27,14 @@ service/store/StoreService.class
 repository/DistributedPlayerRepository.class
 security/CustomUserDetailsService.class
 service/store/PurchaseResult.class
+service/messaging/PrivateMessagingService.class
 config/AppConfig.class
+repository/FriendshipRepository.class
 model/AttributeEffect.class
 repository/UserRepository.class
 repository/JpaPlayerRepository.class
 service/store/CardPackFactory.class
+pubsub/RedisMessageSubscriber$PrivateMessageHandler.class
 model/CardPack.class
 repository/CardRepository.class
 pubsub/RedisMessageListener$MessageHandler.class
@@ -58,8 +63,11 @@ model/ScenarioEffect.class
 controller/DuelingProtocolApplication.class
 service/auth/AuthenticationService.class
 service/store/PurchaseStatus.class
+service/messaging/PrivateMessagingService$PrivateMessageHandler.class
+model/PrivateMessage.class
 pubsub/IEventManager.class
 model/GameSession.class
+model/Friendship.class
 model/User.class
 config/WebSocketConfig.class
 service/matchmaking/ConcurrentMatchmakingService.class

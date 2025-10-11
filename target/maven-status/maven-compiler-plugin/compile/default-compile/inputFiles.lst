@@ -8,6 +8,7 @@
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/api/ServerApiClient.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/client/GameClient.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/pubsub/RedisMessageSubscriber.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/PrivateMessage.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/matchmaking/ConcurrentMatchmakingService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/Card.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/store/StoreService.java
@@ -19,7 +20,9 @@
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/controller/GameFacade.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/pubsub/RedisMessageListener.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/PlayerRepositoryPostgreSQL.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/messaging/PrivateMessagingService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/config/AppConfig.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/controller/FriendController.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/User.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/CardRepository.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/store/StoreServiceImpl.java
@@ -38,6 +41,7 @@
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/DistributedPlayerRepository.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/trade/TradeService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/PlayerRepositoryJson.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/repository/FriendshipRepository.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/websocket/GameWebSocketHandler.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/config/RedisConfig.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/api/ServerSynchronizationController.java
@@ -48,6 +52,7 @@
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/controller/AuthController.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/security/CustomUserDetailsService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/Player.java
+/home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/model/Friendship.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/store/CardPackFactory.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/service/registry/ServerRegistrationService.java
 /home/lucas/Documentos/dev/projects/dueling-protocol/src/main/java/security/SecurityConfig.java
