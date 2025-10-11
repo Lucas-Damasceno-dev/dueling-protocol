@@ -552,14 +552,21 @@ public class GameFacade {
      * @param loserId The ID of the player who lost the match.
      */
     public void finishGame(String matchId, String winnerId, String loserId) {
-        if (activeGames.remove(matchId) == null) {
+        if (gameSessionRepository.findById(matchId).isEmpty()) {
             logger.warn("Attempt to finish non-existent match: {}", matchId);
             return;
         }
-        
+        gameSessionRepository.deleteById(matchId);
+
         Optional<Player> winnerOpt = playerRepository.findById(winnerId);
-        if (winnerOpt.isPresent()) {
+        Optional<Player> loserOpt = playerRepository.findById(loserId);
+
+        if (winnerOpt.isPresent() && loserOpt.isPresent()) {
             Player winner = winnerOpt.get();
+            Player loser = loserOpt.get();
+
+            rankingService.updateEloRatings(winner, loser);
+
             int pointsEarned = 10;
             winner.setUpgradePoints(winner.getUpgradePoints() + pointsEarned);
             playerRepository.update(winner);
@@ -568,7 +575,7 @@ public class GameFacade {
 
         notifyPlayer(winnerId, "UPDATE:GAME_OVER:VICTORY");
         notifyPlayer(loserId, "UPDATE:GAME_OVER:DEFEAT");
-        
+
         logger.info("Match {} finished. Winner: {}, Loser: {}", matchId, winnerId, loserId);
     }
 
