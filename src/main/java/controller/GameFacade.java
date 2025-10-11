@@ -140,7 +140,7 @@ public class GameFacade {
         List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
         List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
 
-        GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this);
+        GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this, cardRepository);
         session.startGame();
         activeGames.put(matchId, session);
         
