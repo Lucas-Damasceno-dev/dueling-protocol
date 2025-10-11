@@ -17,11 +17,9 @@ public class ServerRegistrationService implements ApplicationListener<Applicatio
 
     private static final Logger logger = LoggerFactory.getLogger(ServerRegistrationService.class);
 
-    @Value("${server.name}")
-    private String serverName;
+    private String serverName = "server-1";
 
-    @Value("${server.port}")
-    private int serverPort;
+    private int serverPort = 8080;
 
     @Autowired
     private ServerApiClient serverApiClient;
