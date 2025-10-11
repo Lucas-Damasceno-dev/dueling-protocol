@@ -1,5 +1,9 @@
 package pubsub;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import controller.dto.chat.GroupMessage;
+import controller.dto.chat.InGameMessage;
 import model.PrivateMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +71,79 @@ public class RedisEventManager implements IEventManager {
             logger.debug("Private message sent from {} to {}: {}", senderId, recipientId, content);
         } catch (Exception e) {
             logger.error("Error sending private message: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Sends a message to a specific group.
+     *
+     * @param groupName The name of the group to send the message to.
+     * @param senderId  The ID of the sender.
+     * @param content   The content of the message.
+     */
+    @Override
+    public void sendGroupMessage(String groupName, String senderId, String content) {
+        try {
+            GroupMessage message = new GroupMessage(groupName, senderId, content);
+            String messageJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(message);
+
+            String channel = "group-messages:" + groupName;
+            redisTemplate.convertAndSend(channel, messageJson);
+
+            logger.debug("Group message sent to group {}: {}", groupName, content);
+        } catch (Exception e) {
+            logger.error("Error sending group message: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Sends a message to a specific match.
+     *
+     * @param matchId  The ID of the match to send the message to.
+     * @param senderId The ID of the sender.
+     * @param content  The content of the message.
+     */
+    @Override
+    public void sendInGameMessage(String matchId, String senderId, String content) {
+        try {
+            InGameMessage message = new InGameMessage(matchId, senderId, content);
+            String messageJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(message);
+
+            String channel = "in-game-chat:" + matchId;
+            redisTemplate.convertAndSend(channel, messageJson);
+
+            logger.debug("In-game message sent to match {}: {}", matchId, content);
+        } catch (Exception e) {
+            logger.error("Error sending in-game message: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Sends an emote to a specific channel.
+     *
+     * @param channelType The type of the channel (e.g., "group", "match").
+     * @param channelId   The ID of the channel.
+     * @param senderId    The ID of the sender.
+     * @param emoteId     The ID of the emote.
+     */
+    @Override
+    public void sendEmote(String channelType, String channelId, String senderId, String emoteId) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            ObjectNode emoteMessage = mapper.createObjectNode();
+            emoteMessage.put("channelType", channelType);
+            emoteMessage.put("channelId", channelId);
+            emoteMessage.put("senderId", senderId);
+            emoteMessage.put("emoteId", emoteId);
+
+            String messageJson = mapper.writeValueAsString(emoteMessage);
+
+            String channel = channelType + "-chat:" + channelId;
+            redisTemplate.convertAndSend(channel, messageJson);
+
+            logger.debug("Emote {} sent to channel {}", emoteId, channel);
+        } catch (Exception e) {
+            logger.error("Error sending emote: {}", e.getMessage());
         }
     }
 
