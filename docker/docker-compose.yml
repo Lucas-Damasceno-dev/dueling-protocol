@@ -4,6 +4,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+    command: ["java", "-Dspring.profiles.active=server", "-jar", "app.jar"]
     container_name: server-1
     ports:
       - "8081:8080"
@@ -18,6 +19,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+    command: ["java", "-Dspring.profiles.active=server", "-jar", "app.jar"]
     container_name: server-2
     ports:
       - "8082:8080"
@@ -31,19 +33,13 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: >
-      sh -c '
-        echo "Waiting for servers..."
-        sleep 8
-        echo "Starting client-1..."
-        java -jar app.jar client.GameClient autobot
-      '
+    command: ["java", "-Dspring.profiles.active=client", "-jar", "app.jar", "autobot"]
     depends_on:
       - server-1
       - server-2
     environment:
-      - SERVER_HOST=localhost
-      - SERVER_PORT=8081
+      - SERVER_HOST=server-1
+      - SERVER_PORT=8080
     networks:
       - dueling-network
 
@@ -51,20 +47,13 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: >
-      sh -c '
-        echo "Waiting for servers..."
-        sleep 10
-        echo "Starting client-2..."
-        java -cp app.jar client.GameClient autobot
-      '
+    command: ["java", "-Dspring.profiles.active=client", "-jar", "app.jar", "autobot"]
     depends_on:
       - server-1
       - server-2
     environment:
-      - SERVER_HOST=localhost
-      - SERVER_PORT=8082
-      - SPRING_PROFILES_ACTIVE=client
+      - SERVER_HOST=server-2
+      - SERVER_PORT=8080
     networks:
       - dueling-network
 
