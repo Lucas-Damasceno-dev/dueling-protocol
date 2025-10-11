@@ -16,13 +16,10 @@ import model.EquipmentEffect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Represents an active game session between two players.
- * Manages the game state, card decks, hands, and game flow.
- */
 public class GameSession {
     private final String matchId;
     private final GameFacade gameFacade;
+    private final CardRepository cardRepository;
     private final Player player1;
     private final Player player2;
     private final List<Card> deckP1;
@@ -39,17 +36,7 @@ public class GameSession {
     
     private static final Logger logger = LoggerFactory.getLogger(GameSession.class);
 
-    /**
-     * Constructs a new game session between two players.
-     *
-     * @param matchId the unique identifier for this match
-     * @param p1 the first player
-     * @param p2 the second player
-     * @param deckP1 the deck of cards for player 1
-     * @param deckP2 the deck of cards for player 2
-     * @param facade the game facade for communication
-     */
-    public GameSession(String matchId, Player p1, Player p2, List<Card> deckP1, List<Card> deckP2, GameFacade facade) {
+    public GameSession(String matchId, Player p1, Player p2, List<Card> deckP1, List<Card> deckP2, GameFacade facade, CardRepository cardRepository) {
         this.matchId = matchId;
         this.player1 = p1;
         this.player2 = p2;
@@ -60,11 +47,9 @@ public class GameSession {
         this.turn = 1;
         this.pendingActions = new HashMap<>();
         this.gameFacade = facade;
+        this.cardRepository = cardRepository;
     }
 
-    /**
-     * Starts the game session by shuffling decks and dealing initial cards.
-     */
     public synchronized void startGame() {
         Collections.shuffle(deckP1);
         Collections.shuffle(deckP2);
@@ -76,12 +61,6 @@ public class GameSession {
         logger.info("Match {} started between {} and {}", matchId, player1.getId(), player2.getId());
     }
     
-    /**
-     * Draws cards from the player's deck into their hand.
-     *
-     * @param playerId the ID of the player drawing cards
-     * @param count the number of cards to draw
-     */
     public synchronized void drawCards(String playerId, int count) {
         List<Card> deck = playerId.equals(player1.getId()) ? deckP1 : deckP2;
         List<Card> hand = playerId.equals(player1.getId()) ? handP1 : handP2;
@@ -91,14 +70,6 @@ public class GameSession {
         logger.debug("Player {} drew {} cards", playerId, count);
     }
 
-    /**
-     * Plays a card from the player's hand.
-     * Enforces a global cooldown to prevent spamming actions.
-     *
-     * @param playerId the ID of the player playing the card
-     * @param cardId the ID of the card to play
-     * @return true if the card was played successfully, false otherwise
-     */
     public synchronized boolean playCard(String playerId, String cardId) {
         long currentTime = System.currentTimeMillis();
         
@@ -131,10 +102,6 @@ public class GameSession {
         return true;
     }
 
-    /**
-     * Resolves all pending actions for the current turn.
-     * Executes card effects and checks for game end conditions.
-     */
     public synchronized void resolveActions() {
         if (gameEnded) return;
 
@@ -171,12 +138,6 @@ public class GameSession {
         checkGameStatus();
     }
     
-    /**
-     * Gets the appropriate card effect implementation based on card type.
-     *
-     * @param card the card for which to get the effect
-     * @return the card effect implementation, or null if not found
-     */
     private CardEffect getCardEffect(Card card) {
         switch (card.getCardType()) {
             case ATTACK:
@@ -197,13 +158,6 @@ public class GameSession {
         }
     }
 
-    /**
-     * Notifies players of a card action.
-     *
-     * @param caster the player who cast the card
-     * @param target the target of the card effect
-     * @param card the card that was played
-     */
     private void notifyAction(Player caster, Player target, Card card) {
         String message = String.format("UPDATE:ACTION:%s:used:'%s':on:%s", 
             caster.getNickname(), card.getName(), target.getNickname());
@@ -211,11 +165,6 @@ public class GameSession {
         gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
     }
 
-    /**
-     * Notifies players of a health update.
-     *
-     * @param playerToUpdate the player whose health was updated
-     */
     private void notifyHealthUpdate(Player playerToUpdate) {
         String message = String.format("UPDATE:HEALTH:%s:%d", 
             playerToUpdate.getId(), playerToUpdate.getHealthPoints());
@@ -223,10 +172,6 @@ public class GameSession {
         gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
     }
 
-    /**
-     * Checks if the game has ended due to a player's health reaching zero.
-     * If the game has ended, notifies players and updates player records.
-     */
     private void checkGameStatus() {
         if (player1.getHealthPoints() <= 0) {
             gameEnded = true;
@@ -239,38 +184,13 @@ public class GameSession {
         }
     }
     
-    /**
-     * Gets the first player in this session.
-     *
-     * @return the first player
-     */
     public Player getPlayer1() { return player1; }
     
-    /**
-     * Gets the second player in this session.
-     *
-     * @return the second player
-     */
     public Player getPlayer2() { return player2; }
     
-    /**
-     * Gets the hand of the first player.
-     *
-     * @return the first player's hand
-     */
     public List<Card> getHandP1() { return handP1; }
     
-    /**
-     * Gets the hand of the second player.
-     *
-     * @return the second player's hand
-     */
     public List<Card> getHandP2() { return handP2; }
     
-    /**
-     * Gets the current turn number.
-     *
-     * @return the current turn number
-     */
     public int getTurn() { return turn; }
 }
