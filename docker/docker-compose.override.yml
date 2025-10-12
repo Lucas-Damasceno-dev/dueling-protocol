@@ -1,0 +1,13 @@
+services:
+  server-2:
+    deploy:
+      replicas: 0
+  server-3:
+    deploy:
+      replicas: 0
+  client-1:
+    deploy:
+      replicas: 0
+  client-2:
+    deploy:
+      replicas: 0

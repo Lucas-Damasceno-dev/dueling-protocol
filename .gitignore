@@ -24,7 +24,7 @@ hs_err_pid*
 replay_pid*
 
 # Environment files
-.env
+docker/.env
 
 # IDE specific files
 .idea/
