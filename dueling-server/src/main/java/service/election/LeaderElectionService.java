@@ -1,51 +1,59 @@
 package service.election;
 
-import api.registry.ServerRegistry;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.redisson.api.RLeaderElector;
+import org.redisson.api.RedissonClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import javax.annotation.PostConstruct;
 
 @Profile("server")
 @Service
 public class LeaderElectionService {
 
-    private final ServerRegistry serverRegistry;
+    private static final Logger logger = LoggerFactory.getLogger(LeaderElectionService.class);
+    private static final String LEADER_ELECTION_KEY = "dueling-protocol-leader-election";
+    private static final String LEADER_URL_KEY = "leader:url";
 
-    @Value("${server.name}")
-    private String serverName;
-    
-    @Value("${server.port}")
-    private String serverPort;
+    private final RedissonClient redissonClient;
+    private final RLeaderElector leaderElector;
+    private final String selfUrl;
 
-    private String selfUrl;
-
-    @Autowired
-    public LeaderElectionService(ServerRegistry serverRegistry) {
-        this.serverRegistry = serverRegistry;
+    public LeaderElectionService(RedissonClient redissonClient,
+                                 @Value("${server.name}") String serverName,
+                                 @Value("${server.port}") String serverPort) {
+        this.redissonClient = redissonClient;
+        this.selfUrl = "http://" + serverName + ":" + serverPort;
+        this.leaderElector = redissonClient.getLeaderElector(LEADER_ELECTION_KEY);
     }
 
-    private String getSelfUrl() {
-        if (selfUrl == null) {
-            selfUrl = "http://" + serverName + ":" + serverPort;
-        }
-        return selfUrl;
+    @PostConstruct
+    public void start() {
+        leaderElector.addListener(new org.redisson.api.listener.LeaderElectionListener() {
+            @Override
+            public void onLeaderElection(String leader) {
+                if (selfUrl.equals(leader)) {
+                    logger.info("This server ({}) has been elected as the new leader.", selfUrl);
+                    redissonClient.getBucket(LEADER_URL_KEY).set(selfUrl);
+                } else {
+                    logger.info("A new leader has been elected: {}. This server is a follower.", leader);
+                }
+            }
+        });
+
+        // Tenta se tornar o líder
+        leaderElector.tryToBecomeLeader(selfUrl);
+        logger.info("This server ({}) has joined the leader election.", selfUrl);
     }
 
     public String getLeader() {
-        List<String> servers = new ArrayList<>(serverRegistry.getRegisteredServers());
-        servers.add(getSelfUrl());
-        Collections.sort(servers);
-        if (servers.isEmpty()) return null;
-        return servers.get(0);
+        return (String) redissonClient.getBucket(LEADER_URL_KEY).get();
     }
 
     public boolean isLeader() {
-        String leader = getLeader();
-        return leader != null && leader.equals(getSelfUrl());
+        return leaderElector.isLeader();
     }
 }

@@ -442,43 +442,55 @@ public class GameFacade {
             return false;
         }
 
-        String leader = leaderElectionService.getLeader();
         boolean lockAcquired = false;
         try {
-            lockAcquired = serverApiClient.acquireLock(leader);
+            lockAcquired = lockService.acquire();
             if (!lockAcquired) {
                 logger.warn("Could not acquire lock to execute trade {}", tradeId);
                 return false;
             }
 
-            Player p1 = playerRepository.findById(proposal.getProposingPlayerId()).orElse(null);
-            Player p2 = playerRepository.findById(proposal.getTargetPlayerId()).orElse(null);
+            // Re-fetch proposal inside the lock to ensure we have the latest state
+            Optional<TradeProposal> lockedProposalOpt = tradeService.findTradeById(tradeId);
+            if (lockedProposalOpt.isEmpty() || lockedProposalOpt.get().getStatus() != TradeProposal.Status.ACCEPTED) {
+                logger.warn("Trade {} is no longer valid for execution.", tradeId);
+                return false;
+            }
+            TradeProposal lockedProposal = lockedProposalOpt.get();
+
+            Player p1 = playerRepository.findById(lockedProposal.getProposingPlayerId()).orElse(null);
+            Player p2 = playerRepository.findById(lockedProposal.getTargetPlayerId()).orElse(null);
 
             if (p1 == null || p2 == null) {
                 logger.error("Could not find one or both players for trade {}", tradeId);
                 return false;
             }
 
-            if (!p1.hasCards(proposal.getOfferedCardIds()) || !p2.hasCards(proposal.getRequestedCardIds())) {
-                logger.warn("Trade {} invalid: one or both players missing cards.", tradeId);
-                notifyPlayer(p1.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
-                notifyPlayer(p2.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
-                return false;
+            // Synchronize on players to prevent concurrent modifications to their collections
+            synchronized (p1) {
+                synchronized (p2) {
+                    if (!p1.hasCards(lockedProposal.getOfferedCardIds()) || !p2.hasCards(lockedProposal.getRequestedCardIds())) {
+                        logger.warn("Trade {} invalid: one or both players missing cards.", tradeId);
+                        notifyPlayer(p1.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
+                        notifyPlayer(p2.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
+                        return false;
+                    }
+
+                    List<Card> p1OfferedCards = p1.getCardCollection().stream().filter(c -> lockedProposal.getOfferedCardIds().contains(c.getId())).collect(Collectors.toList());
+                    List<Card> p2RequestedCards = p2.getCardCollection().stream().filter(c -> lockedProposal.getRequestedCardIds().contains(c.getId())).collect(Collectors.toList());
+
+                    p1.getCardCollection().removeAll(p1OfferedCards);
+                    p1.getCardCollection().addAll(p2RequestedCards);
+
+                    p2.getCardCollection().removeAll(p2RequestedCards);
+                    p2.getCardCollection().addAll(p1OfferedCards);
+
+                    playerRepository.save(p1);
+                    playerRepository.save(p2);
+                }
             }
 
-            List<Card> p1OfferedCards = p1.getCardCollection().stream().filter(c -> proposal.getOfferedCardIds().contains(c.getId())).collect(Collectors.toList());
-            List<Card> p2RequestedCards = p2.getCardCollection().stream().filter(c -> proposal.getRequestedCardIds().contains(c.getId())).collect(Collectors.toList());
-
-            p1.getCardCollection().removeAll(p1OfferedCards);
-            p1.getCardCollection().addAll(p2RequestedCards);
-
-            p2.getCardCollection().removeAll(p2RequestedCards);
-            p2.getCardCollection().addAll(p1OfferedCards);
-
-            playerRepository.save(p1);
-            playerRepository.save(p2);
-
-            proposal.setStatus(TradeProposal.Status.COMPLETED);
+            lockedProposal.setStatus(TradeProposal.Status.COMPLETED);
             logger.info("Trade {} executed successfully.", tradeId);
 
             notifyPlayer(p1.getId(), "UPDATE:TRADE_COMPLETE:SUCCESS");
@@ -488,7 +500,7 @@ public class GameFacade {
 
         } finally {
             if (lockAcquired) {
-                serverApiClient.releaseLock(leader);
+                lockService.release();
             }
         }
     }
