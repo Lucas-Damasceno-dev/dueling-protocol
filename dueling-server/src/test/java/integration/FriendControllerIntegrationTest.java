@@ -3,7 +3,6 @@ package integration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
@@ -17,12 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Integration tests for the friends API endpoints.
  */
-@SpringBootTest(
-    classes = {controller.DuelingProtocolApplication.class, config.TestConfig.class},
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
 @ActiveProfiles("test") // Use test profile to avoid conflicts with development/production configs
-public class FriendControllerIntegrationTest {
+public class FriendControllerIntegrationTest extends AbstractIntegrationTest {
 
     @LocalServerPort
     private int port;
@@ -39,35 +34,9 @@ public class FriendControllerIntegrationTest {
 
     @BeforeEach
     public void setupUsers() {
-        // Register two test users
-        Map<String, String> userData1 = new HashMap<>();
-        userData1.put("username", "user1");
-        userData1.put("password", "pass123");
-        userData1.put("playerId", "player1");
-        
-        Map<String, String> userData2 = new HashMap<>();
-        userData2.put("username", "user2");
-        userData2.put("password", "pass123");
-        userData2.put("playerId", "player2");
-
-        // Register users
-        restTemplate.postForEntity("/api/auth/register", userData1, Map.class);
-        restTemplate.postForEntity("/api/auth/register", userData2, Map.class);
-
-        // Login users to get authentication tokens
-        Map<String, String> loginData1 = new HashMap<>();
-        loginData1.put("username", "user1");
-        loginData1.put("password", "pass123");
-        
-        Map<String, String> loginData2 = new HashMap<>();
-        loginData2.put("username", "user2");
-        loginData2.put("password", "pass123");
-
-        ResponseEntity<Map> loginResponse1 = restTemplate.postForEntity("/api/auth/login", loginData1, Map.class);
-        ResponseEntity<Map> loginResponse2 = restTemplate.postForEntity("/api/auth/login", loginData2, Map.class);
-
-        authToken1 = (String) loginResponse1.getBody().get("token");
-        authToken2 = (String) loginResponse2.getBody().get("token");
+        // Use the TestUserHelper to register and login users
+        authToken1 = TestUserHelper.registerAndLoginUser(restTemplate, "user1", "pass123", "player1");
+        authToken2 = TestUserHelper.registerAndLoginUser(restTemplate, "user2", "pass123", "player2");
     }
 
     @Test
