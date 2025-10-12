@@ -1,6 +1,7 @@
 package controller;
 
 import dto.DeckDTO;
+import jakarta.validation.Valid;
 import model.Card;
 import model.Deck;
 import model.Player;
@@ -38,7 +39,7 @@ public class DeckController {
      * @return ResponseEntity containing the created deck or an error message
      */
     @PostMapping("/create/{playerId}")
-    public ResponseEntity<?> createDeck(@PathVariable String playerId, @RequestBody DeckDTO deckDTO) {
+    public ResponseEntity<?> createDeck(@PathVariable String playerId, @Valid @RequestBody DeckDTO deckDTO) {
         try {
             // Validate if player exists
             Optional<Player> playerOpt = playerRepository.findById(playerId);
@@ -130,7 +131,7 @@ public class DeckController {
      * @return ResponseEntity containing the updated deck or an error message
      */
     @PutMapping("/{deckId}")
-    public ResponseEntity<?> updateDeck(@PathVariable String deckId, @RequestBody DeckDTO deckDTO) {
+    public ResponseEntity<?> updateDeck(@PathVariable String deckId, @Valid @RequestBody DeckDTO deckDTO) {
         try {
             Optional<Deck> existingDeckOpt = deckRepository.findById(deckId);
             if (!existingDeckOpt.isPresent()) {

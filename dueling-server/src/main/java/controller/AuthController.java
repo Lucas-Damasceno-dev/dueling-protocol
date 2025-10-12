@@ -1,5 +1,7 @@
 package controller;
 
+import dto.LoginRequest;
+import dto.RegisterRequest;
 import model.Player;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -8,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import repository.PlayerRepository;
 import service.auth.AuthenticationService;
 
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -30,17 +33,10 @@ public class AuthController {
      * Register a new user account
      */
     @PostMapping("/register")
-    public ResponseEntity<Map<String, String>> register(@RequestBody Map<String, String> credentials) {
-        String username = credentials.get("username");
-        String password = credentials.get("password");
-        String playerId = credentials.get("playerId");
-
-        // Validate input
-        if (username == null || password == null || playerId == null) {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "Username, password, and playerId are required");
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        String username = registerRequest.getUsername();
+        String password = registerRequest.getPassword();
+        String playerId = registerRequest.getPlayerId();
 
         // Check if the player exists in the system
         Optional<Player> playerOpt = playerRepository.findById(playerId);
@@ -66,16 +62,9 @@ public class AuthController {
      * Authenticate user and return JWT token
      */
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(@RequestBody Map<String, String> credentials) {
-        String username = credentials.get("username");
-        String password = credentials.get("password");
-
-        // Validate input
-        if (username == null || password == null) {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "Username and password are required");
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<Map<String, String>> login(@Valid @RequestBody LoginRequest loginRequest) {
+        String username = loginRequest.getUsername();
+        String password = loginRequest.getPassword();
 
         String token = authenticationService.authenticateUser(username, password);
         if (token != null) {

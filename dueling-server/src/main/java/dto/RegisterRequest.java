@@ -1,12 +1,23 @@
 package dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 /**
  * Data Transfer Object for user registration requests.
  * Contains the information needed to register a new user.
  */
 public class RegisterRequest {
+    @NotBlank(message = "Username is required")
+    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     private String username;
+    
+    @NotBlank(message = "Password is required")
+    @Size(min = 6, max = 100, message = "Password must be between 6 and 100 characters")
     private String password;
+    
+    @NotBlank(message = "Player ID is required")
+    @Size(min = 1, max = 100, message = "Player ID must be between 1 and 100 characters")
     private String playerId;
 
     // Default constructor
