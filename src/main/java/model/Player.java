@@ -5,6 +5,7 @@ import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -222,4 +223,18 @@ public class Player {
     
     public String getCardCollectionJson() { return cardCollectionJson; }
     public void setCardCollectionJson(String cardCollectionJson) { this.cardCollectionJson = cardCollectionJson; }
+    
+    /**
+     * Checks if the player has all the specified cards.
+     * 
+     * @param cardIds A list of card IDs to check for
+     * @return true if the player has all the specified cards, false otherwise
+     */
+    public boolean hasCards(List<String> cardIds) {
+        List<String> playerCardIds = getCardCollection().stream()
+            .map(Card::getId)
+            .collect(Collectors.toList());
+        
+        return playerCardIds.containsAll(cardIds);
+    }
 }
