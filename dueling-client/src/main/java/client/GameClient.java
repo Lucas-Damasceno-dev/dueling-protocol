@@ -92,11 +92,12 @@ public final class GameClient {
         logger.info("\n=== GAME MENU ===");
         logger.info("1. Set up character");
         logger.info("2. Enter matchmaking queue");
-        logger.info("3. Buy card pack");
-        logger.info("4. Check ping");
-        logger.info("5. Play card (during match)");
-        logger.info("6. Upgrade attributes");
-        logger.info("7. Exit");
+        logger.info("3. Select and use custom deck");
+        logger.info("4. Buy card pack");
+        logger.info("5. Check ping");
+        logger.info("6. Play card (during match)");
+        logger.info("7. Upgrade attributes");
+        logger.info("8. Exit");
         logger.info("Choose an option: ");
     }
 
@@ -112,13 +113,16 @@ public final class GameClient {
                 case "2":
                     enterMatchmaking();
                     break;
-                case "3":
-                    buyCardPack(scanner);
+                case "3": // Previously "buyCardPack", now "select deck"
+                    selectDeck(scanner);
                     break;
                 case "4":
-                    checkPing();
+                    buyCardPack(scanner);
                     break;
                 case "5":
+                    checkPing();
+                    break;
+                case "6":
                     if (inGame) {
                         playCard(scanner);
                     } else {
@@ -126,10 +130,10 @@ public final class GameClient {
                         printFullMenu();
                     }
                     break;
-                case "6":
+                case "7":
                     upgradeAttributes(scanner);
                     break;
-                case "7":
+                case "8":
                     logger.info("Exiting...");
                     isExiting = true;
                     webSocketClient.close();
@@ -177,7 +181,12 @@ public final class GameClient {
     private static final long SCENARIO_DELAY_MS = 500;
 
     private static void scenarioMatchmakingDisconnect() throws InterruptedException {
-        webSocketClient.send("MATCHMAKING:ENTER");
+        if (selectedDeckId != null && !selectedDeckId.isEmpty()) {
+            webSocketClient.send("MATCHMAKING:ENTER:" + selectedDeckId);
+            logger.info("[autobot] Entering matchmaking with selected deck: {}", selectedDeckId);
+        } else {
+            webSocketClient.send("MATCHMAKING:ENTER");
+        }
         Thread.sleep(SCENARIO_DELAY_MS);
         logger.info("[autobot] Disconnecting abruptly in matchmaking queue");
         webSocketClient.close();
@@ -187,7 +196,12 @@ public final class GameClient {
     private static final int WAIT_INTERVAL_MS = 200;
 
     private static void scenarioPreGameDisconnect() throws InterruptedException {
-        webSocketClient.send("MATCHMAKING:ENTER");
+        if (selectedDeckId != null && !selectedDeckId.isEmpty()) {
+            webSocketClient.send("MATCHMAKING:ENTER:" + selectedDeckId);
+            logger.info("[autobot] Entering matchmaking with selected deck: {}", selectedDeckId);
+        } else {
+            webSocketClient.send("MATCHMAKING:ENTER");
+        }
         int waited = 0;
         while (!inGame && waited < MAX_WAIT_TIME_MS) {
             Thread.sleep(WAIT_INTERVAL_MS);
@@ -200,7 +214,12 @@ public final class GameClient {
     }
 
     private static void scenarioSimultaneousPlay() throws InterruptedException {
-        webSocketClient.send("MATCHMAKING:ENTER");
+        if (selectedDeckId != null && !selectedDeckId.isEmpty()) {
+            webSocketClient.send("MATCHMAKING:ENTER:" + selectedDeckId);
+            logger.info("[autobot] Entering matchmaking with selected deck: {}", selectedDeckId);
+        } else {
+            webSocketClient.send("MATCHMAKING:ENTER");
+        }
         int waited = 0;
         while (!inGame && waited < MAX_WAIT_TIME_MS) {
             Thread.sleep(WAIT_INTERVAL_MS);
@@ -217,7 +236,12 @@ public final class GameClient {
     private static final long MID_GAME_DISCONNECT_DELAY_MS = 300;
 
     private static void scenarioMidGameDisconnect() throws InterruptedException {
-        webSocketClient.send("MATCHMAKING:ENTER");
+        if (selectedDeckId != null && !selectedDeckId.isEmpty()) {
+            webSocketClient.send("MATCHMAKING:ENTER:" + selectedDeckId);
+            logger.info("[autobot] Entering matchmaking with selected deck: {}", selectedDeckId);
+        } else {
+            webSocketClient.send("MATCHMAKING:ENTER");
+        }
         int waited = 0;
         while (!inGame && waited < MAX_WAIT_TIME_MS) {
             Thread.sleep(WAIT_INTERVAL_MS);
@@ -242,7 +266,12 @@ public final class GameClient {
 
     private static void scenarioDefault() throws InterruptedException {
         logger.info("[autobot] Character created. Entering matchmaking queue...");
-        webSocketClient.send("MATCHMAKING:ENTER");
+        if (selectedDeckId != null && !selectedDeckId.isEmpty()) {
+            webSocketClient.send("MATCHMAKING:ENTER:" + selectedDeckId);
+            logger.info("[autobot] Entering matchmaking with selected deck: {}", selectedDeckId);
+        } else {
+            webSocketClient.send("MATCHMAKING:ENTER");
+        }
         Thread.sleep(DEFAULT_SCENARIO_TEST_TIME_MS);
         logger.info("[autobot] Test time elapsed, exiting...");
         webSocketClient.close();
@@ -278,9 +307,31 @@ public final class GameClient {
         webSocketClient.send("CHARACTER_SETUP:" + race + ":" + playerClass);
     }
 
+    private static String selectedDeckId = null; // Store the selected deck id
+    
+    private static void selectDeck(Scanner scanner) {
+        logger.info("\n=== DECK SELECTION ===");
+        logger.info("Enter the ID of the deck you want to use (or 'none' for default):");
+        String input = scanner.nextLine().trim();
+        
+        if ("none".equalsIgnoreCase(input) || input.isEmpty()) {
+            selectedDeckId = null;
+            logger.info("Using default deck for matchmaking");
+        } else {
+            selectedDeckId = input;
+            logger.info("Selected deck ID: {}", selectedDeckId);
+        }
+    }
+    
     private static void enterMatchmaking() {
         logger.info("\nEntering matchmaking queue...");
-        webSocketClient.send("MATCHMAKING:ENTER");
+        if (selectedDeckId != null && !selectedDeckId.isEmpty()) {
+            webSocketClient.send("MATCHMAKING:ENTER:" + selectedDeckId);
+            logger.info("Entering matchmaking with deck ID: {}", selectedDeckId);
+        } else {
+            webSocketClient.send("MATCHMAKING:ENTER");
+            logger.info("Entering matchmaking with default deck");
+        }
     }
 
     private static void buyCardPack(Scanner scanner) {

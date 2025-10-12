@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ConcurrentMatchmakingService implements MatchmakingService {
 
-    private final Queue<Player> matchmakingQueue = new ConcurrentLinkedQueue<>();
+    private final Queue<PlayerWithDeck> matchmakingQueue = new ConcurrentLinkedQueue<>();
     private final Object lock = new Object();
     
     private static final Logger logger = LoggerFactory.getLogger(ConcurrentMatchmakingService.class);
@@ -44,16 +44,38 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
         
         // The contains check is not atomic with the offer, but it prevents spamming the logs
         // for a player that is already waiting. ConcurrentLinkedQueue handles duplicates gracefully.
-        if (!matchmakingQueue.contains(player)) {
-            matchmakingQueue.offer(player);
+        PlayerWithDeck playerWithDeck = new PlayerWithDeck(player, null);
+        if (!matchmakingQueue.contains(playerWithDeck)) {
+            matchmakingQueue.offer(playerWithDeck);
             logger.info("{} entered the matchmaking queue", player.getNickname());
         } else {
             logger.debug("{} is already in the matchmaking queue", player.getNickname());
         }
     }
+    
+    /**
+     * Adds a player to the matchmaking queue with their selected deck.
+     *
+     * @param player the player to add to the queue
+     * @param deckId the ID of the deck the player wants to use
+     */
+    @Override
+    public void addPlayerToQueueWithDeck(Player player, String deckId) {
+        if (player == null) {
+            logger.warn("Attempt to add null player to matchmaking queue with deck");
+            return;
+        }
+        
+        PlayerWithDeck playerWithDeck = new PlayerWithDeck(player, deckId);
+        if (!matchmakingQueue.contains(playerWithDeck)) {
+            matchmakingQueue.offer(playerWithDeck);
+            logger.info("{} entered the matchmaking queue with deck {}", player.getNickname(), deckId);
+        } else {
+            logger.debug("{} is already in the matchmaking queue with deck {}", player.getNickname(), deckId);
+        }
+    }
 
     /**
-     * {@inheritDoc}
      * Attempts to find a match between players in the queue.
      * This method is synchronized to ensure that match creation is atomic,
      * preventing a race condition where multiple threads might try to create a match with the same players.
@@ -64,22 +86,24 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
     public Optional<Match> findMatch() {
         synchronized (lock) {
             if (matchmakingQueue.size() >= 2) {
-                Player player1 = matchmakingQueue.poll();
-                Player player2 = matchmakingQueue.poll();
+                PlayerWithDeck playerWithDeck1 = matchmakingQueue.poll();
+                PlayerWithDeck playerWithDeck2 = matchmakingQueue.poll();
 
-                if (player1 != null && player2 != null) {
-                    logger.info("Match found: {} vs {}", player1.getNickname(), player2.getNickname());
-                    Match match = new Match(player1, player2);
+                if (playerWithDeck1 != null && playerWithDeck2 != null) {
+                    logger.info("Match found: {} vs {}", 
+                                playerWithDeck1.getPlayer().getNickname(), 
+                                playerWithDeck2.getPlayer().getNickname());
+                    Match match = new Match(playerWithDeck1.getPlayer(), playerWithDeck2.getPlayer());
                     return Optional.of(match);
                 } else {
                     // This case can happen if a player disconnects right after being polled
                     logger.warn("Error forming match: one or both players are null after polling from queue.");
                     // Re-queue the non-null player if one exists
-                    if (player1 != null) {
-                        addPlayerToQueue(player1);
+                    if (playerWithDeck1 != null) {
+                        matchmakingQueue.offer(playerWithDeck1);
                     }
-                    if (player2 != null) {
-                        addPlayerToQueue(player2);
+                    if (playerWithDeck2 != null) {
+                        matchmakingQueue.offer(playerWithDeck2);
                     }
                 }
             }
@@ -91,9 +115,13 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
     public Optional<Player> findAndLockPartner() {
         synchronized (lock) {
             if (!matchmakingQueue.isEmpty()) {
-                Player partner = matchmakingQueue.poll();
-                logger.info("Found and locked partner {} for remote match.", partner.getNickname());
-                return Optional.ofNullable(partner);
+                PlayerWithDeck partnerWithDeck = matchmakingQueue.poll();
+                if (partnerWithDeck != null) {
+                    logger.info("Found and locked partner {} for remote match with deck {}.", 
+                                partnerWithDeck.getPlayer().getNickname(), 
+                                partnerWithDeck.getDeckId());
+                    return Optional.ofNullable(partnerWithDeck.getPlayer());
+                }
             }
             return Optional.empty();
         }
