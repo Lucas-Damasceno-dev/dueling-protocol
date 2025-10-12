@@ -108,6 +108,13 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
         
+        <!-- OpenAPI (Swagger) documentation -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.5.0</version>
+        </dependency>
+        
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
