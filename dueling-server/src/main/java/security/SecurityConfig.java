@@ -51,6 +51,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/health").permitAll()   // Allow health checks
                 .requestMatchers("/actuator/**").permitAll()  // Allow actuator endpoints for monitoring
                 .requestMatchers("/ws/**").permitAll()        // WebSocket endpoints will be authenticated separately
+                .requestMatchers("/api/servers/**").permitAll() // Allow server-to-server communication
                 .anyRequest().authenticated()                 // All other requests require authentication
             )
             .sessionManagement(session -> session

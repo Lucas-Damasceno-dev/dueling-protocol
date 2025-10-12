@@ -105,6 +105,41 @@ services:
         timeout: 5s
         retries: 5
         start_period: 30s
+  
+  server-4:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: >
+      java 
+      -Dredis.host=${REDIS_HOST} 
+      -Dredis.port=${REDIS_PORT} 
+      -jar app.jar 
+      --spring.profiles.active=server,distributed,distributed-db
+    container_name: server-4
+    ports:
+      - "8084:8080"
+    environment:
+      SERVER_PORT: 8080
+      SERVER_NAME: server-4
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - dueling-network
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 30s
 
   client-1:
     build:
@@ -116,10 +151,24 @@ services:
       server-2:
         condition: service_healthy
       server-3:
-        condition: service_healthy 
+        condition: service_healthy
+      server-4:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      echo 'Waiting for gateway server to be ready...'
+      until curl -f http://$GATEWAY_HOST:$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
+        echo 'Actuator health not ready yet, waiting...'
+        sleep 2
+      done
+      echo 'Gateway is ready, starting client...'
+      java -jar app.jar
     environment:
       - GATEWAY_HOST=${GATEWAY_HOST:-server-1}
-      - GATEWAY_PORT=${GATEWAY_PORT:-8081}
+      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - DOCKER_ENV=true
+      - CLIENT_USERNAME=client1
+      - CLIENT_PASSWORD=password1
     networks:
       - dueling-network
 
@@ -134,11 +183,85 @@ services:
         condition: service_healthy
       server-3:
         condition: service_healthy
-      redis:
-        condition: service_started
+      server-4:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      echo 'Waiting for gateway server to be ready...'
+      until curl -f http://$GATEWAY_HOST:$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
+        echo 'Actuator health not ready yet, waiting...'
+        sleep 2
+      done
+      echo 'Gateway is ready, starting client...'
+      java -jar app.jar
     environment:
       - GATEWAY_HOST=${GATEWAY_HOST:-server-2}
-      - GATEWAY_PORT=${GATEWAY_PORT:-8082} 
+      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - DOCKER_ENV=true
+      - CLIENT_USERNAME=client2
+      - CLIENT_PASSWORD=password2
+    networks:
+      - dueling-network
+
+  client-3:
+    build:
+      context: ..
+      dockerfile: dueling-client/Dockerfile
+    depends_on:
+      server-1:
+        condition: service_healthy
+      server-2:
+        condition: service_healthy
+      server-3:
+        condition: service_healthy
+      server-4:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      echo 'Waiting for gateway server to be ready...'
+      until curl -f http://$GATEWAY_HOST:$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
+        echo 'Actuator health not ready yet, waiting...'
+        sleep 2
+      done
+      echo 'Gateway is ready, starting client...'
+      java -jar app.jar
+    environment:
+      - GATEWAY_HOST=${GATEWAY_HOST:-server-3}
+      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - DOCKER_ENV=true
+      - CLIENT_USERNAME=client3
+      - CLIENT_PASSWORD=password3
+    networks:
+      - dueling-network
+
+  client-4:
+    build:
+      context: ..
+      dockerfile: dueling-client/Dockerfile
+    depends_on:
+      server-1:
+        condition: service_healthy
+      server-2:
+        condition: service_healthy
+      server-3:
+        condition: service_healthy
+      server-4:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      echo 'Waiting for gateway server to be ready...'
+      until curl -f http://$GATEWAY_HOST:$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
+        echo 'Actuator health not ready yet, waiting...'
+        sleep 2
+      done
+      echo 'Gateway is ready, starting client...'
+      java -jar app.jar
+    environment:
+      - GATEWAY_HOST=${GATEWAY_HOST:-server-4}
+      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - DOCKER_ENV=true
+      - CLIENT_USERNAME=client4
+      - CLIENT_PASSWORD=password4
     networks:
       - dueling-network
 
@@ -166,6 +289,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init-test-data.sql:/docker-entrypoint-initdb.d/99-init-test-data.sql
     networks:
       - dueling-network
     healthcheck:
@@ -191,6 +316,8 @@ services:
       server-2:
         condition: service_healthy
       server-3:
+        condition: service_healthy
+      server-4:
         condition: service_healthy
 
   grafana:

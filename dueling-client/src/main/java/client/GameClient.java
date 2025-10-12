@@ -7,6 +7,7 @@ import org.java_websocket.handshake.ServerHandshake;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.DatagramPacket;
@@ -29,6 +30,11 @@ public final class GameClient {
     private static final String GATEWAY_PORT = System.getenv().getOrDefault("GATEWAY_PORT", "8080");
     private static final String API_BASE_URL = "http://" + GATEWAY_ADDRESS + ":" + GATEWAY_PORT;
     private static final int UDP_PORT = 7778;
+    
+    // Environment variable to check if running in Docker
+    private static final boolean IS_DOCKER_ENV = System.getenv().getOrDefault("DOCKER_ENV", "false").equalsIgnoreCase("true");
+    private static final String AUTO_USERNAME = System.getenv().getOrDefault("CLIENT_USERNAME", "");
+    private static final String AUTO_PASSWORD = System.getenv().getOrDefault("CLIENT_PASSWORD", "");
 
     private static MyWebSocketClient webSocketClient;
     private static String jwtToken;
@@ -42,35 +48,44 @@ public final class GameClient {
     }
 
     private static void handleUserAuthentication() {
-        Scanner scanner = new Scanner(System.in);
-        while (jwtToken == null && !isExiting) {
-            logger.info("\n=== AUTHENTICATION ===");
-            logger.info("1. Login");
-            logger.info("2. Register");
-            logger.info("3. Exit");
-            logger.info("Choose an option: ");
-            String choice = scanner.nextLine().trim();
+        if (IS_DOCKER_ENV && !AUTO_USERNAME.isEmpty() && !AUTO_PASSWORD.isEmpty()) {
+            // Non-interactive mode: auto-login with environment variables
+            logger.info("Running in Docker environment, attempting auto-login with provided credentials");
+            autoLogin();
+        } else {
+            // Interactive mode: prompt user for input
+            Scanner scanner = new Scanner(System.in);
+            while (jwtToken == null && !isExiting) {
+                logger.info("\n=== AUTHENTICATION ===");
+                logger.info("1. Login");
+                logger.info("2. Register");
+                logger.info("3. Exit");
+                logger.info("Choose an option: ");
+                String choice = scanner.nextLine().trim();
 
-            switch (choice) {
-                case "1":
-                    login(scanner);
-                    break;
-                case "2":
-                    register(scanner);
-                    break;
-                case "3":
-                    isExiting = true;
-                    break;
-                default:
-                    logger.warn("Invalid option.");
-                    break;
+                switch (choice) {
+                    case "1":
+                        login(scanner);
+                        break;
+                    case "2":
+                        register(scanner);
+                        break;
+                    case "3":
+                        isExiting = true;
+                        break;
+                    default:
+                        logger.warn("Invalid option.");
+                        break;
+                }
             }
         }
 
         if (jwtToken != null) {
             connectToWebSocket();
             if (webSocketClient != null && webSocketClient.isOpen()) {
-                printFullMenu();
+                if (!IS_DOCKER_ENV) {
+                    printFullMenu();
+                }
                 handleUserInput();
             }
         }
@@ -102,6 +117,53 @@ public final class GameClient {
         }
     }
 
+    private static void autoLogin() {
+        try {
+            logger.info("Auto-login with username: {}", AUTO_USERNAME);
+
+            JsonObject credentials = new JsonObject();
+            credentials.addProperty("username", AUTO_USERNAME);
+            credentials.addProperty("password", AUTO_PASSWORD);
+
+            HttpResponse response = makeHttpRequest("/api/auth/login", "POST", credentials.toString(), null);
+
+            if (response.statusCode == 200) {
+                JsonObject responseJson = new Gson().fromJson(response.body, JsonObject.class);
+                jwtToken = responseJson.get("token").getAsString();
+                logger.info("[SUCCESS] ✓ Auto-login successful!");
+            } else {
+                logger.error("[ERROR] ✗ Auto-login failed: {} (Code: {})", response.body, response.statusCode);
+                // Attempt to register if login fails
+                autoRegister();
+            }
+        } catch (IOException e) {
+            logger.error("[ERROR] ✗ IOException during auto-login: {}", e.getMessage());
+        }
+    }
+
+    private static void autoRegister() {
+        try {
+            logger.info("Attempting auto-registration with username: {}", AUTO_USERNAME);
+
+            JsonObject credentials = new JsonObject();
+            credentials.addProperty("username", AUTO_USERNAME);
+            credentials.addProperty("password", AUTO_PASSWORD);
+
+            HttpResponse response = makeHttpRequest("/api/auth/register", "POST", credentials.toString(), null);
+
+            if (response.statusCode == 200 || response.statusCode == 201) {
+                logger.info("[SUCCESS] ✓ Auto-registration successful. Attempting to login now.");
+                // Try login again after successful registration
+                autoLogin();
+            } else {
+                logger.error("[ERROR] ✗ Auto-registration failed: {} (Code: {})", response.body, response.statusCode);
+                isExiting = true;
+            }
+        } catch (IOException e) {
+            logger.error("[ERROR] ✗ IOException during auto-registration: {}", e.getMessage());
+        }
+    }
+
     private static void register(Scanner scanner) {
         try {
             logger.info("Username: ");
@@ -126,19 +188,49 @@ public final class GameClient {
     }
 
     private static void connectToWebSocket() {
-        try {
-            String gatewayUri = "ws://" + GATEWAY_ADDRESS + ":" + GATEWAY_PORT + "/ws?token=" + jwtToken;
-            logger.info("Connecting to WebSocket server at {}", gatewayUri);
-            webSocketClient = new MyWebSocketClient(new URI(gatewayUri));
-            if (!webSocketClient.connectBlocking()) {
-                logger.error("Failed to connect to the WebSocket server.");
-                jwtToken = null; // Clear token on connection failure
+        int maxRetries = 10;
+        int retryCount = 0;
+        
+        while (retryCount < maxRetries) {
+            try {
+                String gatewayUri = "ws://" + GATEWAY_ADDRESS + ":" + GATEWAY_PORT + "/ws?token=" + jwtToken;
+                logger.info("Connecting to WebSocket server at {} (attempt {}/{})", gatewayUri, retryCount + 1, maxRetries);
+                
+                webSocketClient = new MyWebSocketClient(new URI(gatewayUri));
+                if (webSocketClient.connectBlocking()) {
+                    logger.info("Successfully connected to WebSocket server.");
+                    return; // Success, exit the retry loop
+                } else {
+                    logger.warn("Failed to connect to the WebSocket server on attempt {}/{}", retryCount + 1, maxRetries);
+                    jwtToken = null; // Clear token on connection failure
+                }
+            } catch (URISyntaxException e) {
+                logger.error("Invalid URI syntax: {}", e.getMessage());
+                jwtToken = null;
+                return; // Can't recover from invalid URI
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.error("Connection interrupted: {}", e.getMessage());
+                jwtToken = null;
+                return;
             }
-        } catch (URISyntaxException | InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.error("Error connecting to WebSocket: {}", e.getMessage());
-            jwtToken = null;
+            
+            retryCount++;
+            if (retryCount < maxRetries) {
+                logger.info("Waiting 3 seconds before retry...");
+                try {
+                    Thread.sleep(3000); // Wait 3 seconds before retry
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.error("Retry wait interrupted: {}", e.getMessage());
+                    jwtToken = null;
+                    return;
+                }
+            }
         }
+        
+        logger.error("Failed to connect to WebSocket server after {} attempts.", maxRetries);
+        jwtToken = null; // Clear token on connection failure
     }
 
     private static void printFullMenu() {
@@ -155,38 +247,54 @@ public final class GameClient {
     }
 
     private static void handleUserInput() {
-        Scanner scanner = new Scanner(System.in);
-        while (!isExiting && webSocketClient != null && webSocketClient.isOpen()) {
-            String input = scanner.nextLine().trim();
-            if (jwtToken == null) {
-                logger.warn("Your session has expired. Please restart the client to log in again.");
-                isExiting = true;
-                break;
-            }
-
-            switch (input) {
-                case "1": setupCharacter(scanner); break;
-                case "2": enterMatchmaking(); break;
-                case "3": selectDeck(scanner); break;
-                case "4": buyCardPack(scanner); break;
-                case "5": checkPing(); break;
-                case "6":
-                    if (inGame) {
-                        playCard(scanner);
-                    } else {
-                        logger.info("\nYou need to be in a match to play cards!");
-                        printFullMenu();
-                    }
+        if (IS_DOCKER_ENV) {
+            // In Docker environment, keep the connection alive but don't wait for input
+            logger.info("Running in Docker mode - keeping WebSocket connection alive for game events");
+            while (!isExiting && webSocketClient != null && webSocketClient.isOpen()) {
+                try {
+                    // Sleep for a short period to avoid busy waiting
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.info("Client interrupted, exiting...");
                     break;
-                case "7": upgradeAttributes(scanner); break;
-                case "8":
-                    logger.info("Exiting...");
+                }
+            }
+        } else {
+            // Interactive mode: wait for user input
+            Scanner scanner = new Scanner(System.in);
+            while (!isExiting && webSocketClient != null && webSocketClient.isOpen()) {
+                String input = scanner.nextLine().trim();
+                if (jwtToken == null) {
+                    logger.warn("Your session has expired. Please restart the client to log in again.");
                     isExiting = true;
                     break;
-                default:
-                    logger.info("\nInvalid option!");
-                    printFullMenu();
-                    break;
+                }
+
+                switch (input) {
+                    case "1": setupCharacter(scanner); break;
+                    case "2": enterMatchmaking(); break;
+                    case "3": selectDeck(scanner); break;
+                    case "4": buyCardPack(scanner); break;
+                    case "5": checkPing(); break;
+                    case "6":
+                        if (inGame) {
+                            playCard(scanner);
+                        } else {
+                            logger.info("\nYou need to be in a match to play cards!");
+                            printFullMenu();
+                        }
+                        break;
+                    case "7": upgradeAttributes(scanner); break;
+                    case "8":
+                        logger.info("Exiting...");
+                        isExiting = true;
+                        break;
+                    default:
+                        logger.info("\nInvalid option!");
+                        printFullMenu();
+                        break;
+                }
             }
         }
         if (webSocketClient != null) {
@@ -300,11 +408,13 @@ public final class GameClient {
 
         int statusCode = conn.getResponseCode();
         StringBuilder responseBody = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(
-                (statusCode >= 200 && statusCode < 300) ? conn.getInputStream() : conn.getErrorStream(), StandardCharsets.UTF_8))) {
-            String responseLine;
-            while ((responseLine = br.readLine()) != null) {
-                responseBody.append(responseLine.trim());
+        InputStream inputStream = (statusCode >= 200 && statusCode < 300) ? conn.getInputStream() : conn.getErrorStream();
+        if (inputStream != null) {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                String responseLine;
+                while ((responseLine = br.readLine()) != null) {
+                    responseBody.append(responseLine.trim());
+                }
             }
         }
         conn.disconnect();
