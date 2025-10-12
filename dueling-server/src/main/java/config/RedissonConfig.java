@@ -10,18 +10,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RedissonConfig {
 
-    @Value("${spring.redis.host:localhost}")
+    @Value("${spring.redis.host:#{systemProperties['redis.host'] ?: 'localhost'}}")
     private String redisHost;
 
-    @Value("${spring.redis.port:6379}")
+    @Value("${spring.redis.port:#{systemProperties['redis.port'] ?: 6379}}")
     private int redisPort;
 
-    @Bean
+    @Bean(destroyMethod = "shutdown")
     public RedissonClient redissonClient() {
         Config config = new Config();
+        String redisAddress = "redis://" + redisHost + ":" + redisPort;
+        System.out.println("--- Configuring Redisson with address: " + redisAddress + " ---");
         config.useSingleServer()
-                .setAddress("redis://" + redisHost + ":" + redisPort);
+                .setAddress(redisAddress);
 
-        return Redisson.create(config);
+        try {
+            return Redisson.create(config);
+        } catch (Exception e) {
+            System.err.println("!!! Failed to create Redisson client: " + e.getMessage());
+            throw e;
+        }
     }
 }

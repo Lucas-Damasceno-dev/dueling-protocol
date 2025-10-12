@@ -15,7 +15,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update  # Automatically update schema
+      ddl-auto: update
       use-second-level-cache: true
       use-query-cache: true
       cache:
@@ -26,20 +26,17 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-        cache:
-          use_second_level_cache: true
-          use_query_cache: true
-          region.factory_class: org.redisson.hibernate.RedissonRegionFactory
+        cache.redisson.instance_name: redissonClient 
 
 jwt:
   secret: ${JWT_SECRET:mySecretKeyForDuelingProtocolThatShouldBeLongerThan256Bits}
-  expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
+  expiration: ${JWT_EXPIRATION:86400000}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus  # Expose health, metrics, and prometheus endpoints
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: when-authorized
@@ -56,7 +53,6 @@ logging:
     api: DEBUG
     websocket: DEBUG
 
-# Configuration for clients
 client:
   default-host: ${SERVER_HOST:localhost}
   default-port: ${SERVER_PORT:8080}
