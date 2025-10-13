@@ -61,7 +61,7 @@ echo ">>> Build completed successfully."
 # Step 2: Start services for performance testing
 run_test "Start Services" "Starting services for performance testing"
 echo ">>> Starting services..."
-docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client-1=0 --scale client-2=0 --scale client-3=0 --scale client-4=0 --remove-orphans -d
 echo ">>> Waiting for services to initialize..."
 sleep 25
 
@@ -77,7 +77,7 @@ run_test "Baseline Response Time" "Testing baseline response time under minimal 
 echo ">>> Testing baseline response time..."
 
 START_TIME=$(date +%s.%N)
-RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/actuator/health 2>/dev/null || true)
+RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || true)
 END_TIME=$(date +%s.%N)
 ELAPSED_TIME=$(echo "$END_TIME - $START_TIME" | bc)
 
@@ -94,7 +94,7 @@ echo ">>> Testing performance under increasing load..."
 echo ">>> Testing with 1 client..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=1 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client-1=1 --remove-orphans -d
 sleep 30
 
 # Record metrics after 1 client
@@ -110,7 +110,7 @@ record_metric "load_test_1_client" "postgres_cpu" "$POSTGRES_CPU_1"
 
 # Test response time with 1 client
 START_TIME=$(date +%s.%N)
-RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/actuator/health 2>/dev/null || true)
+RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || true)
 END_TIME=$(date +%s.%N)
 ELAPSED_TIME_1=$(echo "$END_TIME - $START_TIME" | bc)
 record_metric "load_test_1_client" "response_time_seconds" "$ELAPSED_TIME_1"
@@ -119,7 +119,7 @@ docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 
 # Test with 3 clients
 echo ">>> Testing with 3 clients..."
-docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=3 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client-1=1 --scale client-2=1 --scale client-3=1 --remove-orphans -d
 sleep 45
 
 # Record metrics after 3 clients
@@ -135,7 +135,7 @@ record_metric "load_test_3_clients" "postgres_cpu" "$POSTGRES_CPU_3"
 
 # Test response time with 3 clients
 START_TIME=$(date +%s.%N)
-RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/actuator/health 2>/dev/null || true)
+RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || true)
 END_TIME=$(date +%s.%N)
 ELAPSED_TIME_3=$(echo "$END_TIME - $START_TIME" | bc)
 record_metric "load_test_3_clients" "response_time_seconds" "$ELAPSED_TIME_3"
@@ -144,7 +144,7 @@ docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 
 # Test with 5 clients
 echo ">>> Testing with 5 clients..."
-docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=5 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client-1=1 --scale client-2=1 --scale client-3=1 --scale client-4=2 --remove-orphans -d
 sleep 60
 
 # Record metrics after 5 clients
@@ -160,7 +160,7 @@ record_metric "load_test_5_clients" "postgres_cpu" "$POSTGRES_CPU_5"
 
 # Test response time with 5 clients
 START_TIME=$(date +%s.%N)
-RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/actuator/health 2>/dev/null || true)
+RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || true)
 END_TIME=$(date +%s.%N)
 ELAPSED_TIME_5=$(echo "$END_TIME - $START_TIME" | bc)
 record_metric "load_test_5_clients" "response_time_seconds" "$ELAPSED_TIME_5"
@@ -178,7 +178,7 @@ rm -f .env
 run_test "Stress Test" "Testing system behavior under high load"
 echo ">>> Running stress test with 8 clients for 2 minutes..."
 
-docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=8 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client-1=2 --scale client-2=2 --scale client-3=2 --scale client-4=2 --remove-orphans -d
 sleep 120
 
 # Record stress test metrics
@@ -193,7 +193,7 @@ record_metric "stress_test" "redis_cpu" "$STRESS_REDIS_CPU"
 record_metric "stress_test" "postgres_cpu" "$STRESS_POSTGRES_CPU"
 
 # Check health during stress
-STRESS_HEALTH=$(curl -s -o stress_health.txt -w "%{http_code}" http://localhost:8081/actuator/health 2>/dev/null || echo "0")
+STRESS_HEALTH=$(curl -s -o stress_health.txt -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || echo "0")
 record_metric "stress_test" "health_response_code" "$STRESS_HEALTH"
 echo ">>> Health check during stress: HTTP $STRESS_HEALTH"
 
@@ -205,13 +205,13 @@ run_test "Scalability Test" "Testing scalability by adding more server instances
 echo ">>> Testing scalability by examining current multi-server performance..."
 
 # Start both servers again and measure their individual loads
-docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client-1=0 --scale client-2=0 --scale client-3=0 --scale client-4=0 --remove-orphans -d
 sleep 10
 
 # Start client that should distribute load between servers
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=4 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client-1=1 --scale client-2=1 --scale client-3=1 --scale client-4=1 --remove-orphans -d
 sleep 30
 
 # Calculate load distribution between servers
