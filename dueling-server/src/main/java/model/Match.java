@@ -2,6 +2,16 @@ package model;
 
 import java.util.UUID;
 
+/**
+ * Represents a match between two players.
+ * <p>
+ * <b>Failover Behavior:</b>
+ * In a distributed environment, if the server instance hosting this match fails,
+ * the system will detect the failure via health checks. The match will be automatically
+ * terminated, and the player on the non-failing server will be declared the winner.
+ * This ensures that games do not remain in an orphaned state and players are
+ * properly notified.
+ */
 public class Match {
 
     public enum Status {
