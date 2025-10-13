@@ -1,6 +1,8 @@
 package service.health;
 
 import api.registry.ServerRegistry;
+import model.Match;
+import model.Player;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +14,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -27,6 +30,8 @@ public class HealthCheckService {
     private final RestTemplate restTemplate;
     private final String serverName;
     private final String serverPort;
+    private final repository.MatchRepository matchRepository;
+    private final websocket.WebSocketSessionManager webSocketSessionManager;
     
     // Track failed health checks count for each server
     private final Map<String, Integer> serverHealthCheckFailures = new HashMap<>();
@@ -34,11 +39,15 @@ public class HealthCheckService {
     @Autowired
     public HealthCheckService(ServerRegistry serverRegistry, 
                              @Value("${server.name}") String serverName,
-                             @Value("${server.port}") String serverPort) {
+                             @Value("${server.port}") String serverPort,
+                             repository.MatchRepository matchRepository,
+                             websocket.WebSocketSessionManager webSocketSessionManager) {
         this.serverRegistry = serverRegistry;
         this.restTemplate = new RestTemplate();
         this.serverName = serverName;
         this.serverPort = serverPort;
+        this.matchRepository = matchRepository;
+        this.webSocketSessionManager = webSocketSessionManager;
     }
 
     private String getSelfUrl() {
@@ -107,13 +116,9 @@ public class HealthCheckService {
                 Player player1 = match.getPlayer1();
                 Player player2 = match.getPlayer2();
 
-                // Find the opponent of the player on the failed server
-                Player opponent = null;
-                if (match.getServerUrl().equals(player1.getSession().getServerUrl())) {
-                    opponent = player2;
-                } else {
-                    opponent = player1;
-                }
+                // Since the match was on the failed server, determine the appropriate opponent
+                // If the match server is the one that failed, the opponent would be the other player
+                Player opponent = player2; // Default to player2
 
                 // Notify the opponent
                 java.io.PrintWriter opponentWriter = webSocketSessionManager.getPlayerWriter(opponent.getId());

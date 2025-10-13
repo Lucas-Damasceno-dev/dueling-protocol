@@ -1,6 +1,7 @@
 package controller;
 
 import model.PlayerAchievement;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,7 +18,7 @@ public class AchievementController {
     private final PlayerAchievementRepository playerAchievementRepository;
     private final PlayerRepository playerRepository;
 
-    public AchievementController(PlayerAchievementRepository playerAchievementRepository, PlayerRepository playerRepository) {
+    public AchievementController(PlayerAchievementRepository playerAchievementRepository, @Qualifier("playerRepositoryImpl") PlayerRepository playerRepository) {
         this.playerAchievementRepository = playerAchievementRepository;
         this.playerRepository = playerRepository;
     }

@@ -81,6 +81,10 @@ public class PurchaseResult {
         /** The requested card pack is out of stock */
         OUT_OF_STOCK,
         /** The requested pack type was not found */
-        PACK_NOT_FOUND
+        PACK_NOT_FOUND,
+        /** Server is busy and cannot handle the request right now */
+        SERVER_BUSY,
+        /** An internal server error occurred during the request */
+        INTERNAL_SERVER_ERROR
     }
 }

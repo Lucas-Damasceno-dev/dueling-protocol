@@ -1,10 +1,29 @@
 spring:
+  main:
+    allow-bean-definition-overriding: true
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
   jpa:
+    hibernate:
+      ddl-auto: create-drop  # Automatically create and drop schema for tests
     properties:
       hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
         cache:
           use_second_level_cache: false
           use_query_cache: false
+    show-sql: false  # Disable to avoid confusion if JPA is somehow still active
+  redis:
+    enabled: false  # Disable Redis for tests
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      # Remove DataSource and JPA auto-config exclusions since TestConfig handles them manually
+
 jwt:
   secret: mySecretKeyForDuelingProtocolThatShouldBeLongerThan256Bits
   expiration: 86400000 # 24 hours in milliseconds
