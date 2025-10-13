@@ -26,7 +26,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -64,7 +64,7 @@ fi
 # Step 3: Initialize services for migration testing
 run_test "Start Services" "Starting services for migration testing"
 echo ">>> Starting services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 echo ">>> Waiting for services to initialize..."
 sleep 30
 
@@ -73,7 +73,7 @@ run_test "Initial Schema Analysis" "Analyzing initial database schema"
 echo ">>> Analyzing initial database schema..."
 
 # Get list of tables and their structures
-INITIAL_TABLES=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;" 2>/dev/null || echo "No tables")
+INITIAL_TABLES=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;" 2>/dev/null || echo "No tables")
 
 echo ">>> Initial database tables:"
 echo "$INITIAL_TABLES"
@@ -84,7 +84,7 @@ if [ "$INITIAL_TABLES" != "No tables" ] && [ -n "$(echo "$INITIAL_TABLES" | grep
   while IFS= read -r table; do
     if [ -n "$table" ] && [ "$table" != "No tables" ]; then
       echo ">>> Schema for table '$table':"
-      docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "\\d $table" 2>/dev/null || echo "  (Could not describe table $table)"
+      docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "\\d $table" 2>/dev/null || echo "  (Could not describe table $table)"
     fi
   done <<< "$INITIAL_TABLES"
 else
@@ -98,20 +98,20 @@ echo ">>> Creating baseline data to test migration preservation..."
 # Start a client to potentially generate data that would be migrated
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
 sleep 25
 
 # Check what data was created
-DATA_BEFORE_MIGRATION=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT table_name, (SELECT COUNT(*) FROM \"table_name\") AS row_count FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "Cannot query data")
+DATA_BEFORE_MIGRATION=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT table_name, (SELECT COUNT(*) FROM \"table_name\") AS row_count FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "Cannot query data")
 
 echo ">>> Data state before migration test:"
 echo "$DATA_BEFORE_MIGRATION"
 
 # Check Redis data as well
-REDIS_KEYS_BEFORE=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
+REDIS_KEYS_BEFORE=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
 echo ">>> Redis keys before migration test: $REDIS_KEYS_BEFORE"
 
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 rm -f .env
 
 # Step 6: Simulate schema evolution by creating a mock migration
@@ -120,7 +120,7 @@ echo ">>> Creating mock schema for migration testing..."
 
 # Create a backup of the current state
 echo ">>> Creating database backup for migration test..."
-docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_dump -U dueling_user -d dueling_db > db_backup_before_migration.sql 2>/dev/null || echo "Could not create backup"
+docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_dump -U dueling_user -d dueling_db > db_backup_before_migration.sql 2>/dev/null || echo "Could not create backup"
 
 if [ -f "db_backup_before_migration.sql" ]; then
   BACKUP_SIZE=$(stat -c%s db_backup_before_migration.sql)
@@ -134,7 +134,7 @@ run_test "Schema Versioning" "Testing schema versioning capabilities"
 echo ">>> Testing schema versioning..."
 
 # Check if there are any schema version tables created by Flyway or Liquibase
-FLYWAY_TABLES=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT table_name FROM information_schema.tables WHERE table_name LIKE '%flyway%' OR table_name LIKE '%schema_version%';" 2>/dev/null || echo "")
+FLYWAY_TABLES=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT table_name FROM information_schema.tables WHERE table_name LIKE '%flyway%' OR table_name LIKE '%schema_version%';" 2>/dev/null || echo "")
 
 if [ -n "$FLYWAY_TABLES" ] && [ "$FLYWAY_TABLES" != $'\n' ]; then
   echo ">>> SUCCESS: Found Flyway schema versioning tables:"
@@ -144,7 +144,7 @@ if [ -n "$FLYWAY_TABLES" ] && [ "$FLYWAY_TABLES" != $'\n' ]; then
   for table in $FLYWAY_TABLES; do
     if [ -n "$table" ] && [ "$table" != $'\n' ]; then
       echo ">>> Schema versions in $table:"
-      docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "SELECT * FROM $table;" 2>/dev/null || echo "  (Could not query table $table)"
+      docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "SELECT * FROM $table;" 2>/dev/null || echo "  (Could not query table $table)"
     fi
   done
 else
@@ -156,7 +156,7 @@ run_test "Migration Rollback Simulation" "Testing migration rollback capabilitie
 echo ">>> Testing migration rollback simulation..."
 
 # Check current state before simulating a rollback
-CURRENT_TABLES=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "No tables")
+CURRENT_TABLES=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "No tables")
 
 echo ">>> Current tables before rollback test:"
 echo "$CURRENT_TABLES"
@@ -168,20 +168,20 @@ if [ -f "db_backup_before_migration.sql" ]; then
   
   # Create a test table to simulate a schema change
   echo ">>> Creating a test table to simulate migration..."
-  docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "CREATE TABLE IF NOT EXISTS migration_test_table (id SERIAL PRIMARY KEY, test_data VARCHAR(255));" 2>/dev/null || echo "Could not create test table"
+  docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "CREATE TABLE IF NOT EXISTS migration_test_table (id SERIAL PRIMARY KEY, test_data VARCHAR(255));" 2>/dev/null || echo "Could not create test table"
   
   # Verify the test table was created
-  TEST_TABLE_EXISTS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'migration_test_table');" 2>/dev/null | tr -d ' ')
+  TEST_TABLE_EXISTS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'migration_test_table');" 2>/dev/null | tr -d ' ')
   echo ">>> Test table exists: $TEST_TABLE_EXISTS"
   
   if [ "$TEST_TABLE_EXISTS" = "t" ]; then
     echo ">>> SUCCESS: Schema change (test table creation) was successful"
     
     # Insert some test data to verify later
-    docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "INSERT INTO migration_test_table (test_data) VALUES ('test_migration_data');" 2>/dev/null || echo "Could not insert test data"
+    docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "INSERT INTO migration_test_table (test_data) VALUES ('test_migration_data');" 2>/dev/null || echo "Could not insert test data"
     
     # Verify the data
-    TEST_DATA_COUNT=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM migration_test_table;" 2>/dev/null | tr -d ' ')
+    TEST_DATA_COUNT=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM migration_test_table;" 2>/dev/null | tr -d ' ')
     echo ">>> Test data rows: $TEST_DATA_COUNT"
   fi
 else
@@ -194,14 +194,14 @@ echo ">>> Testing distributed data migration concepts..."
 
 # Check if both servers can see the same data through Redis
 echo ">>> Starting both servers to test distributed data access..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" stop server-1 server-2
+docker compose -f "$DOCKER_COMPOSE_FILE" stop server-1 server-2
 sleep 5
-docker-compose -f "$DOCKER_COMPOSE_FILE" start server-1 server-2
+docker compose -f "$DOCKER_COMPOSE_FILE" start server-1 server-2
 sleep 20
 
 # Check if data is still accessible by both servers
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_migration.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_migration.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_migration.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_migration.log 2>&1
 
 # Look for any migration-related messages
 if grep -i -E "migration\|schema\|update\|upgrade" server1_migration.log; then
@@ -213,7 +213,7 @@ if grep -i -E "migration\|schema\|update\|upgrade" server2_migration.log; then
 fi
 
 # Check Redis state after server restart
-REDIS_KEYS_AFTER_RESTART=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
+REDIS_KEYS_AFTER_RESTART=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
 echo ">>> Redis keys after server restart: $REDIS_KEYS_AFTER_RESTART"
 
 rm -f server1_migration.log server2_migration.log
@@ -276,11 +276,11 @@ echo ">>> Testing migration concepts under simulated load..."
 # Start clients again to generate activity during "migration"
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=3 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=3 --remove-orphans -d
 sleep 20
 
 # Check the health of the database during this time
-DB_HEALTH_STATUS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_isready -h localhost -U dueling_user -d dueling_db; echo $?)
+DB_HEALTH_STATUS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_isready -h localhost -U dueling_user -d dueling_db; echo $?)
 if [ $DB_HEALTH_STATUS -eq 0 ]; then
   echo ">>> SUCCESS: Database remains healthy under load"
 else
@@ -288,7 +288,7 @@ else
 fi
 
 # Check if we can still query data during this time
-TABLE_COUNT=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
+TABLE_COUNT=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
 
 if [ "$TABLE_COUNT" -ge 0 ]; then
   echo ">>> SUCCESS: Can still query database during load (found $TABLE_COUNT tables)"
@@ -296,7 +296,7 @@ else
   echo ">>> WARNING: Cannot query database during load"
 fi
 
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 rm -f .env
 
 # Step 13: Migration validation summary
@@ -304,8 +304,8 @@ run_test "Migration Validation Summary" "Summary of migration validation testing
 echo ">>> Data migration validation summary:"
 
 # Final checks
-FINAL_TABLES=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
-FINAL_REDIS_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
+FINAL_TABLES=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
+FINAL_REDIS_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
 
 echo ">>> Final database tables: $FINAL_TABLES"
 echo ">>> Final Redis keys: $FINAL_REDIS_KEYS"
@@ -318,13 +318,13 @@ else
 fi
 
 # Verify that test table still exists if we created one
-TEST_TABLE_EXISTS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'migration_test_table');" 2>/dev/null | tr -d ' ' || echo "f")
+TEST_TABLE_EXISTS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'migration_test_table');" 2>/dev/null | tr -d ' ' || echo "f")
 
 if [ "$TEST_TABLE_EXISTS" = "t" ]; then
   echo ">>> SUCCESS: Test table from migration simulation still exists"
   
   # Clean up the test table
-  docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "DROP TABLE IF EXISTS migration_test_table;" 2>/dev/null || echo "Could not drop test table"
+  docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "DROP TABLE IF EXISTS migration_test_table;" 2>/dev/null || echo "Could not drop test table"
 else
   echo ">>> INFO: Test table not found (this may be expected)"
 fi

@@ -25,7 +25,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -41,14 +41,14 @@ cd "$PROJECT_ROOT"
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
 rm -f .env
 echo ">>> Build completed successfully."
 
 # Step 2: Start services (without clients initially)
 run_test "Start Services" "Starting servers, Redis, and PostgreSQL for Redis tests"
 echo ">>> Starting services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 echo ">>> Waiting for services to initialize..."
 sleep 20
 
@@ -57,11 +57,11 @@ run_test "Redis Connectivity" "Testing direct connectivity to Redis instance"
 echo ">>> Testing Redis connectivity..."
 
 # Check if Redis is accessible
-if docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli ping | grep -q "PONG"; then
+if docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli ping | grep -q "PONG"; then
   echo ">>> SUCCESS: Redis is accessible and responding to PING"
 else
   echo ">>> FAILURE: Redis is not accessible or not responding to PING"
-  docker-compose -f "$DOCKER_COMPOSE_FILE" logs redis
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs redis
   exit 1
 fi
 
@@ -71,18 +71,18 @@ echo ">>> Testing Redis session caching functionality..."
 
 # Start a simple test client to generate some session data
 echo ">>> Starting temporary client to test session caching..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=1 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=1 --remove-orphans -d
 sleep 10
 
 # Check Redis for session-related keys
-SESSION_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "spring:session:*" | wc -l)
+SESSION_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "spring:session:*" | wc -l)
 
 if [ "$SESSION_KEYS" -gt 0 ]; then
   echo ">>> SUCCESS: Found $SESSION_KEYS session-related keys in Redis"
   
   # Get details of session keys
   echo ">>> Session keys found in Redis:"
-  docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli keys "spring:session:*"
+  docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli keys "spring:session:*"
 else
   echo ">>> WARNING: No session-related keys found in Redis, but this might be expected depending on implementation"
 fi
@@ -92,8 +92,8 @@ run_test "Pub/Sub Functionality" "Testing Redis publisher-subscriber functionali
 echo ">>> Testing Redis pub/sub functionality..."
 
 # Check the server logs to see if pub/sub is being used
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1.log
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2.log
 
 # Look for pub/sub related messages in logs
 if grep -i -E "publish|subscribe|pubsub|redis.*pub|redis.*sub" server1.log || grep -i -E "publish|subscribe|pubsub|redis.*pub|redis.*sub" server2.log; then
@@ -110,8 +110,8 @@ run_test "Hibernate Cache via Redis" "Testing Redis as Hibernate cache provider"
 echo ">>> Testing Redis as Hibernate cache provider..."
 
 # Check server logs for Redisson/Hibernate cache initialization
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_cache.log
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_cache.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_cache.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_cache.log
 
 if grep -i -E "redisson|hibernate.*cache|jcache|redission" server1_cache.log || grep -i -E "redisson|hibernate.*cache|jcache|redission" server2_cache.log; then
   echo ">>> SUCCESS: Found Redisson/Hibernate cache initialization in server logs"
@@ -126,15 +126,15 @@ run_test "Distributed Cache" "Testing Redis as distributed cache between servers
 echo ">>> Testing data sharing between servers via Redis..."
 
 # Start a client to create some data that would be cached in Redis
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=2 --remove-orphans -d
 sleep 15
 
 # Check Redis for any game-related keys that might indicate distributed caching
-GAME_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "game:*" | wc -l)
-MATCH_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "match:*" | wc -l)
-PLAYER_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "player:*" | wc -l)
+GAME_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "game:*" | wc -l)
+MATCH_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "match:*" | wc -l)
+PLAYER_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "player:*" | wc -l)
 
-TOTAL_REDIS_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
+TOTAL_REDIS_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
 
 echo ">>> Total Redis keys: $TOTAL_REDIS_KEYS"
 echo ">>> Game-related keys: $GAME_KEYS"
@@ -152,22 +152,22 @@ run_test "Redis Failover Readiness" "Testing application resilience to Redis ava
 echo ">>> Testing application behavior when Redis is temporarily unavailable..."
 
 # Get initial server logs
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > initial_server1.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > initial_server2.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > initial_server1.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > initial_server2.log 2>&1
 
 # Stop Redis temporarily
 echo ">>> Stopping Redis temporarily to test resilience..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" stop redis
+docker compose -f "$DOCKER_COMPOSE_FILE" stop redis
 sleep 5
 
 # Start Redis again
 echo ">>> Restarting Redis..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" start redis
+docker compose -f "$DOCKER_COMPOSE_FILE" start redis
 sleep 10
 
 # Check server logs for any Redis-related errors during the Redis unavailability
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > after_redis_restart_server1.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > after_redis_restart_server2.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > after_redis_restart_server1.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > after_redis_restart_server2.log 2>&1
 
 # Compare logs to see if there were any Redis-related issues
 if diff -u initial_server1.log after_redis_restart_server1.log | grep -i -E "error|exception|fail|redis|connection|timeout"; then

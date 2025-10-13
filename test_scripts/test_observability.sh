@@ -26,7 +26,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -42,14 +42,14 @@ cd "$PROJECT_ROOT"
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
 rm -f .env
 echo ">>> Build completed successfully."
 
 # Step 2: Start services including monitoring stack
 run_test "Start Services With Monitoring" "Starting services with Prometheus and Grafana"
 echo ">>> Starting services with monitoring stack..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 echo ">>> Waiting for services and monitoring to initialize..."
 sleep 35
 
@@ -160,12 +160,12 @@ echo ">>> Testing application logging configuration..."
 # Start a client to generate some logs
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
 sleep 20
 
 # Check server logs for expected log patterns
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_logs.txt 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_logs.txt 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_logs.txt 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_logs.txt 2>&1
 
 # Check for different log levels
 LOG_LEVELS=("INFO" "WARN" "ERROR" "DEBUG")
@@ -249,8 +249,8 @@ run_test "Distributed Tracing" "Testing distributed tracing capabilities"
 echo ">>> Testing distributed tracing..."
 
 # Check server logs for trace-related information
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_trace_check.txt 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_trace_check.txt 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_trace_check.txt 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_trace_check.txt 2>&1
 
 if grep -i -E "trace.*id\|span.*id\|request.*id.*correlation\|distributed.*trace" server1_trace_check.txt > /dev/null; then
   echo ">>> SUCCESS: Found distributed tracing information in server-1 logs"
@@ -273,7 +273,7 @@ echo ">>> Testing metrics collection under load..."
 # Start more clients to generate metrics
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=4 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=4 --remove-orphans -d
 sleep 30
 
 # Check metrics again to see if they're being updated under load
@@ -287,7 +287,7 @@ else
   echo ">>> INFO: No request count metrics found under load"
 fi
 
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 rm -f .env
 
 # Step 10: Test monitoring system resilience
@@ -315,11 +315,11 @@ run_test "Alerting Configuration" "Testing alerting system configuration"
 echo ">>> Testing alerting system configuration..."
 
 # Check if Prometheus has alerting rules configured
-if docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q prometheus) test -f /etc/prometheus/prometheus.yml; then
+if docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q prometheus) test -f /etc/prometheus/prometheus.yml; then
   echo ">>> SUCCESS: Prometheus configuration file exists"
   
   # Check if there are rules in the config
-  ALERT_RULES_COUNT=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q prometheus) cat /etc/prometheus/prometheus.yml 2>/dev/null | grep -i -E "rule\|alert" | wc -l || echo "0")
+  ALERT_RULES_COUNT=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q prometheus) cat /etc/prometheus/prometheus.yml 2>/dev/null | grep -i -E "rule\|alert" | wc -l || echo "0")
   echo ">>> Alert rules found in Prometheus config: $ALERT_RULES_COUNT"
   
   if [ $ALERT_RULES_COUNT -gt 0 ]; then
@@ -334,7 +334,7 @@ run_test "Observability Summary" "Summary of observability testing"
 echo ">>> Observability testing completed. Verifying collected metrics..."
 
 # Get a final check of all services
-FINAL_SERVICES_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps)
+FINAL_SERVICES_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps)
 echo ">>> Final service status:"
 echo "$FINAL_SERVICES_STATUS"
 

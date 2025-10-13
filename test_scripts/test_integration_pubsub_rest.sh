@@ -24,12 +24,12 @@ run_test() {
   echo ">>> Running test: $test_name"
   echo "-------------------------------------------------------"
 
-  # Create a temporary .env file for docker-compose
+  # Create a temporary .env file for docker compose
   echo "BOT_MODE=autobot" > "$ENV_FILE"
   echo "BOT_SCENARIO=" >> "$ENV_FILE"
 
   # Start containers
-  docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" up --scale client=$client_count --remove-orphans -d
+  docker compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" up --scale client=$client_count --remove-orphans -d
 
   echo ">>> Waiting for services to initialize..."
   sleep 8
@@ -38,7 +38,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" down --remove-orphans
   rm -f "$ENV_FILE"
 }
 
@@ -46,11 +46,11 @@ cleanup() {
 run_test "Publisher-Subscriber Test" 2
 
 echo ">>> Verifying Pub/Sub matchmaking notifications..."
-if docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" logs server | grep -q "New match created"; then
+if docker compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" logs server | grep -q "New match created"; then
   echo ">>> SUCCESS: Match creation message found in logs."
 else
   echo ">>> FAILURE: Could not find match creation message in server logs."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" logs server
+  docker compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" logs server
   cleanup
   exit 1
 fi
@@ -70,11 +70,11 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 sleep 5 # Wait for the server to process the API request
 
-if docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" logs server | grep -q "Player player-api-123 added to matchmaking queue"; then
+if docker compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" logs server | grep -q "Player player-api-123 added to matchmaking queue"; then
   echo ">>> SUCCESS: API player successfully added to matchmaking queue."
 else
   echo ">>> FAILURE: Did not find log entry for API player in matchmaking."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" logs server
+  docker compose -f "$DOCKER_COMPOSE_FILE" --env-file "$ENV_FILE" logs server
   cleanup
   exit 1
 fi

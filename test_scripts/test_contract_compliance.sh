@@ -26,7 +26,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -42,14 +42,14 @@ cd "$PROJECT_ROOT"
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
 rm -f .env
 echo ">>> Build completed successfully."
 
 # Step 2: Start services
 run_test "Start Services" "Starting gateway, servers, Redis, and PostgreSQL"
 echo ">>> Starting services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 echo ">>> Waiting for services to initialize..."
 sleep 25
 
@@ -159,12 +159,12 @@ echo ">>> Testing gateway-backend contract matching..."
 # Start a client to generate some backend activity
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=1 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=1 --remove-orphans -d
 sleep 15
 
 # Check logs for contract-related messages
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_contracts.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_contracts.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_contracts.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_contracts.log 2>&1
 
 CONTRACT_SUCCESS=0
 if grep -i -E "contract|api.*mapping|route.*mapping|gateway.*forward|uri.*rewrite" server1_contracts.log; then

@@ -12,7 +12,7 @@ echo "======================================================="
 
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
 }
 
 trap cleanup EXIT
@@ -21,21 +21,21 @@ echo ">>> Building project JAR..."
 (cd "$PROJECT_ROOT" && mvn clean package)
 
 echo ">>> Building and starting services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --build -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --build -d
 
 echo ">>> Waiting for clients to run and matchmaking to occur..."
 sleep 20 
 
 echo ">>> Verifying distributed matchmaking..."
 
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs > matchmaking_logs.txt
+docker compose -f "$DOCKER_COMPOSE_FILE" logs > matchmaking_logs.txt
 
 if grep "New match created" matchmaking_logs.txt; then
   echo ">>> SUCCESS: Distributed match creation message found in logs."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" logs
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs
 else
   echo ">>> FAILURE: Could not find match creation message in logs."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" logs
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs
   exit 1
 fi
 
