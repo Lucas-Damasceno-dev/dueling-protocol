@@ -44,6 +44,7 @@ services:
       -Dredis.host=${REDIS_HOST} 
       -Dredis.port=${REDIS_PORT} 
       -jar app.jar 
+      --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
     container_name: server-1
     ports:
@@ -80,6 +81,7 @@ services:
       -Dredis.host=${REDIS_HOST} 
       -Dredis.port=${REDIS_PORT} 
       -jar app.jar 
+      --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
     container_name: server-2
     ports:
@@ -115,6 +117,7 @@ services:
       -Dredis.host=${REDIS_HOST} 
       -Dredis.port=${REDIS_PORT} 
       -jar app.jar 
+      --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
     container_name: server-3
     ports:
@@ -150,6 +153,7 @@ services:
       -Dredis.host=${REDIS_HOST} 
       -Dredis.port=${REDIS_PORT} 
       -jar app.jar 
+      --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
     container_name: server-4
     ports:
