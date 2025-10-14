@@ -31,7 +31,6 @@ public final class GameClient {
     private static final String API_BASE_URL = "http://" + GATEWAY_ADDRESS + ":" + GATEWAY_PORT;
     private static final int UDP_PORT = 7778;
     
-    // Environment variable to check if running in Docker
     private static final boolean IS_DOCKER_ENV = System.getenv().getOrDefault("DOCKER_ENV", "false").equalsIgnoreCase("true");
     private static final String AUTO_USERNAME = System.getenv().getOrDefault("CLIENT_USERNAME", "");
     private static final String AUTO_PASSWORD = System.getenv().getOrDefault("CLIENT_PASSWORD", "");
@@ -40,27 +39,32 @@ public final class GameClient {
     private static String jwtToken;
     private static String currentMatchId;
     private static boolean inGame;
+    private static boolean characterSet = false;
+    private static boolean hasCards = false;
     private static volatile boolean isExiting;
+    private static volatile long lastPingTime = -1; // Now in nanoseconds
+    private static volatile Thread pingUpdateThread;
+    private static volatile boolean pingModeActive = false;
+    private static volatile boolean awaitingUserInput = false;
 
     public static void main(String[] args) {
-        logger.info("Dueling Protocol Client Started");
+        // logger.info("Dueling Protocol Client Started");  // Removed to keep UI clean
         handleUserAuthentication();
     }
 
     private static void handleUserAuthentication() {
         if (IS_DOCKER_ENV && !AUTO_USERNAME.isEmpty() && !AUTO_PASSWORD.isEmpty()) {
-            // Non-interactive mode: auto-login with environment variables
             logger.info("Running in Docker environment, attempting auto-login with provided credentials");
             autoLogin();
         } else {
-            // Interactive mode: prompt user for input
             Scanner scanner = new Scanner(System.in);
             while (jwtToken == null && !isExiting) {
-                logger.info("\n=== AUTHENTICATION ===");
-                logger.info("1. Login");
-                logger.info("2. Register");
-                logger.info("3. Exit");
-                logger.info("Choose an option: ");
+                System.out.println();
+                System.out.println("--- AUTHENTICATION ---");
+                System.out.println("1. Login");
+                System.out.println("2. Register");
+                System.out.println("3. Exit");
+                System.out.print("Choose an option: > ");
                 String choice = scanner.nextLine().trim();
 
                 switch (choice) {
@@ -74,7 +78,7 @@ public final class GameClient {
                         isExiting = true;
                         break;
                     default:
-                        logger.warn("Invalid option.");
+                        System.out.println("Invalid option.");
                         break;
                 }
             }
@@ -84,20 +88,85 @@ public final class GameClient {
             connectToWebSocket();
             if (webSocketClient != null && webSocketClient.isOpen()) {
                 if (!IS_DOCKER_ENV) {
-                    printFullMenu();
+                    startPingUpdateService();
                 }
                 handleUserInput();
+                if (!IS_DOCKER_ENV) {
+                    stopPingUpdateService();
+                }
             }
         }
-        logger.info("Exiting client.");
+        // logger.info("Exiting client.");  // Removed to keep UI clean
+    }
+    
+    private static void startPingUpdateService() {
+        if (pingUpdateThread != null && pingUpdateThread.isAlive()) {
+            pingUpdateThread.interrupt();
+        }
+        
+        pingUpdateThread = new Thread(() -> {
+            try (DatagramSocket datagramSocket = new DatagramSocket()) {
+                datagramSocket.setSoTimeout(1000);
+
+                while (!Thread.currentThread().isInterrupted() && webSocketClient != null && webSocketClient.isOpen()) {
+                    try {
+                        InetAddress address = InetAddress.getByName(GATEWAY_ADDRESS);
+                        long startTime = System.nanoTime();
+                        byte[] buffer = String.valueOf(startTime).getBytes();
+                        DatagramPacket request = new DatagramPacket(buffer, buffer.length, address, UDP_PORT);
+                        
+                        datagramSocket.send(request);
+                        
+                        DatagramPacket response = new DatagramPacket(new byte[buffer.length], buffer.length);
+                        datagramSocket.receive(response);
+                        
+                        long endTime = System.nanoTime();
+                        lastPingTime = (endTime - startTime);
+
+                    } catch (IOException e) {
+                        lastPingTime = -1;
+                    }
+                    
+                    long sleepTime = pingModeActive ? 200 : 5000;
+                    try {
+                        Thread.sleep(sleepTime);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                // Silent error in ping service to avoid cluttering UI
+            }
+        }, "PingUpdateService");
+        
+        pingUpdateThread.setDaemon(true);
+        pingUpdateThread.start();
+    }
+    
+    private static void stopPingUpdateService() {
+        if (pingUpdateThread != null && !pingUpdateThread.isInterrupted()) {
+            pingUpdateThread.interrupt();
+        }
     }
 
     private static void login(Scanner scanner) {
         try {
-            logger.info("Username: ");
+            System.out.print("Username: > ");
             String username = scanner.nextLine().trim();
-            logger.info("Password: ");
+            if (username.isEmpty()) {
+                System.out.println("[ERROR] ✗ Username cannot be empty");
+                return;
+            }
+            
+            System.out.print("Password: > ");
             String password = scanner.nextLine().trim();
+            if (password.isEmpty()) {
+                System.out.println("[ERROR] ✗ Password cannot be empty");
+                return;
+            }
 
             JsonObject credentials = new JsonObject();
             credentials.addProperty("username", username);
@@ -108,12 +177,13 @@ public final class GameClient {
             if (response.statusCode == 200) {
                 JsonObject responseJson = new Gson().fromJson(response.body, JsonObject.class);
                 jwtToken = responseJson.get("token").getAsString();
-                logger.info("[SUCCESS] \u2713 Login successful!");
+                System.out.println("[SUCCESS] ✓ Login successful!");
             } else {
-                logger.error("[ERROR] \u2717 Login failed: {} (Code: {})", response.body, response.statusCode);
+                String errorMessage = response.body != null && !response.body.isEmpty() ? response.body : "Invalid credentials";
+                System.out.println("[ERROR] ✗ Login failed: " + errorMessage + " (Code: " + response.statusCode + ")");
             }
         } catch (IOException e) {
-            logger.error("[ERROR] \u2717 IOException during login: {}", e.getMessage());
+            System.out.println("[ERROR] ✗ IOException during login: " + e.getMessage());
         }
     }
 
@@ -130,14 +200,13 @@ public final class GameClient {
             if (response.statusCode == 200) {
                 JsonObject responseJson = new Gson().fromJson(response.body, JsonObject.class);
                 jwtToken = responseJson.get("token").getAsString();
-                logger.info("[SUCCESS] ✓ Auto-login successful!");
+                System.out.println("[SUCCESS] ✓ Auto-login successful!");
             } else {
-                logger.error("[ERROR] ✗ Auto-login failed: {} (Code: {})", response.body, response.statusCode);
-                // Attempt to register if login fails
+                System.out.println("[ERROR] ✗ Auto-login failed: " + response.body + " (Code: " + response.statusCode + ")");
                 autoRegister();
             }
         } catch (IOException e) {
-            logger.error("[ERROR] ✗ IOException during auto-login: {}", e.getMessage());
+            System.out.println("[ERROR] ✗ IOException during auto-login: " + e.getMessage());
         }
     }
 
@@ -152,24 +221,32 @@ public final class GameClient {
             HttpResponse response = makeHttpRequest("/api/auth/register", "POST", credentials.toString(), null);
 
             if (response.statusCode == 200 || response.statusCode == 201) {
-                logger.info("[SUCCESS] ✓ Auto-registration successful. Attempting to login now.");
-                // Try login again after successful registration
+                System.out.println("[SUCCESS] ✓ Auto-registration successful. Attempting to login now.");
                 autoLogin();
             } else {
-                logger.error("[ERROR] ✗ Auto-registration failed: {} (Code: {})", response.body, response.statusCode);
+                System.out.println("[ERROR] ✗ Auto-registration failed: " + response.body + " (Code: " + response.statusCode + ")");
                 isExiting = true;
             }
         } catch (IOException e) {
-            logger.error("[ERROR] ✗ IOException during auto-registration: {}", e.getMessage());
+            System.out.println("[ERROR] ✗ IOException during auto-registration: " + e.getMessage());
         }
     }
 
     private static void register(Scanner scanner) {
         try {
-            logger.info("Username: ");
+            System.out.print("Username: > ");
             String username = scanner.nextLine().trim();
-            logger.info("Password: ");
+            if (username.isEmpty()) {
+                System.out.println("[ERROR] ✗ Username cannot be empty");
+                return;
+            }
+            
+            System.out.print("Password: > ");
             String password = scanner.nextLine().trim();
+            if (password.isEmpty()) {
+                System.out.println("[ERROR] ✗ Password cannot be empty");
+                return;
+            }
 
             JsonObject credentials = new JsonObject();
             credentials.addProperty("username", username);
@@ -178,12 +255,13 @@ public final class GameClient {
             HttpResponse response = makeHttpRequest("/api/auth/register", "POST", credentials.toString(), null);
 
             if (response.statusCode == 200 || response.statusCode == 201) {
-                logger.info("[SUCCESS] \u2713 Registration successful. Please log in.");
+                System.out.println("[SUCCESS] ✓ Registration successful. Please log in.");
             } else {
-                logger.error("[ERROR] \u2717 Registration failed: {} (Code: {})", response.body, response.statusCode);
+                String errorMessage = response.body != null && !response.body.isEmpty() ? response.body : "Registration failed";
+                System.out.println("[ERROR] ✗ Registration failed: " + errorMessage + " (Code: " + response.statusCode + ")");
             }
         } catch (IOException e) {
-            logger.error("[ERROR] \u2717 IOException during registration: {}", e.getMessage());
+            System.out.println("[ERROR] ✗ IOException during registration: " + e.getMessage());
         }
     }
 
@@ -194,23 +272,24 @@ public final class GameClient {
         while (retryCount < maxRetries) {
             try {
                 String gatewayUri = "ws://" + GATEWAY_ADDRESS + ":" + GATEWAY_PORT + "/ws?token=" + jwtToken;
-                logger.info("Connecting to WebSocket server at {} (attempt {}/{})", gatewayUri, retryCount + 1, maxRetries);
+                // logger.info("Connecting to WebSocket server at {} (attempt {}/{})", gatewayUri, retryCount + 1, maxRetries);  // Removed to keep UI clean
                 
                 webSocketClient = new MyWebSocketClient(new URI(gatewayUri));
                 if (webSocketClient.connectBlocking()) {
-                    logger.info("Successfully connected to WebSocket server.");
-                    return; // Success, exit the retry loop
+                    // logger.info("WebSocket connection established.");  // Removed to keep UI clean
+                    // logger.info("Successfully connected to WebSocket server.");  // Removed to keep UI clean
+                    return;
                 } else {
-                    logger.warn("Failed to connect to the WebSocket server on attempt {}/{}", retryCount + 1, maxRetries);
-                    jwtToken = null; // Clear token on connection failure
+                    System.out.println("Failed to connect to the WebSocket server on attempt " + (retryCount + 1) + "/" + maxRetries);
+                    jwtToken = null;
                 }
             } catch (URISyntaxException e) {
-                logger.error("Invalid URI syntax: {}", e.getMessage());
+                System.out.println("Invalid URI syntax: " + e.getMessage());
                 jwtToken = null;
-                return; // Can't recover from invalid URI
+                return;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                logger.error("Connection interrupted: {}", e.getMessage());
+                System.out.println("Connection interrupted: " + e.getMessage());
                 jwtToken = null;
                 return;
             }
@@ -219,40 +298,52 @@ public final class GameClient {
             if (retryCount < maxRetries) {
                 logger.info("Waiting 3 seconds before retry...");
                 try {
-                    Thread.sleep(3000); // Wait 3 seconds before retry
+                    Thread.sleep(3000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    logger.error("Retry wait interrupted: {}", e.getMessage());
+                    System.out.println("Retry wait interrupted: " + e.getMessage());
                     jwtToken = null;
                     return;
                 }
             }
         }
         
-        logger.error("Failed to connect to WebSocket server after {} attempts.", maxRetries);
-        jwtToken = null; // Clear token on connection failure
+        System.out.println("Failed to connect to WebSocket server after " + maxRetries + " attempts.");
+        jwtToken = null;
     }
 
     private static void printFullMenu() {
-        logger.info("\n=== GAME MENU ===");
-        logger.info("1. Set up character");
-        logger.info("2. Enter matchmaking queue");
-        logger.info("3. Select and use custom deck");
-        logger.info("4. Buy card pack");
-        logger.info("5. Check ping");
-        logger.info("6. Play card (during match)");
-        logger.info("7. Upgrade attributes");
-        logger.info("8. Exit");
-        logger.info("Choose an option: ");
+        System.out.println();
+        System.out.println("--- GAME MENU ---");
+        System.out.println("1. Set up character");
+        System.out.println("2. Enter matchmaking queue");
+        System.out.println("3. Select and use custom deck");
+        System.out.println("4. Buy card pack");
+        System.out.println("5. Check ping");
+        System.out.println("6. Play card (during match)");
+        System.out.println("7. Upgrade attributes");
+        System.out.println("8. Exit");
+        if (lastPingTime >= 0 && !pingModeActive) {
+            // Only show ping in main menu if not in ping mode
+            if (lastPingTime < 1000) {
+                // Less than 1 microsecond, display in nanoseconds
+                System.out.println("Current ping: " + lastPingTime + " ns");
+            } else if (lastPingTime < 1_000_000) {
+                // Less than 1 millisecond, display in microseconds
+                System.out.println("Current ping: " + (lastPingTime / 1000) + " µs");
+            } else {
+                // 1 millisecond or more, display in milliseconds but as microseconds in µs
+                System.out.println("Current ping: " + (lastPingTime / 1000) + " µs");
+            }
+        }
+        System.out.print("Choose an option: > ");
     }
 
     private static void handleUserInput() {
         if (IS_DOCKER_ENV) {
-            // In Docker environment, keep the connection alive but don't wait for input
             logger.info("Running in Docker mode - keeping WebSocket connection alive for game events");
             while (!isExiting && webSocketClient != null && webSocketClient.isOpen()) {
                 try {
-                    // Sleep for a short period to avoid busy waiting
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -261,12 +352,16 @@ public final class GameClient {
                 }
             }
         } else {
-            // Interactive mode: wait for user input
             Scanner scanner = new Scanner(System.in);
             while (!isExiting && webSocketClient != null && webSocketClient.isOpen()) {
+                awaitingUserInput = true;
+                printFullMenu();
+                
                 String input = scanner.nextLine().trim();
+                awaitingUserInput = false;
+                
                 if (jwtToken == null) {
-                    logger.warn("Your session has expired. Please restart the client to log in again.");
+                    System.out.println("[WARNING] Your session has expired. Please restart the client to log in again.");
                     isExiting = true;
                     break;
                 }
@@ -276,23 +371,21 @@ public final class GameClient {
                     case "2": enterMatchmaking(); break;
                     case "3": selectDeck(scanner); break;
                     case "4": buyCardPack(scanner); break;
-                    case "5": checkPing(); break;
+                    case "5": checkPing(scanner); break;
                     case "6":
                         if (inGame) {
                             playCard(scanner);
                         } else {
-                            logger.info("\nYou need to be in a match to play cards!");
-                            printFullMenu();
+                            System.out.println("You need to be in a match to play cards!");
                         }
                         break;
                     case "7": upgradeAttributes(scanner); break;
                     case "8":
-                        logger.info("Exiting...");
+                        System.out.println("Exiting...");
                         isExiting = true;
                         break;
                     default:
-                        logger.info("\nInvalid option!");
-                        printFullMenu();
+                        System.out.println("Invalid option! Please choose a number from 1-8.");
                         break;
                 }
             }
@@ -300,74 +393,241 @@ public final class GameClient {
         if (webSocketClient != null) {
             webSocketClient.close();
         }
+        
+        if (!IS_DOCKER_ENV) {
+            stopPingUpdateService();
+        }
     }
 
-    // Existing action methods (unchanged, they send messages via WebSocket)
     private static void setupCharacter(Scanner scanner) {
-        logger.info("\n=== CHARACTER SETUP ===");
-        logger.info("Choose your race: ");
-        String race = scanner.nextLine().trim();
-        logger.info("Choose your class: ");
-        String playerClass = scanner.nextLine().trim();
-        webSocketClient.send("CHARACTER_SETUP:" + race + ":" + playerClass);
+        System.out.println();
+        System.out.println("--- CHARACTER SETUP ---");
+        
+        System.out.print("Enter your nickname: > ");
+        String nickname = scanner.nextLine().trim();
+        if (nickname.isEmpty()) {
+            System.out.println("Nickname cannot be empty!");
+            return;
+        }
+        
+        System.out.println("Available races:");
+        System.out.println("1. Human");
+        System.out.println("2. Elf");
+        System.out.println("3. Dwarf");
+        System.out.println("4. Orc");
+        System.out.print("Choose your race (1-4): > ");
+        String raceInput = scanner.nextLine().trim();
+        String race = getRaceFromInput(raceInput);
+        if (race == null) {
+            System.out.println("Invalid race selection. Please choose 1-4.");
+            return;
+        }
+        
+        System.out.println("Available classes:");
+        System.out.println("1. Warrior");
+        System.out.println("2. Mage");
+        System.out.println("3. Archer");
+        System.out.println("4. Rogue");
+        System.out.print("Choose your class (1-4): > ");
+        String classInput = scanner.nextLine().trim();
+        String playerClass = getClassFromInput(classInput);
+        if (playerClass == null) {
+            System.out.println("Invalid class selection. Please choose 1-4.");
+            return;
+        }
+        
+        webSocketClient.send("CHARACTER_SETUP:" + nickname + ":" + race + ":" + playerClass);
+        characterSet = true;
+    }
+    
+    private static String getRaceFromInput(String input) {
+        switch (input) {
+            case "1": return "Human";
+            case "2": return "Elf";
+            case "3": return "Dwarf";
+            case "4": return "Orc";
+            default: return null;
+        }
+    }
+    
+    private static String getClassFromInput(String input) {
+        switch (input) {
+            case "1": return "Warrior";
+            case "2": return "Mage";
+            case "3": return "Archer";
+            case "4": return "Rogue";
+            default: return null;
+        }
     }
 
     private static String selectedDeckId = null;
 
     private static void selectDeck(Scanner scanner) {
-        logger.info("\n=== DECK SELECTION ===");
-        logger.info("Enter the ID of the deck you want to use (or 'none' for default):");
+        if (!hasCards) {
+            System.out.println("You need to have cards in your collection before selecting a deck!");
+            System.out.println("Try buying a card pack first (option 4).");
+            return;
+        }
+        
+        System.out.println();
+        System.out.println("--- DECK SELECTION ---");
+        System.out.println("Available decks:");
+        System.out.println("1. none (default deck)");
+        System.out.println("2. custom_deck_1");
+        System.out.println("3. custom_deck_2");
+        System.out.print("Enter the number or ID of the deck you want to use: > ");
+        
         String input = scanner.nextLine().trim();
-        selectedDeckId = ("none".equalsIgnoreCase(input) || input.isEmpty()) ? null : input;
-        logger.info("Deck selection updated.");
+        
+        if ("1".equals(input) || "none".equalsIgnoreCase(input)) {
+            selectedDeckId = null;
+        } else if ("2".equals(input)) {
+            selectedDeckId = "custom_deck_1";
+        } else if ("3".equals(input)) {
+            selectedDeckId = "custom_deck_2";
+        } else if (!input.isEmpty()) {
+            if (input.length() < 2) {
+                System.out.println("Invalid deck ID. Deck ID should be at least 2 characters.");
+                return;
+            }
+            selectedDeckId = input;
+        } else {
+            selectedDeckId = null;
+        }
+        
+        System.out.println("Deck selection updated.");
     }
 
     private static void enterMatchmaking() {
-        logger.info("\nEntering matchmaking queue...");
+        if (!characterSet) {
+            System.out.println("You need to set up your character first before entering matchmaking!");
+            return;
+        }
+        
+        System.out.println("Entering matchmaking queue...");
         String message = (selectedDeckId != null) ? "MATCHMAKING:ENTER:" + selectedDeckId : "MATCHMAKING:ENTER";
         webSocketClient.send(message);
     }
 
     private static void buyCardPack(Scanner scanner) {
-        logger.info("Which package do you want to buy? (BASIC, PREMIUM, LEGENDARY): ");
-        String packType = scanner.nextLine().trim().toUpperCase();
+        System.out.println("Available card packages:");
+        System.out.println("1. BASIC - Basic card pack");
+        System.out.println("2. PREMIUM - Premium card pack");
+        System.out.println("3. LEGENDARY - Legendary card pack");
+        System.out.print("Which package do you want to buy? (1-3): > ");
+        
+        String input = scanner.nextLine().trim();
+        String packType;
+        
+        switch (input) {
+            case "1": packType = "BASIC"; break;
+            case "2": packType = "PREMIUM"; break;
+            case "3": packType = "LEGENDARY"; break;
+            default:
+                System.out.println("Invalid package selection. Please choose 1, 2, or 3.");
+                return;
+        }
+        
         webSocketClient.send("STORE:BUY:" + packType);
     }
 
     private static void playCard(Scanner scanner) {
-        logger.info("Card ID to play: ");
+        if (currentMatchId == null || currentMatchId.isEmpty()) {
+            System.out.println("No active match to play a card in!");
+            return;
+        }
+        
+        System.out.print("Card ID to play: > ");
         String cardId = scanner.nextLine().trim();
+        if (cardId.isEmpty()) {
+            System.out.println("Card ID cannot be empty!");
+            return;
+        }
+        
         webSocketClient.send("PLAY_CARD:" + currentMatchId + ":" + cardId);
     }
 
     private static void upgradeAttributes(Scanner scanner) {
-        logger.info("Which attribute do you want to upgrade? (BASE_ATTACK): ");
+        if (!characterSet) {
+            System.out.println("You need to set up your character first before upgrading attributes!");
+            return;
+        }
+        
+        System.out.print("Which attribute do you want to upgrade? (BASE_ATTACK): > ");
         String attribute = scanner.nextLine().trim().toUpperCase();
+        if (attribute.isEmpty()) {
+            System.out.println("Attribute cannot be empty!");
+            return;
+        }
+        
         webSocketClient.send("UPGRADE:" + attribute);
     }
 
-    public static void checkPing() {
-        try (DatagramSocket datagramSocket = new DatagramSocket()) {
-            InetAddress address = InetAddress.getByName(GATEWAY_ADDRESS);
-            long startTime = System.currentTimeMillis();
-            byte[] buffer = String.valueOf(startTime).getBytes();
-            DatagramPacket request = new DatagramPacket(buffer, buffer.length, address, UDP_PORT);
-            datagramSocket.send(request);
-            DatagramPacket response = new DatagramPacket(new byte[buffer.length], buffer.length);
-            datagramSocket.setSoTimeout(1000);
-            datagramSocket.receive(response);
-            long endTime = System.currentTimeMillis();
-            logger.info("\nPing: {} ms", (endTime - startTime));
-        } catch (IOException e) {
-            logger.error("\nNetwork error during ping: {}", e.getMessage());
+    private static void checkPing(Scanner scanner) {
+        pingModeActive = true;
+        System.out.println();
+        System.out.println("--- REAL-TIME PING MODE ---");
+        System.out.println("Press Enter to return to main menu...");
+
+        Thread displayThread = new Thread(() -> {
+            while (pingModeActive) {
+                long pingNanos = lastPingTime;
+                String pingDisplay;
+                if (pingNanos >= 0) {
+                    if (pingNanos < 1000) {
+                        pingDisplay = pingNanos + " ns";
+                    } else if (pingNanos < 1_000_000) {
+                        pingDisplay = (pingNanos / 1000) + " µs";
+                    } else {
+                        pingDisplay = (pingNanos / 1000) + " µs";
+                    }
+                } else {
+                    pingDisplay = "N/A";
+                }
+                System.out.printf("\rCurrent ping: %-20s", pingDisplay);
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }, "PingDisplayThread");
+
+        displayThread.setDaemon(true);
+        displayThread.start();
+
+        if (scanner.hasNextLine()) {
+            scanner.nextLine();
         }
-        printFullMenu();
+
+        pingModeActive = false;
+        displayThread.interrupt();
+        try {
+            displayThread.join(100);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        System.out.print("\r" + " ".repeat(40) + "\r");
     }
 
     private static void processServerMessage(String message) {
-        logger.info("\nServer: {}", message);
         String[] parts = message.split(":");
         String type = parts[0];
+
+        if ("PONG".equals(message)) {
+            return;
+        }
+
+        if ("ERROR".equals(type)) {
+            String errorMsg = message.substring(message.indexOf(":") + 1).trim();
+            System.out.println("\n[ERROR] " + errorMsg);
+        } else if ("SUCCESS".equals(parts[0]) && parts.length > 1 && parts[1].startsWith("CONNECTED")) {
+            return;
+        } else {
+            System.out.println("\n[SERVER] " + message);
+        }
 
         if ("UPDATE".equals(type)) {
             if (parts.length > 2 && "GAME_START".equals(parts[1])) {
@@ -377,8 +637,9 @@ public final class GameClient {
                 inGame = false;
                 currentMatchId = null;
             }
+        } else if ("CARD_UPDATE".equals(type) || message.contains("PURCHASE_SUCCESS") || message.contains("CARDS_GRANTED")) {
+            hasCards = true;
         }
-        printFullMenu();
     }
 
     private static class HttpResponse {
@@ -428,7 +689,6 @@ public final class GameClient {
 
         @Override
         public void onOpen(ServerHandshake handshakedata) {
-            logger.info("WebSocket connection established.");
         }
 
         @Override
@@ -438,14 +698,21 @@ public final class GameClient {
 
         @Override
         public void onClose(int code, String reason, boolean remote) {
-            logger.error("\nConnection lost. Code: {}, Reason: {}. Please restart the client.", code, reason);
-            isExiting = true;
+            if (!isExiting) {
+                System.out.println("Connection lost. Code: " + code + ", Reason: " + reason + ". Please restart the client.");
+            }
             jwtToken = null;
+            characterSet = false;
+            if (!IS_DOCKER_ENV) {
+                stopPingUpdateService();
+            }
         }
 
         @Override
         public void onError(Exception ex) {
-            logger.error("WebSocket error: {}", ex.getMessage());
+            if (!isExiting) {
+                System.out.println("WebSocket error: " + ex.getMessage());
+            }
         }
     }
 }
