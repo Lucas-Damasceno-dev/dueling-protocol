@@ -128,15 +128,8 @@ public final class GameClient {
                     }
                     
                     long sleepTime = pingModeActive ? 200 : 5000;
-                    try {
-                        Thread.sleep(sleepTime);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
+                    Thread.sleep(sleepTime);
                 }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
             } catch (Exception e) {
                 // Silent error in ping service to avoid cluttering UI
             }
