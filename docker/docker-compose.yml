@@ -1,9 +1,9 @@
-version: '3.8'
+
 services:
   server-1:
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
     command: java -jar app.jar --spring.profiles.active=server,distributed,distributed-db
     container_name: server-1
     ports:
@@ -27,21 +27,21 @@ services:
   server-2:
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
     command: java -jar app.jar --spring.profiles.active=server,distributed,distributed-db
     container_name: server-2
     ports:
       - "8082:8080"
     environment:
-      - SERVER_PORT=8080
-      - SERVER_NAME=server-2
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=dueling_db
-      - POSTGRES_USER=dueling_user
-      - POSTGRES_PASSWORD=dueling_password
+      SERVER_PORT: 8080
+      SERVER_NAME: server-2
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - postgres
     networks:
@@ -49,8 +49,8 @@ services:
 
   client-1:
     build:
-      context: ../dueling-client
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: dueling-client/Dockerfile
     command: autobot
     depends_on:
       - server-1
@@ -63,13 +63,16 @@ services:
 
   client-2:
     build:
-      context: ../dueling-client
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: dueling-client/Dockerfile
     command: autobot
     depends_on:
-      - server-1
-      - server-2
-      - redis
+      server-1:
+        condition: service_healthy
+      server-2:
+        condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       - GATEWAY_HOST=server-2
       - GATEWAY_PORT=8080
@@ -113,8 +116,10 @@ services:
     networks:
       - dueling-network
     depends_on:
-      - server-1
-      - server-2
+      server-1:
+        condition: service_healthy
+      server-2:
+        condition: service_healthy
 
   grafana:
     image: grafana/grafana:latest

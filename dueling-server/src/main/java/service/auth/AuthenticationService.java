@@ -1,6 +1,6 @@
 package service.auth;
 
-import model.Player;
+
 import model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;

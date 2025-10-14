@@ -115,13 +115,13 @@ public class Player {
      * Applies attribute bonuses corresponding to the race and class combination.
      *
      * @param race Character race (e.g.: "Elf", "Dwarf", "Human", "Orc")
-     * @param playerClass Character class (e.g.: "Mage", "Archer", "Warrior", "Rogue")
+     * @param playerClassParam Character class (e.g.: "Mage", "Archer", "Warrior", "Rogue")
      */
-    public void setCharacter(String race, String playerClass) {
+    public void setCharacter(String race, String playerClassParam) {
         this.playerRace = race;
-        this.playerClass = playerClass;
+        this.playerClass = playerClassParam;
         applyAttributeBonuses();
-        logger.info("Character set: {} as {} {}", id, race, playerClass);
+        logger.info("Character set: {} as {} {}", id, race, playerClassParam);
     }
 
     /**
@@ -129,10 +129,10 @@ public class Player {
      * Adds 5 basic ATTACK-type cards to the player's deck.
      */
     private void initializeStarterDeck() {
-        List<Card> cardCollection = getCardCollection(); // This will initialize if null
+        List<Card> starterDeckCards = getCardCollection(); // This will initialize if null
         // Add basic cards to starter deck
         for (int i = 0; i < 5; i++) {
-            cardCollection.add(new Card(
+            starterDeckCards.add(new Card(
                 "basic-" + i,
                 "Basic Card " + i,
                 1, 1, "Common",
@@ -140,7 +140,7 @@ public class Player {
                 "Standard attack", 1
             ));
         }
-        logger.debug("Starter deck created with {} cards for player {}", cardCollection.size(), id);
+        logger.debug("Starter deck created with {} cards for player {}", starterDeckCards.size(), id);
     }
 
     /**

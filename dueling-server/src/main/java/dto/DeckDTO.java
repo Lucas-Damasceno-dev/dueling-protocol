@@ -95,8 +95,8 @@ public class DeckDTO {
         return isDefault;
     }
 
-    public void setDefault(boolean isDefault) {
-        this.isDefault = isDefault;
+    public void setDefault(boolean defaultDeck) {
+        this.isDefault = defaultDeck;
     }
 
     @Override

@@ -49,6 +49,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/api/auth/**").permitAll()  // Allow authentication endpoints
                 .requestMatchers("/api/health").permitAll()   // Allow health checks
+                .requestMatchers("/actuator/**").permitAll()  // Allow actuator endpoints for monitoring
                 .requestMatchers("/ws/**").permitAll()        // WebSocket endpoints will be authenticated separately
                 .anyRequest().authenticated()                 // All other requests require authentication
             )

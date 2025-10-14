@@ -1,5 +1,11 @@
 package model;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.util.Objects;
 
 /**
@@ -7,14 +13,33 @@ import java.util.Objects;
  * Each card has attributes such as attack, defense, rarity, type, and mana cost.
  * Cards are used by players during matches to apply effects and strategies.
  */
+@Entity
+@Table(name = "cards")
 public class Card {
+    @Id
+    @Column(name = "id", unique = true, nullable = false)
     private String id;
+
+    @Column(name = "name", nullable = false)
     private String name;
+
+    @Column(name = "attack")
     private int attack;
+
+    @Column(name = "defense")
     private int defense;
+
+    @Column(name = "rarity")
     private String rarity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "card_type", nullable = false)
     private CardType cardType;
+
+    @Column(name = "effect_description", length = 512)
     private String effectDescription;
+
+    @Column(name = "mana_cost")
     private int manaCost;
 
     /**
@@ -219,11 +244,11 @@ public class Card {
     @Override
     public String toString() {
         return "Card{" +
-                "id='" + id + '\'' +
-                ", name='" + name + '\'' +
+                "id='" + id + "'" +
+                ", name='" + name + "'" +
                 ", attack=" + attack +
                 ", defense=" + defense +
-                ", rarity='" + rarity + '\'' +
+                ", rarity='" + rarity + "'" +
                 ", cardType=" + cardType +
                 ", manaCost=" + manaCost +
                 '}';

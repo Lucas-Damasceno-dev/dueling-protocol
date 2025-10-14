@@ -3,7 +3,7 @@ package controller;
 import dto.DeckDTO;
 import dto.ErrorResponse;
 import jakarta.validation.Valid;
-import model.Card;
+
 import model.Deck;
 import model.Player;
 import repository.DeckRepository;

@@ -13,7 +13,7 @@ import java.util.ArrayList;
  */
 @Entity
 @Table(name = "decks", indexes = {
-    @Index(name = "idx_player_id", columnList = "player_id")
+    @Index(name = "idx_deck_player_id", columnList = "player_id")
 })
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 public class Deck {
@@ -189,8 +189,8 @@ public class Deck {
         return isDefault;
     }
 
-    public void setDefault(boolean isDefault) {
-        this.isDefault = isDefault;
+    public void setDefault(boolean defaultDeck) {
+        this.isDefault = defaultDeck;
     }
 
     @Override

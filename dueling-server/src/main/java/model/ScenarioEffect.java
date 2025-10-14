@@ -1,11 +1,17 @@
 package model;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Implementation of the scenario effect for SCENARIO type cards.
  * This effect modifies the game scenario, affecting both players.
  * Currently, the effect grants a mana bonus to both players.
  */
 public class ScenarioEffect implements CardEffect {
+    
+    private static final Logger logger = LoggerFactory.getLogger(ScenarioEffect.class);
+    
     /**
      * {@inheritDoc}
      * Applies a scenario effect that grants a mana bonus to both players.
@@ -24,7 +30,7 @@ public class ScenarioEffect implements CardEffect {
         caster.setBaseMana(caster.getBaseMana() + turnBonus);
         target.setBaseMana(target.getBaseMana() + turnBonus);
         
-        System.out.println("The scenario '" + card.getName() + 
-            "' affected the battlefield! Both players gained +" + turnBonus + " mana!");
+        logger.info("The scenario '{}' affected the battlefield! Both players gained +{} mana!", 
+            card.getName(), turnBonus);
     }
 }

@@ -1,11 +1,17 @@
 package model;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Implementation of the attribute effect for ATTRIBUTE-type cards.
  * This effect increases the casting player's base attributes,
  * including attack, defense, and mana.
  */
 public class AttributeEffect implements CardEffect {
+    
+    private static final Logger logger = LoggerFactory.getLogger(AttributeEffect.class);
+    
     /**
      * {@inheritDoc}
      * Increases the casting player's base attributes:
@@ -29,8 +35,7 @@ public class AttributeEffect implements CardEffect {
         caster.setBaseDefense(caster.getBaseDefense() + defenseBonus);
         caster.setBaseMana(caster.getBaseMana() + manaBonus);
         
-        System.out.println(caster.getNickname() + " used '" + card.getName() + 
-            "', gaining +" + attackBonus + " attack, +" + defenseBonus + 
-            " defense and +" + manaBonus + " mana!");
+        logger.info("{} used '{}', gaining +{} attack, +{} defense and +{} mana!", 
+            caster.getNickname(), card.getName(), attackBonus, defenseBonus, manaBonus);
     }
 }

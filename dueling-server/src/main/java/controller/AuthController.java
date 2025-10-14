@@ -13,8 +13,7 @@ import repository.PlayerRepository;
 import service.auth.AuthenticationService;
 
 import jakarta.validation.Valid;
-import java.util.HashMap;
-import java.util.Map;
+
 import java.util.Optional;
 
 import io.swagger.v3.oas.annotations.Operation;
