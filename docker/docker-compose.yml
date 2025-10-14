@@ -10,8 +10,8 @@ services:
     environment:
       SERVER_PORT: 8080
       SERVER_NAME: server-gateway
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
+      REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
+      REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -20,7 +20,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      redis-master:
+        condition: service_healthy
+      redis-sentinel-1:
         condition: service_healthy
     networks:
       - dueling-network
@@ -37,8 +39,6 @@ services:
       dockerfile: docker/Dockerfile
     command: >
       java 
-      -Dredis.host=${REDIS_HOST} 
-      -Dredis.port=${REDIS_PORT} 
       -jar app.jar 
       --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
@@ -49,8 +49,8 @@ services:
     environment:
       SERVER_PORT: 8080
       SERVER_NAME: server-1
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
+      REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
+      REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -58,7 +58,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - postgres
-      - redis
+      - redis-master
+      - redis-sentinel-1
     networks:
       - dueling-network
     healthcheck:
@@ -74,8 +75,6 @@ services:
       dockerfile: docker/Dockerfile
     command: >
       java 
-      -Dredis.host=${REDIS_HOST} 
-      -Dredis.port=${REDIS_PORT} 
       -jar app.jar 
       --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
@@ -85,8 +84,8 @@ services:
     environment:
       SERVER_PORT: 8080
       SERVER_NAME: server-2
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
+      REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
+      REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -94,7 +93,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - postgres
-      - redis
+      - redis-master
+      - redis-sentinel-1
     networks:
       - dueling-network
     healthcheck:
@@ -110,8 +110,6 @@ services:
       dockerfile: docker/Dockerfile
     command: >
       java 
-      -Dredis.host=${REDIS_HOST} 
-      -Dredis.port=${REDIS_PORT} 
       -jar app.jar 
       --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
@@ -121,8 +119,8 @@ services:
     environment:
       SERVER_PORT: 8080
       SERVER_NAME: server-3
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
+      REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
+      REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -130,7 +128,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - postgres
-      - redis
+      - redis-master
+      - redis-sentinel-1
     networks:
       - dueling-network
     healthcheck:
@@ -146,8 +145,6 @@ services:
       dockerfile: docker/Dockerfile
     command: >
       java 
-      -Dredis.host=${REDIS_HOST} 
-      -Dredis.port=${REDIS_PORT} 
       -jar app.jar 
       --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
@@ -157,8 +154,8 @@ services:
     environment:
       SERVER_PORT: 8080
       SERVER_NAME: server-4
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
+      REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
+      REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -166,7 +163,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - postgres
-      - redis
+      - redis-master
+      - redis-sentinel-1
     networks:
       - dueling-network
     healthcheck:
@@ -276,15 +274,98 @@ services:
     networks:
       - dueling-network
 
-  redis:
+  redis-master:
     image: redis:7-alpine
-    container_name: redis
+    container_name: redis-master
     ports:
       - "6379:6379"
+    command: redis-server /etc/redis/redis-master.conf
+    volumes:
+      - ./redis-conf/redis-master.conf:/etc/redis/redis-master.conf:ro
+      - redis-master-data:/data
     networks:
       - dueling-network
     healthcheck:
         test: ["CMD", "redis-cli", "ping"]
+        interval: 5s
+        timeout: 2s
+        retries: 5
+
+  redis-slave:
+    image: redis:7-alpine
+    container_name: redis-slave
+    ports:
+      - "6380:6379"
+    command: redis-server /etc/redis/redis-slave.conf
+    volumes:
+      - ./redis-conf/redis-slave.conf:/etc/redis/redis-slave.conf:ro
+      - redis-slave-data:/data
+    networks:
+      - dueling-network
+    depends_on:
+      - redis-master
+    healthcheck:
+        test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+        interval: 5s
+        timeout: 2s
+        retries: 5
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: redis-sentinel-1
+    ports:
+      - "26379:26379"
+    command: sh -c "cp /etc/redis/sentinel.conf.copy /etc/redis/sentinel.conf && redis-server /etc/redis/sentinel.conf --sentinel"
+    volumes:
+      - ./redis-conf/sentinel.conf:/etc/redis/sentinel.conf.copy:ro
+      - redis-sentinel-1-data:/data
+    networks:
+      - dueling-network
+    depends_on:
+      - redis-master
+      - redis-slave
+    healthcheck:
+        test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+        interval: 5s
+        timeout: 2s
+        retries: 5
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: redis-sentinel-2
+    ports:
+      - "26380:26379"
+    command: sh -c "cp /etc/redis/sentinel.conf.copy /etc/redis/sentinel.conf && redis-server /etc/redis/sentinel.conf --sentinel"
+    volumes:
+      - ./redis-conf/sentinel.conf:/etc/redis/sentinel.conf.copy:ro
+      - redis-sentinel-2-data:/data
+    networks:
+      - dueling-network
+    depends_on:
+      - redis-master
+      - redis-slave
+    healthcheck:
+        test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+        interval: 5s
+        timeout: 2s
+        retries: 5
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: redis-sentinel-3
+    ports:
+      - "26381:26379"
+    command: sh -c "cp /etc/redis/sentinel.conf.copy /etc/redis/sentinel.conf && redis-server /etc/redis/sentinel.conf --sentinel"
+    volumes:
+      - ./redis-conf/sentinel.conf:/etc/redis/sentinel.conf.copy:ro
+      - redis-sentinel-3-data:/data
+    networks:
+      - dueling-network
+    depends_on:
+      - redis-master
+      - redis-slave
+    healthcheck:
+        test: ["CMD", "redis-cli", "-p", "26379", "ping"]
         interval: 5s
         timeout: 2s
         retries: 5
@@ -346,6 +427,12 @@ services:
 volumes:
   postgres_data:
   grafana_data:
+  redis-master-data:
+  redis-slave-data:
+  redis-sentinel-1-data:
+  redis-sentinel-2-data:
+  redis-sentinel-3-data:
+  redis-sentinel-config:
 
 networks:
   dueling-network:
