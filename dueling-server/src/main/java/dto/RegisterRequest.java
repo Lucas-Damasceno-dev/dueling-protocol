@@ -16,8 +16,7 @@ public class RegisterRequest {
     @Size(min = 6, max = 100, message = "Password must be between 6 and 100 characters")
     private String password;
     
-    @NotBlank(message = "Player ID is required")
-    @Size(min = 1, max = 100, message = "Player ID must be between 1 and 100 characters")
+    // Player ID is optional for registration
     private String playerId;
 
     // Default constructor

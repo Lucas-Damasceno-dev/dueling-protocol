@@ -81,11 +81,16 @@ public class AuthController {
         String password = registerRequest.getPassword();
         String playerId = registerRequest.getPlayerId();
 
-        // Check if the player exists in the system
-        Optional<Player> playerOpt = playerRepository.findById(playerId);
-        if (playerOpt.isEmpty()) {
-            ErrorResponse response = new ErrorResponse("Player ID does not exist in the system", "PLAYER_NOT_FOUND");
-            return ResponseEntity.badRequest().body(new AuthenticationResponse(response.getError()));
+        // If playerId is provided, check if the player exists in the system
+        if (playerId != null && !playerId.trim().isEmpty()) {
+            Optional<Player> playerOpt = playerRepository.findById(playerId);
+            if (playerOpt.isEmpty()) {
+                ErrorResponse response = new ErrorResponse("Player ID does not exist in the system", "PLAYER_NOT_FOUND");
+                return ResponseEntity.badRequest().body(new AuthenticationResponse(response.getError()));
+            }
+        } else {
+            // If no playerId is provided, we can generate one or use username as playerId
+            playerId = username; // Simple approach: use username as playerId
         }
 
         boolean success = authenticationService.registerUser(username, password, playerId);
