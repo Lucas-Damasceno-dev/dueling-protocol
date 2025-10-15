@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class GameSession {
+    private static final int TURN_DURATION_SECONDS = 20;
     private final String matchId;
     private final GameFacade gameFacade;
     private final CardRepository cardRepository;
@@ -19,6 +20,10 @@ public class GameSession {
     private final List<Card> handP2;
     private int turn;
     private boolean gameEnded = false;
+    private int resourceP1;
+    private int resourceP2;
+    private String currentPlayerId;
+    private long turnEndTime;
 
     private static final Logger logger = LoggerFactory.getLogger(GameSession.class);
 
@@ -33,6 +38,8 @@ public class GameSession {
         this.turn = 1;
         this.gameFacade = facade;
         this.cardRepository = cardRepository;
+        this.resourceP1 = 3;
+        this.resourceP2 = 3;
     }
 
     public synchronized void startGame() {
@@ -43,28 +50,118 @@ public class GameSession {
         drawCards(player2, handP2, deckP2, 5);
         gameFacade.notifyPlayer(player1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(handP1));
         gameFacade.notifyPlayer(player2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(handP2));
+        
+        // Randomly select starting player
+        this.currentPlayerId = new Random().nextBoolean() ? player1.getId() : player2.getId();
+        startNewTurn();
+    }
+
+    private void startNewTurn() {
+        if (gameEnded) return;
+        this.turnEndTime = System.currentTimeMillis() + (TURN_DURATION_SECONDS * 1000);
+        String message = String.format("UPDATE:NEW_TURN:%s:%d", currentPlayerId, turnEndTime);
+        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
+        logger.info("Match {}: Starting turn {} for player {}. Turn ends at {}.", matchId, turn, currentPlayerId, turnEndTime);
+    }
+
+    private void switchTurn() {
+        turn++;
+        currentPlayerId = currentPlayerId.equals(player1.getId()) ? player2.getId() : player1.getId();
+        startNewTurn();
+    }
+
+    public synchronized void forceEndTurn() {
+        if (gameEnded || System.currentTimeMillis() < turnEndTime) {
+            return;
+        }
+
+        logger.info("Match {}: Turn timer expired for player {}. Forcing end of turn.", matchId, currentPlayerId);
+
+        List<Card> hand = currentPlayerId.equals(player1.getId()) ? handP1 : handP2;
+        int currentResource = currentPlayerId.equals(player1.getId()) ? resourceP1 : resourceP2;
+
+        // Find the cheapest playable card
+        Optional<Card> cardToPlay = hand.stream()
+            .filter(c -> c.getManaCost() <= currentResource)
+            .min(Comparator.comparingInt(Card::getManaCost));
+
+        if (cardToPlay.isPresent()) {
+            logger.info("Match {}: Automatically playing card {} for player {}.", matchId, cardToPlay.get().getName(), currentPlayerId);
+            playCard(currentPlayerId, cardToPlay.get().getId(), true); // Internal call, bypass turn check
+        } else {
+            logger.info("Match {}: No playable card for player {}. Switching turn.", matchId, currentPlayerId);
+            switchTurn();
+        }
     }
 
     public synchronized void playCard(String playerId, String cardId) {
+        playCard(playerId, cardId, false);
+    }
+
+    private synchronized void playCard(String playerId, String cardId, boolean isAutoPlay) {
+        if (gameEnded) return;
+
+        if (!isAutoPlay && !playerId.equals(currentPlayerId)) {
+            gameFacade.notifyPlayer(playerId, "ERROR:NOT_YOUR_TURN");
+            return;
+        }
+
         Player caster = player1.getId().equals(playerId) ? player1 : player2;
         Player target = player1.getId().equals(playerId) ? player2 : player1;
         List<Card> hand = player1.getId().equals(playerId) ? handP1 : handP2;
+        int currentResource = player1.getId().equals(playerId) ? resourceP1 : resourceP2;
 
-        Optional<Card> cardToPlay = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst();
-        if (cardToPlay.isPresent()) {
-            Card card = cardToPlay.get();
-            hand.remove(card);
+        Optional<Card> cardToPlayOpt = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst();
+        if (cardToPlayOpt.isEmpty()) {
+            if (!isAutoPlay) gameFacade.notifyPlayer(playerId, "ERROR:Card not in hand");
+            return;
+        }
 
-            CardEffect effect = getCardEffect(card);
-            if (effect != null) {
-                effect.execute(this, caster, target, card);
-            }
-            notifyAction(caster, target, card);
-            notifyHealthUpdate(caster);
-            notifyHealthUpdate(target);
-            checkGameStatus();
+        Card card = cardToPlayOpt.get();
+        if (currentResource < card.getManaCost()) {
+            if (!isAutoPlay) gameFacade.notifyPlayer(playerId, "ERROR:INSUFFICIENT_RESOURCE");
+            return;
+        }
+
+        if (player1.getId().equals(playerId)) {
+            resourceP1 -= card.getManaCost();
         } else {
-            gameFacade.notifyPlayer(playerId, "ERROR: Card not in hand");
+            resourceP2 -= card.getManaCost();
+        }
+
+        hand.remove(card);
+
+        CardEffect effect = getCardEffect(card);
+        if (effect != null) {
+            effect.execute(this, caster, target, card);
+        }
+        notifyAction(caster, target, card);
+        notifyHealthUpdate(caster);
+        notifyHealthUpdate(target);
+        String resourceMessage = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
+        gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), resourceMessage);
+        
+        checkGameStatus();
+        if (!gameEnded) {
+            switchTurn();
+        }
+    }
+
+    public synchronized void regenerateResources() {
+        if (gameEnded) return;
+        boolean updated = false;
+        if (resourceP1 < 10) {
+            resourceP1++;
+            updated = true;
+        }
+        if (resourceP2 < 10) {
+            resourceP2++;
+            updated = true;
+        }
+
+        if (updated) {
+            String message = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
+            gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
         }
     }
 
@@ -96,7 +193,7 @@ public class GameSession {
     }
 
     private void notifyAction(Player caster, Player target, Card card) {
-        String message = String.format("UPDATE:ACTION:%s:used:'%s':on:%s",
+        String message = String.format("UPDATE:ACTION:%s:used:'''%s''':on:%s",
             caster.getNickname(), card.getName(), target.getNickname());
         gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
     }
