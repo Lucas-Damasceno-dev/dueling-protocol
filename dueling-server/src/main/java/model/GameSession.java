@@ -24,6 +24,8 @@ public class GameSession {
     private int resourceP2;
     private String currentPlayerId;
     private long turnEndTime;
+    private int nextAttackBonusP1 = 0;
+    private int nextAttackBonusP2 = 0;
 
     private static final Logger logger = LoggerFactory.getLogger(GameSession.class);
 
@@ -40,6 +42,8 @@ public class GameSession {
         this.cardRepository = cardRepository;
         this.resourceP1 = 3;
         this.resourceP2 = 3;
+        this.nextAttackBonusP1 = 0;
+        this.nextAttackBonusP2 = 0;
     }
 
     public synchronized void startGame() {
@@ -47,7 +51,6 @@ public class GameSession {
         Collections.shuffle(deckP2);
         logger.info("Match {} started between {} and {}", matchId, player1.getId(), player2.getId());
 
-        // Notify players about game start with resource types
         ResourceType resourceTypeP1 = player1.getResourceType();
         ResourceType resourceTypeP2 = player2.getResourceType();
 
@@ -59,17 +62,14 @@ public class GameSession {
                 matchId, player1.getNickname(), resourceTypeP2.name(), resourceTypeP1.name(), resourceTypeP2.colorHex, resourceTypeP1.colorHex);
         gameFacade.notifyPlayer(player2.getId(), gameStartMsgP2);
 
-        // Draw cards and notify
         drawCards(player1, handP1, deckP1, 5);
         drawCards(player2, handP2, deckP2, 5);
         gameFacade.notifyPlayer(player1.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(handP1));
         gameFacade.notifyPlayer(player2.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(handP2));
         
-        // Notify initial resource state
         String resourceMessage = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
         gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), resourceMessage);
 
-        // Randomly select starting player and start first turn
         this.currentPlayerId = new Random().nextBoolean() ? player1.getId() : player2.getId();
         startNewTurn();
     }
@@ -77,6 +77,9 @@ public class GameSession {
     private void startNewTurn() {
         if (gameEnded) return;
         this.turnEndTime = System.currentTimeMillis() + (TURN_DURATION_SECONDS * 1000);
+        this.nextAttackBonusP1 = 0; // Reset bonus each turn
+        this.nextAttackBonusP2 = 0;
+
         String message = String.format("UPDATE:NEW_TURN:%s:%d", currentPlayerId, turnEndTime);
         gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
         logger.info("Match {}: Starting turn {} for player {}. Turn ends at {}.", matchId, turn, currentPlayerId, turnEndTime);
@@ -89,23 +92,20 @@ public class GameSession {
     }
 
     public synchronized void forceEndTurn() {
-        if (gameEnded || System.currentTimeMillis() < turnEndTime) {
-            return;
-        }
+        if (gameEnded || System.currentTimeMillis() < turnEndTime) return;
 
         logger.info("Match {}: Turn timer expired for player {}. Forcing end of turn.", matchId, currentPlayerId);
 
         List<Card> hand = currentPlayerId.equals(player1.getId()) ? handP1 : handP2;
         int currentResource = currentPlayerId.equals(player1.getId()) ? resourceP1 : resourceP2;
 
-        // Find the cheapest playable card
         Optional<Card> cardToPlay = hand.stream()
             .filter(c -> c.getManaCost() <= currentResource)
             .min(Comparator.comparingInt(Card::getManaCost));
 
         if (cardToPlay.isPresent()) {
             logger.info("Match {}: Automatically playing card {} for player {}.", matchId, cardToPlay.get().getName(), currentPlayerId);
-            playCard(currentPlayerId, cardToPlay.get().getId(), true); // Internal call, bypass turn check
+            playCard(currentPlayerId, cardToPlay.get().getId(), true);
         } else {
             logger.info("Match {}: No playable card for player {}. Switching turn.", matchId, currentPlayerId);
             switchTurn();
@@ -168,19 +168,33 @@ public class GameSession {
     public synchronized void regenerateResources() {
         if (gameEnded) return;
         boolean updated = false;
-        if (resourceP1 < 10) {
-            resourceP1++;
-            updated = true;
-        }
-        if (resourceP2 < 10) {
-            resourceP2++;
-            updated = true;
-        }
+        if (resourceP1 < 10) { resourceP1++; updated = true; }
+        if (resourceP2 < 10) { resourceP2++; updated = true; }
 
         if (updated) {
             String message = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
             gameFacade.notifyPlayers(Arrays.asList(player1.getId(), player2.getId()), message);
         }
+    }
+
+    public void setNextAttackBonus(String playerId, int bonus) {
+        if (player1.getId().equals(playerId)) {
+            this.nextAttackBonusP1 = bonus;
+        } else {
+            this.nextAttackBonusP2 = bonus;
+        }
+    }
+
+    public int consumeNextAttackBonus(String playerId) {
+        int bonus = 0;
+        if (player1.getId().equals(playerId)) {
+            bonus = this.nextAttackBonusP1;
+            this.nextAttackBonusP1 = 0;
+        } else {
+            bonus = this.nextAttackBonusP2;
+            this.nextAttackBonusP2 = 0;
+        }
+        return bonus;
     }
 
     public synchronized void drawCards(Player player, List<Card> hand, List<Card> deck, int count) {
@@ -192,21 +206,13 @@ public class GameSession {
 
     private CardEffect getCardEffect(Card card) {
         switch (card.getCardType()) {
-            case ATTACK:
-                return new AttackEffect();
-            case DEFENSE:
-                return new DefenseEffect();
-            case MAGIC:
-                return new MagicEffect();
-            case ATTRIBUTE:
-                return new AttributeEffect();
-            case SCENARIO:
-                return new ScenarioEffect();
-            case EQUIPMENT:
-                return new EquipmentEffect();
-            default:
-                logger.warn("Effect for {} not implemented", card.getCardType());
-                return null;
+            case ATTACK: return new AttackEffect();
+            case DEFENSE: return new DefenseEffect();
+            case MAGIC: return new MagicEffect();
+            case ATTRIBUTE: return new AttributeEffect();
+            case SCENARIO: return new ScenarioEffect();
+            case EQUIPMENT: return new EquipmentEffect();
+            default: logger.warn("Effect for {} not implemented", card.getCardType()); return null;
         }
     }
 
@@ -224,7 +230,6 @@ public class GameSession {
 
     private void checkGameStatus() {
         if (gameEnded) return;
-
         if (player1.getHealthPoints() <= 0) {
             gameEnded = true;
             logger.info("Match {} finished. Winner: {}", matchId, player2.getId());

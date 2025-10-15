@@ -14,10 +14,8 @@ public class AttributeEffect implements CardEffect {
     
     /**
      * {@inheritDoc}
-     * Increases the casting player's base attributes:
-     * - Base attack is increased by the card's attack value
-     * - Base defense is increased by the card's defense value
-     * - Base mana is increased by half the card's mana cost
+     * Applies a bonus to the caster's next attack in the current turn.
+     * The bonus amount is determined by the card's attack value.
      *
      * @param session the game session where the effect will be applied
      * @param caster the player casting the card
@@ -26,16 +24,10 @@ public class AttributeEffect implements CardEffect {
      */
     @Override
     public void execute(GameSession session, Player caster, Player target, Card card) {
-        // Apply attribute bonuses based on card properties
         int attackBonus = card.getAttack();
-        int defenseBonus = card.getDefense();
-        int manaBonus = card.getManaCost() / 2; // Mana bonus is half the mana cost
+        session.setNextAttackBonus(caster.getId(), attackBonus);
         
-        caster.setBaseAttack(caster.getBaseAttack() + attackBonus);
-        caster.setBaseDefense(caster.getBaseDefense() + defenseBonus);
-        caster.setBaseMana(caster.getBaseMana() + manaBonus);
-        
-        logger.info("{} used '{}', gaining +{} attack, +{} defense and +{} mana!", 
-            caster.getNickname(), card.getName(), attackBonus, defenseBonus, manaBonus);
+        logger.info("{} used '{}'. Their next attack this turn will have +{} bonus damage!", 
+            caster.getNickname(), card.getName(), attackBonus);
     }
 }
