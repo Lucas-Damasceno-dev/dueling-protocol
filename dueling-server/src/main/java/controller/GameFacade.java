@@ -1353,6 +1353,7 @@ public class GameFacade {
             if (sessionOpt.isPresent()) {
                 GameSession session = sessionOpt.get();
                 session.forceEndTurn();
+                session.resolveResponseWindow(); // Add this line
                 gameSessionRepository.save(session);
             }
         }

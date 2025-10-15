@@ -19,13 +19,27 @@ public class CardEffectService implements Serializable {
 
     public CardEffect getCardEffect(Card card) {
         switch (card.getCardType()) {
-            case ATTACK: return new AttackEffect();
-            case DEFENSE: return new DefenseEffect();
-            case MAGIC: return new MagicEffect();
-            case ATTRIBUTE: return new AttributeEffect();
-            case SCENARIO: return new ScenarioEffect();
-            case EQUIPMENT: return new EquipmentEffect();
-            default: logger.warn("Effect for {} not implemented", card.getCardType()); return null;
+            case ATTACK:
+                return new AttackEffect();
+            case DEFENSE:
+                return new DefenseEffect();
+            case MAGIC:
+                return new MagicEffect();
+            case ATTRIBUTE:
+                return new AttributeEffect();
+            case SCENARIO:
+                return new ScenarioEffect();
+            case EQUIPMENT:
+                return new EquipmentEffect();
+            case COMBO:
+                String requiredCardName = card.getEffectParameters().get("requiredCardName");
+                int bonusDamage = Integer.parseInt(card.getEffectParameters().get("bonusDamage"));
+                return new ComboEffect(requiredCardName, bonusDamage);
+            case COUNTER_SPELL:
+                return new CounterSpellEffect();
+            default:
+                logger.warn("Effect for {} not implemented", card.getCardType());
+                return null;
         }
     }
 }
