@@ -790,13 +790,15 @@ public class GameFacade {
 
     private static final Logger logger = LoggerFactory.getLogger(GameFacade.class);
 
+    private final AchievementService achievementService;
+
     @Autowired
     public GameFacade(MatchmakingService matchmakingService, StoreService storeService,
                       PlayerRepository playerRepository, repository.JpaPlayerRepository jpaPlayerRepository,
                       IEventManager eventManager, ServerRegistry serverRegistry, ServerApiClient serverApiClient,
                       TradeService tradeService, LeaderElectionService leaderElectionService,
                       CardRepository cardRepository, DeckService deckService, GameSessionRepository gameSessionRepository,
-                      RedissonClient redissonClient) {
+                      RedissonClient redissonClient, RankingService rankingService, AchievementService achievementService) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
@@ -810,7 +812,8 @@ public class GameFacade {
         this.deckService = deckService;
         this.gameSessionRepository = gameSessionRepository;
         this.redissonClient = redissonClient;
-    }
+        this.rankingService = rankingService;
+        this.achievementService = achievementService;
 
     private String getSelfUrl() {
         if (selfUrl == null) {
