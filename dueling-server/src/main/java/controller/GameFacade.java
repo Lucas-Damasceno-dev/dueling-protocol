@@ -384,11 +384,14 @@ public class GameFacade {
 
         switch (action) {
             case "CHARACTER_SETUP":
-                if (command.length < 5) {
-                    notifyPlayer(playerId, "ERROR:Incomplete character setup command.");
+                if (command.length < 6) {
+                    notifyPlayer(playerId, "ERROR:Incomplete character setup command. Expected: NICKNAME:RACE:CLASS");
                     return;
                 }
+                // First, create the player object with ID and Nickname
                 Player newPlayer = new Player(playerId, command[3]);
+                // Then, set the character Race and Class, which also applies attributes
+                newPlayer.setCharacter(command[4], command[5]);
                 playerRepository.save(newPlayer);
                 notifyPlayer(playerId, "SUCCESS:Character created.");
                 break;
@@ -416,9 +419,20 @@ public class GameFacade {
                 }
                 break;
 
-            
-
-            
+            case "PLAY_CARD":
+                if (command.length < 5) {
+                    notifyPlayer(playerId, "ERROR:Incomplete PLAY_CARD command.");
+                    return;
+                }
+                String matchId = command[3];
+                String cardId = command[4];
+                GameSession session = activeGames.get(matchId);
+                if (session != null) {
+                    session.playCard(playerId, cardId);
+                } else {
+                    notifyPlayer(playerId, "ERROR:Match not found for PLAY_CARD command.");
+                }
+                break;
 
             case "STORE":
                 if (command.length > 4 && "BUY".equals(command[3])) {
