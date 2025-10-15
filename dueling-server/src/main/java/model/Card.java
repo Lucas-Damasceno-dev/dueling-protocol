@@ -15,7 +15,9 @@ import java.util.Objects;
  */
 @Entity
 @Table(name = "cards")
-public class Card {
+import java.io.Serializable;
+public class Card implements Serializable {
+    private static final long serialVersionUID = 1L;
     @Id
     @Column(name = "id", unique = true, nullable = false)
     private String id;

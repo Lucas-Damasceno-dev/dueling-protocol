@@ -8,7 +8,9 @@ import org.slf4j.LoggerFactory;
  * This effect deals magical damage to the target player, calculated as
  * double the card's attack value.
  */
-public class MagicEffect implements CardEffect {
+import java.io.Serializable;
+public class MagicEffect implements CardEffect, Serializable {
+    private static final long serialVersionUID = 1L;
     
     private static final Logger logger = LoggerFactory.getLogger(MagicEffect.class);
     

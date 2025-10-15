@@ -20,7 +20,9 @@ import model.ResourceType;
     @Index(name = "idx_nickname", columnList = "nickname")
 })
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
-public class Player {
+import java.io.Serializable;
+public class Player implements Serializable {
+    private static final long serialVersionUID = 1L;
     @Id
     @Column(name = "id", unique = true, nullable = false)
     private String id;

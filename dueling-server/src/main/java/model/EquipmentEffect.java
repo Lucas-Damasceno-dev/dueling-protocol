@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory;
  * Implementation of the equipment effect for EQUIPMENT type cards.
  * This effect increases the base attack of the player who plays the card.
  */
-public class EquipmentEffect implements CardEffect {
+import java.io.Serializable;
+public class EquipmentEffect implements CardEffect, Serializable {
+    private static final long serialVersionUID = 1L;
     
     private static final Logger logger = LoggerFactory.getLogger(EquipmentEffect.class);
     
