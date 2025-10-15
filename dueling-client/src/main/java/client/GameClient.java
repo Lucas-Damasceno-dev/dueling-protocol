@@ -46,6 +46,8 @@ public final class GameClient {
     private static volatile Thread pingUpdateThread;
     private static volatile boolean pingModeActive = false;
     private static volatile boolean awaitingUserInput = false;
+    private static volatile boolean duringConnectionAttempt = false;
+    private static volatile boolean authenticationFailureOnConnect = false;
 
     public static void main(String[] args) {
         // logger.info("Dueling Protocol Client Started");  // Removed to keep UI clean
@@ -86,6 +88,12 @@ public final class GameClient {
 
         if (jwtToken != null) {
             connectToWebSocket();
+            // If authentication failed during WebSocket connection, return to authentication
+            if (authenticationFailureOnConnect) {
+                authenticationFailureOnConnect = false;
+                handleUserAuthentication(); // Recursively call to return to auth menu
+                return;
+            }
             if (webSocketClient != null && webSocketClient.isOpen()) {
                 if (!IS_DOCKER_ENV) {
                     startPingUpdateService();
@@ -262,28 +270,49 @@ public final class GameClient {
         int maxRetries = 10;
         int retryCount = 0;
         
+        // Set the flag to indicate we're in a connection attempt
+        duringConnectionAttempt = true;
+        authenticationFailureOnConnect = false; // Reset the authentication failure flag
+        
         while (retryCount < maxRetries) {
             try {
-                String gatewayUri = "ws://" + GATEWAY_ADDRESS + ":" + GATEWAY_PORT + "/ws?token=" + jwtToken;
+                // Only proceed if we still have a valid JWT token
+                if (jwtToken == null || jwtToken.isEmpty()) {
+                    System.out.println("JWT token is not available. Cannot connect to WebSocket.");
+                    duringConnectionAttempt = false;
+                    return;
+                }
+                
+                String encodedToken = java.net.URLEncoder.encode(jwtToken, "UTF-8");
+                String gatewayUri = "ws://" + GATEWAY_ADDRESS + ":" + GATEWAY_PORT + "/ws?token=" + encodedToken;
                 // logger.info("Connecting to WebSocket server at {} (attempt {}/{})", gatewayUri, retryCount + 1, maxRetries);  // Removed to keep UI clean
                 
                 webSocketClient = new MyWebSocketClient(new URI(gatewayUri));
                 if (webSocketClient.connectBlocking()) {
                     // logger.info("WebSocket connection established.");  // Removed to keep UI clean
                     // logger.info("Successfully connected to WebSocket server.");  // Removed to keep UI clean
+                    duringConnectionAttempt = false;
+                    authenticationFailureOnConnect = false;
                     return;
                 } else {
                     System.out.println("Failed to connect to the WebSocket server on attempt " + (retryCount + 1) + "/" + maxRetries);
-                    jwtToken = null;
+                    // Don't set jwtToken to null here as it may still be valid; only set to null on authentication error
                 }
             } catch (URISyntaxException e) {
                 System.out.println("Invalid URI syntax: " + e.getMessage());
                 jwtToken = null;
+                duringConnectionAttempt = false;
                 return;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 System.out.println("Connection interrupted: " + e.getMessage());
                 jwtToken = null;
+                duringConnectionAttempt = false;
+                return;
+            } catch (java.io.UnsupportedEncodingException e) {
+                System.out.println("Encoding error: " + e.getMessage());
+                jwtToken = null;
+                duringConnectionAttempt = false;
                 return;
             }
             
@@ -296,13 +325,21 @@ public final class GameClient {
                     Thread.currentThread().interrupt();
                     System.out.println("Retry wait interrupted: " + e.getMessage());
                     jwtToken = null;
+                    duringConnectionAttempt = false;
                     return;
                 }
             }
         }
         
         System.out.println("Failed to connect to WebSocket server after " + maxRetries + " attempts.");
-        jwtToken = null;
+        
+        // If it was an authentication failure, clear the token so user can re-authenticate
+        if (authenticationFailureOnConnect) {
+            jwtToken = null;
+            System.out.println("Authentication failed. Please re-authenticate.");
+        }
+        
+        duringConnectionAttempt = false;
     }
 
     private static void printFullMenu() {
@@ -694,7 +731,13 @@ public final class GameClient {
             if (!isExiting) {
                 System.out.println("Connection lost. Code: " + code + ", Reason: " + reason + ". Please restart the client.");
             }
-            jwtToken = null;
+            
+            // If we're in a connection attempt and getting 401, it's an authentication issue
+            if (duringConnectionAttempt && reason != null && (reason.contains("401") || reason.contains("Unauthorized") || reason.contains("Invalid authentication token") || reason.contains("Authentication"))) {
+                // This is an authentication failure, set the flag to re-authenticate
+                authenticationFailureOnConnect = true;
+            }
+            
             characterSet = false;
             if (!IS_DOCKER_ENV) {
                 stopPingUpdateService();
