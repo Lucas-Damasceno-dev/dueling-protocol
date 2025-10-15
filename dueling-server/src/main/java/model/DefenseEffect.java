@@ -10,10 +10,10 @@ import org.slf4j.LoggerFactory;
 public class DefenseEffect implements CardEffect {
     
     private static final Logger logger = LoggerFactory.getLogger(DefenseEffect.class);
-    
+
     /**
      * {@inheritDoc}
-     * Increases the casting player's base defense by the card's defense value.
+     * Heals the caster by an amount equal to the card's defense value.
      *
      * @param session the game session where the effect will be applied
      * @param caster the player casting the card
@@ -22,8 +22,9 @@ public class DefenseEffect implements CardEffect {
      */
     @Override
     public void execute(GameSession session, Player caster, Player target, Card card) {
-        int defenseBonus = card.getDefense();
-        caster.setBaseDefense(caster.getBaseDefense() + defenseBonus);
-        logger.info("{} used '{}', gaining +{} base defense!", caster.getNickname(), card.getName(), defenseBonus);
+        int healAmount = card.getDefense();
+        // Note: In the future, we could cap healing at a max health value.
+        caster.setHealthPoints(caster.getHealthPoints() + healAmount);
+        logger.info("{} used '{}', healing for {} points!", caster.getNickname(), card.getName(), healAmount);
     }
 }
