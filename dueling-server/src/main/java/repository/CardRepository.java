@@ -66,6 +66,10 @@ public class CardRepository {
         return Optional.ofNullable(allCards.get(id));
     }
 
+    public Map<String, Card> getAllCards() {
+        return new HashMap<>(allCards);
+    }
+
     public synchronized Optional<Card> claimCard(String id) {
         int stock = cardStock.getOrDefault(id, 0);
         if (stock > 0) {

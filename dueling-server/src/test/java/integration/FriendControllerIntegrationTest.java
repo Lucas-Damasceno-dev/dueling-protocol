@@ -19,6 +19,11 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.util.Timeout;
+
 @ActiveProfiles("test")
 public class FriendControllerIntegrationTest extends AbstractIntegrationTest {
 
@@ -32,11 +37,18 @@ public class FriendControllerIntegrationTest extends AbstractIntegrationTest {
     void setUp() {
         // Configure the restTemplate with a custom request factory that avoids connection reuse issues
         // This helps prevent authentication retry problems that occur in test environments
-        org.springframework.http.client.HttpComponentsClientHttpRequestFactory requestFactory = 
-            new org.springframework.http.client.HttpComponentsClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofMillis(5000));
-        requestFactory.setReadTimeout(Duration.ofMillis(10000));
-        // Apache HttpClient handles connection management better than SimpleClientHttpRequestFactory
+        RequestConfig config = RequestConfig.custom()
+            .setConnectTimeout(Timeout.ofMilliseconds(5000))
+            .setResponseTimeout(Timeout.ofMilliseconds(10000))
+            .build();
+
+        CloseableHttpClient httpClient = HttpClients.custom()
+            .setDefaultRequestConfig(config)
+            .build();
+
+        org.springframework.http.client.HttpComponentsClientHttpRequestFactory requestFactory =
+            new org.springframework.http.client.HttpComponentsClientHttpRequestFactory(httpClient);
+
         restTemplate.getRestTemplate().setRequestFactory(requestFactory);
     }
 
@@ -77,12 +89,12 @@ public class FriendControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void testSendFriendRequest_Success() {
-        String user1Token = registerAndLogin("user1", "password", "player1");
-        registerAndLogin("user2", "password", "player2");
+        String user1Token = registerAndLogin("user1_fr", "password", "player1_fr");
+        registerAndLogin("user2_fr", "password", "player2_fr");
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(user1Token);
-        HttpEntity<Map> request = new HttpEntity<>(Map.of("targetUsername", "user2"), headers);
+        HttpEntity<Map> request = new HttpEntity<>(Map.of("targetUsername", "user2_fr"), headers);
 
         ResponseEntity<String> response = restTemplate.postForEntity("/api/friends/request", request, String.class);
 
@@ -110,4 +122,3 @@ public class FriendControllerIntegrationTest extends AbstractIntegrationTest {
         assertThat(response.getBody()).contains("Friend request accepted");
     }
 }
-

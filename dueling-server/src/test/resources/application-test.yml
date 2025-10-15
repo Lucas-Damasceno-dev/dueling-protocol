@@ -5,7 +5,6 @@ spring:
         cache:
           use_second_level_cache: false
           use_query_cache: false
-
 jwt:
   secret: mySecretKeyForDuelingProtocolThatShouldBeLongerThan256Bits
   expiration: 86400000 # 24 hours in milliseconds

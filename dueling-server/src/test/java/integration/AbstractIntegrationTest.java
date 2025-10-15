@@ -6,12 +6,14 @@ import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest(
     classes = {controller.DuelingProtocolApplication.class, config.TestConfig.class},
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @ContextConfiguration(initializers = AbstractIntegrationTest.Initializer.class)
+@ActiveProfiles("test")
 @ExtendWith(TestContainersExtension.class)
 public abstract class AbstractIntegrationTest {
 

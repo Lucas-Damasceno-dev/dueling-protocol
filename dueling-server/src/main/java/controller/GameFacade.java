@@ -21,6 +21,7 @@ import service.store.PurchaseResult;
 import service.store.StoreService;
 import service.trade.TradeService;
 
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -62,6 +63,7 @@ public class GameFacade {
     private final LeaderElectionService leaderElectionService;
     private final CardRepository cardRepository;
     private final DeckService deckService;
+    
 
     @Value("${server.name}")
     private String serverName;
@@ -424,24 +426,10 @@ public class GameFacade {
                 }
                 break;
 
-            case "PLAY_CARD":
-                if (command.length < 5) {
-                    notifyPlayer(playerId, "ERROR:Incomplete PLAY_CARD command.");
-                    return;
-                }
-                String matchId = command[3];
-                String cardId = command[4];
-                GameSession session = activeGames.get(matchId);
-                if (session != null && session.playCard(playerId, cardId)) {
-                    logger.info("Player {} played card {} in match {}", playerId, cardId, matchId);
-                    notifyPlayer(playerId, "SUCCESS:Move executed.");
-                } else {
-                    logger.warn("Invalid move or player on cooldown. Player: {}, Card: {}, Match: {}", 
-                               playerId, cardId, matchId);
-                    notifyPlayer(playerId, "ERROR:Invalid move or player on cooldown.");
-                }
-                break;
             
+
+            
+
             case "STORE":
                 if (command.length > 4 && "BUY".equals(command[3])) {
                     String packType = command[4];
