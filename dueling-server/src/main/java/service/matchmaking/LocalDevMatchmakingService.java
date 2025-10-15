@@ -10,30 +10,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
-import service.election.LeaderElectionService;
 import repository.MatchRepository;
 
 /**
- * Thread-safe implementation of the MatchmakingService interface.
- * Uses a concurrent queue to manage the player matchmaking queue and ensures
- * thread safety when multiple players are added to the queue simultaneously.
- * This service is managed by the Spring container as a singleton.
+ * Thread-safe implementation of the MatchmakingService interface for local development.
+ * This version does not use LeaderElectionService.
  */
 @Service
-@Profile("!local-dev")  // Excluir deste serviço quando estiver no perfil local-dev
-public class ConcurrentMatchmakingService implements MatchmakingService {
+@Profile("local-dev")
+public class LocalDevMatchmakingService implements MatchmakingService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ConcurrentMatchmakingService.class);
+    private static final Logger logger = LoggerFactory.getLogger(LocalDevMatchmakingService.class);
     private final Queue<PlayerWithDeck> matchmakingQueue = new ConcurrentLinkedQueue<>();
     private final Object lock = new Object();
-    private final LeaderElectionService leaderElectionService;
     private final MatchRepository matchRepository;
 
     /**
      * Public constructor for Spring's dependency injection.
      */
-    public ConcurrentMatchmakingService(LeaderElectionService leaderElectionService, MatchRepository matchRepository) {
-        this.leaderElectionService = leaderElectionService;
+    public LocalDevMatchmakingService(MatchRepository matchRepository) {
         this.matchRepository = matchRepository;
     }
 
@@ -119,7 +114,7 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
                                 player1.getNickname(), player1Elo,
                                 player2.getNickname(), player2Elo);
                     Match match = new Match(player1, player2);
-                    match.setServerUrl(leaderElectionService.getSelfUrl());
+                    match.setServerUrl("http://localhost:8083"); // Hardcoded for local dev
                     return Optional.of(match);
                 }
             }

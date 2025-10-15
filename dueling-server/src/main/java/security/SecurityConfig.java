@@ -3,6 +3,7 @@ package security;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -43,25 +44,32 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    @Order(1) // Prioridade alta para isolar o WebSocket
+    public SecurityFilterChain webSocketSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable()) // Disable CSRF for stateless API
+            .securityMatcher("/ws/**") // Aplica esta cadeia de filtros APENAS para /ws/**
+            .authorizeHttpRequests(authz -> authz.anyRequest().permitAll()) // Permite todas as requisições de handshake
+            .csrf(csrf -> csrf.disable()); // CSRF não é relevante para WebSockets
+        return http.build();
+    }
+
+    @Bean
+    @Order(2) // Prioridade mais baixa para o resto da API
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable()) // Desativa CSRF para uma API stateless
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/api/auth/**").permitAll()  // Allow authentication endpoints (for direct server access)
-                .requestMatchers("/auth/**").permitAll()      // Allow authentication endpoints (for gateway access, after path rewrite)
-                 .requestMatchers("/api/health").permitAll()   // Allow health checks
-                .requestMatchers("/health").permitAll()       // Allow health checks (for gateway access, after path rewrite)
-                 .requestMatchers("/actuator/**").permitAll()  // Allow actuator endpoints for monitoring
-                 .requestMatchers("/ws/**").permitAll()        // WebSocket endpoints will be authenticated separately
-                 .requestMatchers("/api/servers/**").permitAll() // Allow server-to-server communication
-                .requestMatchers("/servers/**").permitAll()   // Allow server-to-server communication (for gateway access, after path rewrite)
-                 .anyRequest().authenticated()                 // All other requests require authentication
+                .requestMatchers("/api/auth/**", "/auth/**").permitAll()
+                .requestMatchers("/api/health", "/health").permitAll()
+                .requestMatchers("/actuator/**").permitAll()
+                .requestMatchers("/api/servers/**", "/servers/**").permitAll()
+                .anyRequest().authenticated() // Todas as outras requisições exigem autenticação
             )
             .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // No sessions
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // API é stateless
             );
 
-        // Add JWT filter
+        // Adiciona o filtro JWT para validar os tokens nas requisições da API
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();

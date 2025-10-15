@@ -55,7 +55,7 @@ import static org.mockito.ArgumentMatchers.anyString;
                 repository.PlayerRepositoryJson.class,
                 repository.PlayerRepositoryPostgreSQL.class,
                 repository.InMemoryPlayerRepository.class,
-                config.RedissonConfig.class,
+                config.RedissonSentinelConfig.class,
                 service.election.LeaderElectionService.class, // Exclude the real LeaderElectionService
                 controller.GameFacade.class // Exclude the real GameFacade
             }

@@ -16,8 +16,13 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Autowired
     private GameWebSocketHandler gameWebSocketHandler;
 
+    @Autowired
+    private HttpHandshakeInterceptor handshakeInterceptor;
+
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(gameWebSocketHandler, "/ws").setAllowedOrigins("*");
+        registry.addHandler(gameWebSocketHandler, "/ws")
+                .addInterceptors(handshakeInterceptor)
+                .setAllowedOrigins("*");
     }
 }

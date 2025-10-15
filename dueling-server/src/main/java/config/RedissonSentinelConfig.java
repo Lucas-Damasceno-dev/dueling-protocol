@@ -4,20 +4,19 @@ import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 import org.redisson.config.SentinelServersConfig;
+import org.redisson.config.SingleServerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import java.util.Arrays;
-import java.util.List;
 
 @Configuration
-@Profile("!test")
-public class RedissonConfig {
+@Profile("!test && !local-dev")  // Somente para perfis que não são teste nem desenvolvimento local
+public class RedissonSentinelConfig {
 
-    private static final Logger logger = LoggerFactory.getLogger(RedissonConfig.class);
+    private static final Logger logger = LoggerFactory.getLogger(RedissonSentinelConfig.class);
 
     @Bean(destroyMethod = "shutdown")
     public RedissonClient redissonClient(@Value("${spring.redis.sentinel.master:mymaster}") String masterName,
@@ -42,7 +41,7 @@ public class RedissonConfig {
         try {
             return Redisson.create(config);
         } catch (Exception e) {
-            logger.error("!!! Failed to create Redisson client: {}", e.getMessage());
+            logger.error("!!! Failed to create Redisson client with Sentinel: {}", e.getMessage());
             throw e;
         }
     }
