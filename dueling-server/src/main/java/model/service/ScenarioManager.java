@@ -1,8 +1,6 @@
 package model.service;
 
-import controller.GameFacade;
 import model.Card;
-import model.Player;
 
 import java.io.Serializable;
 public class ScenarioManager implements Serializable {

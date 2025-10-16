@@ -6,6 +6,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+
 @TestConfiguration
 @ComponentScan(basePackages = {
     "controller", 
@@ -18,7 +20,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
     "model",
     "security"
 })
-@EnableJpaRepositories(basePackages = {"repository", "model"})
+@EnableJpaRepositories(basePackages = {"repository"})
+@EntityScan(basePackages = {"model"})
 // Disable Hibernate second-level cache for tests
 @EnableAutoConfiguration(exclude = {
     org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration.class

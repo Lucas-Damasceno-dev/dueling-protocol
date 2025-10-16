@@ -8,8 +8,9 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import model.ResourceType;
 import java.io.Serializable;
+import java.util.Map;
+import java.util.HashMap;
 
 @Entity
 @Table(name = "players", indexes = {
@@ -94,9 +95,6 @@ public class Player implements Serializable {
         applyAttributeBonuses();
         logger.info("Character set: {} as {} {}", id, race, playerClassParam);
     }
-
-    import java.util.Map;
-import java.util.HashMap;
 
     private void initializeStarterDeck() {
         List<Card> starterDeckCards = getCardCollection();

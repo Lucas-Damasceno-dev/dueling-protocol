@@ -123,6 +123,15 @@ public interface DeckRepository extends JpaRepository<Deck, String> {
      * @return Optional containing the deck if found
      */
     Optional<Deck> findByIdAndPlayerId(String id, String playerId);
+
+    /**
+     * Check if a deck with the given ID exists for a specific player.
+     *
+     * @param id The ID of the deck
+     * @param playerId The ID of the player
+     * @return true if a deck with the given ID exists for the player
+     */
+    boolean existsByIdAndPlayerId(String id, String playerId);
     
     /**
      * Set a specific deck as the default for a player, and unset all others.

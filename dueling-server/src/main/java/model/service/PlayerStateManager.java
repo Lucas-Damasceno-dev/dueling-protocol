@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import controller.GameFacade;
 import model.Card;
 import model.Player;
-import model.ResourceType;
+
 
 import java.io.Serializable;
 public class PlayerStateManager implements Serializable {

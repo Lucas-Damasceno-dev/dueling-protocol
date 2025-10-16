@@ -11,6 +11,8 @@ import model.MagicEffect;
 import model.AttributeEffect;
 import model.ScenarioEffect;
 import model.EquipmentEffect;
+import model.ComboEffect;
+import model.CounterSpellEffect;
 
 import java.io.Serializable;
 public class CardEffectService implements Serializable {

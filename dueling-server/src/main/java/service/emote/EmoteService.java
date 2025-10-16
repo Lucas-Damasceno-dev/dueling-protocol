@@ -1,6 +1,5 @@
 package service.emote;
 
-import model.Emote;
 import org.springframework.stereotype.Service;
 import pubsub.IEventManager;
 import repository.EmoteRepository;

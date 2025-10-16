@@ -5,18 +5,9 @@ import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import java.util.List;
 import java.util.ArrayList;
-
-/**
- * Represents a deck in the Dueling Protocol game.
- * A deck is a collection of cards selected by a player for gameplay.
- * Each deck belongs to a single player and contains multiple cards.
- */
-@Entity
-@Table(name = "decks", indexes = {
-    @Index(name = "idx_deck_player_id", columnList = "player_id")
-})
-@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 import java.io.Serializable;
+
+@Entity
 public class Deck implements Serializable {
     private static final long serialVersionUID = 1L;
     @Id
