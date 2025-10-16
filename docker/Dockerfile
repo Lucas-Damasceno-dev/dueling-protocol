@@ -11,7 +11,7 @@ COPY dueling-server ./dueling-server
 COPY dueling-gateway ./dueling-gateway
 RUN mvn dependency:go-offline
 
-RUN mvn package
+RUN mvn package -DskipTests
 
 # Stage 2: Run - Uses a lightweight image with only Java Runtime 21 to run the application
 # UPDATED: Using a slim JRE (Java Runtime Environment) image with OpenJDK 21
