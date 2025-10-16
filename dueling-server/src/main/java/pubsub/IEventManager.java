@@ -30,4 +30,32 @@ public interface IEventManager {
      * @param message The message to send.
      */
     void publish(String topic, String message);
+
+    /**
+     * Sends a message to a specific group.
+     *
+     * @param groupName The name of the group to send the message to.
+     * @param senderId  The ID of the sender.
+     * @param content   The content of the message.
+     */
+    void sendGroupMessage(String groupName, String senderId, String content);
+
+    /**
+     * Sends a message to a specific match.
+     *
+     * @param matchId  The ID of the match to send the message to.
+     * @param senderId The ID of the sender.
+     * @param content  The content of the message.
+     */
+    void sendInGameMessage(String matchId, String senderId, String content);
+
+    /**
+     * Sends an emote to a specific channel.
+     *
+     * @param channelType The type of the channel (e.g., "group", "match").
+     * @param channelId   The ID of the channel.
+     * @param senderId    The ID of the sender.
+     * @param emoteId     The ID of the emote.
+     */
+    void sendEmote(String channelType, String channelId, String senderId, String emoteId);
 }
