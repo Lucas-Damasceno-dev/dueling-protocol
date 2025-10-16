@@ -17,7 +17,9 @@ if [ -n "$SERVER_PID" ]; then
 fi
 
 # Parar e remover containers Docker completamente
-cd /home/lucas/Documentos/dev/projects/dueling-protocol/docker
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+cd "$PROJECT_DIR/docker"
 echo "Parando containers Docker..."
 docker compose down --remove-orphans -v --timeout 10 2>/dev/null || true
 

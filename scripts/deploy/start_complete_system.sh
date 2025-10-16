@@ -3,8 +3,9 @@
 # Script para iniciar o sistema completo do Protocolo de Duelo com NGINX como gateway
 echo "=== Protocolo de Duelo - Iniciar Sistema Completo (com NGINX) ==="
 
-# Diretório base do projeto
-PROJECT_DIR="/home/lucas/Documentos/dev/projects/dueling-protocol"
+# Diretório base do projeto (relative to script location)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Verificar se o diretório do projeto existe
 if [ ! -d "$PROJECT_DIR" ]; then

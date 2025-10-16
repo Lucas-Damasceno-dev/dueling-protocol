@@ -3,8 +3,9 @@
 # Script para executar o cliente do Protocolo de Duelo
 echo "Executando cliente do Protocolo de Duelo..."
 
-# Diretório base do projeto
-PROJECT_DIR="/home/lucas/Documentos/dev/projects/dueling-protocol"
+# Diretório base do projeto (relative to script location)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Verificar se o diretório do projeto existe
 if [ ! -d "$PROJECT_DIR" ]; then
