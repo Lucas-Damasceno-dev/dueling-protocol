@@ -48,6 +48,7 @@ public final class GameClient {
     private static volatile boolean awaitingUserInput = false;
     private static volatile boolean duringConnectionAttempt = false;
     private static volatile boolean authenticationFailureOnConnect = false;
+    private static volatile long connectionStartTime;
 
     public static void main(String[] args) {
         // logger.info("Dueling Protocol Client Started");  // Removed to keep UI clean
@@ -345,14 +346,19 @@ public final class GameClient {
     private static void printFullMenu() {
         System.out.println();
         System.out.println("--- GAME MENU ---");
-        System.out.println("1. Set up character");
+        if (!characterSet) {
+            System.out.println("1. Set up character");
+        } else {
+            System.out.println("1. Set up character (already set up)");
+        }
         System.out.println("2. Enter matchmaking queue");
         System.out.println("3. Select and use custom deck");
         System.out.println("4. Buy card pack");
         System.out.println("5. Check ping");
         System.out.println("6. Play card (during match)");
         System.out.println("7. Upgrade attributes");
-        System.out.println("8. Exit");
+        System.out.println("8. Trade cards with another player");
+        System.out.println("9. Exit");
         if (lastPingTime >= 0 && !pingModeActive) {
             // Only show ping in main menu if not in ping mode
             if (lastPingTime < 1000) {
@@ -370,9 +376,19 @@ public final class GameClient {
     }
 
     private static void handleUserInput() {
+        // Initialize connection start time for timeout tracking
+        connectionStartTime = System.currentTimeMillis();
+        
         if (IS_DOCKER_ENV) {
             logger.info("Running in Docker mode - keeping WebSocket connection alive for game events");
             while (!isExiting && webSocketClient != null && webSocketClient.isOpen()) {
+                // Check for game timeout only when in game
+                if (inGame && isGameTimeout()) {
+                    System.out.println("[TIMEOUT] Game session timed out due to inactivity.");
+                    isExiting = true;
+                    break;
+                }
+                
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
@@ -384,6 +400,14 @@ public final class GameClient {
         } else {
             Scanner scanner = new Scanner(System.in);
             while (!isExiting && webSocketClient != null && webSocketClient.isOpen()) {
+                // Check for game timeout only when in game
+                if (inGame && isGameTimeout()) {
+                    System.out.println("[TIMEOUT] Game session timed out due to inactivity.");
+                    isExiting = true;
+                    break;
+                }
+                
+                // If not in game, allow unlimited time in menu
                 awaitingUserInput = true;
                 printFullMenu();
                 
@@ -398,24 +422,31 @@ public final class GameClient {
 
                 switch (input) {
                     case "1": setupCharacter(scanner); break;
-                    case "2": enterMatchmaking(); break;
+                    case "2": 
+                        enterMatchmaking(); 
+                        // Set connection start time for potential game timeout
+                        connectionStartTime = System.currentTimeMillis();
+                        break;
                     case "3": selectDeck(scanner); break;
                     case "4": buyCardPack(scanner); break;
                     case "5": checkPing(scanner); break;
                     case "6":
                         if (inGame) {
                             playCard(scanner);
+                            // Refresh connection start time when playing card
+                            connectionStartTime = System.currentTimeMillis();
                         } else {
                             System.out.println("You need to be in a match to play cards!");
                         }
                         break;
                     case "7": upgradeAttributes(scanner); break;
-                    case "8":
+                    case "8": tradeCards(scanner); break;
+                    case "9":
                         System.out.println("Exiting...");
                         isExiting = true;
                         break;
                     default:
-                        System.out.println("Invalid option! Please choose a number from 1-8.");
+                        System.out.println("Invalid option! Please choose a number from 1-9.");
                         break;
                 }
             }
@@ -428,8 +459,23 @@ public final class GameClient {
             stopPingUpdateService();
         }
     }
+    
+    private static boolean isGameTimeout() {
+        if (!inGame) {
+            return false; // No timeout when not in game
+        }
+        
+        // Game timeout after 10 minutes (600,000 ms) of inactivity
+        long timeout = 10 * 60 * 1000; // 10 minutes
+        return System.currentTimeMillis() - connectionStartTime > timeout;
+    }
 
     private static void setupCharacter(Scanner scanner) {
+        if (characterSet) {
+            System.out.println("You already have a character set up! Character creation is only allowed once.");
+            return;
+        }
+        
         System.out.println();
         System.out.println("--- CHARACTER SETUP ---");
         
@@ -593,6 +639,38 @@ public final class GameClient {
         webSocketClient.send("UPGRADE:" + attribute);
     }
 
+    private static void tradeCards(Scanner scanner) {
+        System.out.println();
+        System.out.println("--- TRADE CARDS ---");
+        System.out.print("Enter the username of the player you want to trade with: > ");
+        String targetUsername = scanner.nextLine().trim();
+        if (targetUsername.isEmpty()) {
+            System.out.println("Target username cannot be empty!");
+            return;
+        }
+
+        // First, request the player's card collection to help with selection
+        System.out.println("Requesting your card collection to help with card selection...");
+        webSocketClient.send("SHOW_CARDS:PLACEHOLDER:"); // The server will replace PLACEHOLDER with actual playerId
+        
+        System.out.print("Enter the ID of the card you want to offer (comma-separated if multiple): > ");
+        System.out.println("(Note: Card list will be displayed above after server response)");
+        String offeredCards = scanner.nextLine().trim();
+        if (offeredCards.isEmpty()) {
+            System.out.println("You must offer at least one card!");
+            return;
+        }
+
+        System.out.print("Enter the ID of the card you want to request (comma-separated if multiple): > ");
+        String requestedCards = scanner.nextLine().trim();
+        if (requestedCards.isEmpty()) {
+            System.out.println("You must request at least one card!");
+            return;
+        }
+
+        webSocketClient.send("TRADE:PROPOSE:" + targetUsername + ":" + offeredCards + ":" + requestedCards);
+    }
+
     private static void checkPing(Scanner scanner) {
         pingModeActive = true;
         System.out.println();
@@ -655,6 +733,16 @@ public final class GameClient {
             System.out.println("\n[ERROR] " + errorMsg);
         } else if ("SUCCESS".equals(parts[0]) && parts.length > 1 && parts[1].startsWith("CONNECTED")) {
             return;
+        } else if ("INFO".equals(type)) {
+            // Handle info messages including card collection
+            if (message.startsWith("INFO:YOUR_CARDS:")) {
+                String cardsInfo = message.substring("INFO:YOUR_CARDS:".length());
+                System.out.println("\n[CARDS] Your card collection:");
+                System.out.println("[CARDS] " + cardsInfo.replace(";", "\n[CARDS] "));
+                System.out.println("[CARDS] Use these card IDs for trading.");
+            } else {
+                System.out.println("\n[INFO] " + message.substring(5)); // Remove "INFO:" prefix
+            }
         } else {
             System.out.println("\n[SERVER] " + message);
         }
@@ -663,12 +751,23 @@ public final class GameClient {
             if (parts.length > 2 && "GAME_START".equals(parts[1])) {
                 currentMatchId = parts[2];
                 inGame = true;
+                // Reset connection start time when game starts for timeout tracking
+                connectionStartTime = System.currentTimeMillis();
             } else if ("GAME_OVER".equals(parts[1])) {
                 inGame = false;
                 currentMatchId = null;
+                // Reset connection start time after game ends
+                connectionStartTime = System.currentTimeMillis();
             }
         } else if ("CARD_UPDATE".equals(type) || message.contains("PURCHASE_SUCCESS") || message.contains("CARDS_GRANTED")) {
             hasCards = true;
+        }
+        
+        // Update connection time when receiving important game-related messages
+        if (inGame && (message.contains("GAME_START") || message.contains("GAME_OVER") || 
+                      message.contains("PLAY_CARD") || message.contains("TURN") || 
+                      message.contains("MATCH") || message.contains("OPPONENT"))) {
+            connectionStartTime = System.currentTimeMillis();
         }
     }
 
@@ -715,6 +814,9 @@ public final class GameClient {
     public static class MyWebSocketClient extends WebSocketClient {
         public MyWebSocketClient(URI serverUri) {
             super(serverUri);
+            // Disable connection lost timeout to prevent disconnection when in menu
+            // The server-side heartbeat handling will manage timeouts appropriately
+            this.setConnectionLostTimeout(0); // 0 disables the automatic connection lost detection
         }
 
         @Override
@@ -724,6 +826,11 @@ public final class GameClient {
         @Override
         public void onMessage(String message) {
             processServerMessage(message);
+            
+            // Reset connection start time when receiving any message from server
+            if (inGame) {
+                connectionStartTime = System.currentTimeMillis();
+            }
         }
 
         @Override

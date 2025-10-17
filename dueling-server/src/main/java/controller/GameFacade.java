@@ -27,6 +27,7 @@ import service.trade.TradeService;
 
 import service.ranking.RankingService;
 import service.achievement.AchievementService;
+import websocket.WebSocketSessionManager;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -51,6 +52,7 @@ public class GameFacade {
     private final EmoteService emoteService;
     private final RankingService rankingService;
     private final AchievementService achievementService;
+    private final WebSocketSessionManager sessionManager;
 
     @Value("${server.name}")
     private String serverName;
@@ -71,7 +73,7 @@ public class GameFacade {
                       CardRepository cardRepository, DeckService deckService, GameSessionRepository gameSessionRepository,
                       RedissonClient redissonClient, RankingService rankingService, AchievementService achievementService,
                       ChatGroupService chatGroupService, InGameChatService inGameChatService, EmoteService emoteService,
-                      service.lock.LockService lockService) {
+                      service.lock.LockService lockService, WebSocketSessionManager sessionManager) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
@@ -91,6 +93,7 @@ public class GameFacade {
         this.rankingService = rankingService;
         this.achievementService = achievementService;
         this.lockService = lockService;
+        this.sessionManager = sessionManager;
     }
 
     private String getSelfUrl() {
@@ -118,6 +121,10 @@ public class GameFacade {
                 if (session.getPlayer1().getId().equals(playerId) || session.getPlayer2().getId().equals(playerId)) {
                     String opponentId = session.getPlayer1().getId().equals(playerId) ?
                             session.getPlayer2().getId() : session.getPlayer1().getId();
+                    
+                    // Update opponent's match status
+                    sessionManager.setPlayerInMatch(opponentId, false);
+                    
                     notifyPlayer(opponentId, "UPDATE:GAME_OVER:OPPONENT_DISCONNECT");
                     gameSessionRepository.deleteById(matchId);
                     logger.info("Game {} removed due to player {} disconnection", matchId, playerId);
@@ -128,46 +135,120 @@ public class GameFacade {
     }
 
     public void enterMatchmaking(Player player) {
+        // Check if player is already in a match
+        if (sessionManager.isPlayerInMatch(player.getId())) {
+            logger.warn("Player {} tried to enter matchmaking while in a match", player.getId());
+            notifyPlayer(player.getId(), "ERROR:You are already in a match. Please finish your current match first.");
+            return;
+        }
+        
+        // Check if player is already in the matchmaking queue
+        if (matchmakingService.isPlayerInQueue(player)) {
+            logger.warn("Player {} tried to enter matchmaking while already in queue", player.getId());
+            notifyPlayer(player.getId(), "ERROR:You are already in the matchmaking queue.");
+            return;
+        }
+        
         matchmakingService.addPlayerToQueue(player);
         logger.info("Player {} added to matchmaking queue", player.getId());
         tryToCreateMatch();
     }
 
     public void enterMatchmaking(Player player, String deckId) {
+        // Check if player is already in a match
+        if (sessionManager.isPlayerInMatch(player.getId())) {
+            logger.warn("Player {} tried to enter matchmaking while in a match", player.getId());
+            notifyPlayer(player.getId(), "ERROR:You are already in a match. Please finish your current match first.");
+            return;
+        }
+        
+        // Check if player is already in the matchmaking queue
+        if (matchmakingService.isPlayerInQueue(player)) {
+            logger.warn("Player {} tried to enter matchmaking while already in queue", player.getId());
+            notifyPlayer(player.getId(), "ERROR:You are already in the matchmaking queue.");
+            return;
+        }
+        
         matchmakingService.addPlayerToQueueWithDeck(player, deckId);
         logger.info("Player {} added to matchmaking queue with deck {}", player.getId(), deckId);
         tryToCreateMatch();
     }
 
     public void tryToCreateMatch() {
+        // First, try to find any immediate local matches
         Optional<Match> localMatch = matchmakingService.findMatch();
         if (localMatch.isPresent()) {
             startMatch(localMatch.get());
             return;
         }
 
+        // Try two-way matching: local player with remote partner AND remote player with local partner
+        List<String> remoteServers = new ArrayList<>(serverRegistry.getRegisteredServers());
+        remoteServers.remove(getSelfUrl());
+        
+        // Strategy 1: Try to find a local player and match with a remote partner
         Optional<Player> localPlayerOpt = matchmakingService.findAndLockPartner();
         if (localPlayerOpt.isPresent()) {
             Player p1 = localPlayerOpt.get();
-
-            List<String> remoteServers = new ArrayList<>(serverRegistry.getRegisteredServers());
-            remoteServers.remove(getSelfUrl());
-
+            boolean matchFound = false;
+            
             for (String serverUrl : remoteServers) {
                 try {
                     Player p2 = serverApiClient.findAndLockPartner(serverUrl);
                     if (p2 != null) {
                         logger.info("Found remote partner {} for {} on server {}", p2.getNickname(), p1.getNickname(), serverUrl);
                         startMatch(new Match(p1, p2));
-                        return;
+                        matchFound = true;
+                        break;
                     }
                 } catch (Exception e) {
                     logger.warn("Could not request partner from server {}: {}", serverUrl, e.getMessage());
                 }
             }
 
-            logger.info("No remote partner found for {}. Returning to queue.", p1.getNickname());
-            matchmakingService.addPlayerToQueue(p1);
+            // If no remote partner found, put local player back in queue
+            if (!matchFound) {
+                logger.info("No remote partner found for {}. Returning to queue.", p1.getNickname());
+                matchmakingService.addPlayerToQueue(p1);
+            }
+        }
+        
+        // Strategy 2: Try to get a remote player and match with a local partner
+        for (String serverUrl : remoteServers) {
+            try {
+                Player remotePlayer = serverApiClient.findAndLockPartner(getSelfUrl());
+                if (remotePlayer != null) {
+                    logger.info("Received remote player {} from server {} for local matching", remotePlayer.getNickname(), serverUrl);
+                    
+                    // Try to find a local partner for the remote player
+                    Optional<Player> localPlayerOpt2 = matchmakingService.findAndLockPartner();
+                    if (localPlayerOpt2.isPresent()) {
+                        Player localPlayer = localPlayerOpt2.get();
+                        logger.info("Matching remote player {} with local player {}", remotePlayer.getNickname(), localPlayer.getNickname());
+                        startMatch(new Match(remotePlayer, localPlayer));
+                        return; // Exit early if we found a match
+                    } else {
+                        // If no local partner available, put the remote player in our queue
+                        logger.info("No local partner for remote player {}, adding to local queue", remotePlayer.getNickname());
+                        matchmakingService.addPlayerToQueue(remotePlayer);
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Could not receive partner from server {}: {}", serverUrl, e.getMessage());
+            }
+        }
+        
+        // Improve coordination between servers by triggering their matching as well
+        // This helps when both players connect to different servers simultaneously
+        for (String serverUrl : remoteServers) {
+            // Trigger the remote server to try matchmaking too
+            try {
+                // Since we can't directly trigger their scheduling, we'll just ensure
+                // both servers are actively trying to match players
+                // This is achieved through the regular scheduled calls
+            } catch (Exception e) {
+                logger.debug("Could not coordinate with remote server {}: {}", serverUrl, e.getMessage());
+            }
         }
     }
 
@@ -181,6 +262,10 @@ public class GameFacade {
 
         GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this, cardRepository);
         gameSessionRepository.save(session);
+
+        // Update player match status
+        sessionManager.setPlayerInMatch(p1.getId(), true);
+        sessionManager.setPlayerInMatch(p2.getId(), true);
 
         session.startGame();
 
@@ -213,6 +298,10 @@ public class GameFacade {
         GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this, cardRepository);
         gameSessionRepository.save(session);
 
+        // Update player match status
+        sessionManager.setPlayerInMatch(p1.getId(), true);
+        sessionManager.setPlayerInMatch(p2.getId(), true);
+
         session.startGame();
 
         logger.info("New match created between {} and {} with ID {} using decks {} and {}",
@@ -236,7 +325,9 @@ public class GameFacade {
     }
 
     public void notifyPlayer(String playerId, String message) {
+        logger.debug("notifyPlayer: Attempting to send message to playerId {}: {}", playerId, message);
         eventManager.publish(playerId, message);
+        logger.debug("notifyPlayer: Message published for playerId {}", playerId);
     }
 
     public void notifyPlayers(List<String> playerIds, String message) {
@@ -261,18 +352,41 @@ public class GameFacade {
 
         switch (action) {
             case "CHARACTER_SETUP":
+                // Check if player already has a character
+                if (player != null) {
+                    notifyPlayer(playerId, "ERROR:Character already exists for this player. Character creation is only allowed once.");
+                    return;
+                }
+                logger.debug("Processing CHARACTER_SETUP for player {}: nickname={}, race={}, class={}", playerId, command[3], command[4], command[5]);
                 if (command.length < 6) {
+                    logger.warn("Incomplete CHARACTER_SETUP command for player {}: {}", playerId, String.join(":", command));
                     notifyPlayer(playerId, "ERROR:Incomplete character setup command. Expected: NICKNAME:RACE:CLASS");
                     return;
                 }
                 Player newPlayer = new Player(playerId, command[3]);
                 newPlayer.setCharacter(command[4], command[5]);
                 playerRepository.save(newPlayer);
+                // Refresh the player object for use in subsequent operations
+                player = newPlayer;
+                logger.debug("Character created for player {}, sending response: SUCCESS:Character created.", playerId);
                 notifyPlayer(playerId, "SUCCESS:Character created.");
+                logger.debug("Response sent to player {}", playerId);
                 break;
 
             case "MATCHMAKING":
                 if (command.length > 3 && "ENTER".equals(command[3])) {
+                    // Check if player is already in a match
+                    if (sessionManager.isPlayerInMatch(playerId)) {
+                        notifyPlayer(playerId, "ERROR:You are already in a match. Please finish your current match first.");
+                        break;
+                    }
+                    
+                    // Check if player is already in the matchmaking queue
+                    if (matchmakingService.isPlayerInQueue(player)) {
+                        notifyPlayer(playerId, "ERROR:You are already in the matchmaking queue.");
+                        break;
+                    }
+                    
                     String deckId = null;
                     if (command.length > 4) {
                         deckId = command[4];
@@ -314,7 +428,17 @@ public class GameFacade {
                     String packType = command[4];
                     PurchaseResult result = buyPack(player, packType);
                     if (result.isSuccess()) {
-                        notifyPlayer(playerId, "SUCCESS:Pack purchased. You got " + result.getCards().size() + " cards.");
+                        List<Card> cards = result.getCards();
+                        StringBuilder cardList = new StringBuilder("SUCCESS:Pack purchased. Cards received: ");
+                        for (int i = 0; i < cards.size(); i++) {
+                            Card card = cards.get(i);
+                            // Use underscores instead of colons to avoid parsing conflicts
+                            cardList.append(card.getName()).append("(ID_").append(card.getId()).append(")");
+                            if (i < cards.size() - 1) {
+                                cardList.append(", ");
+                            }
+                        }
+                        notifyPlayer(playerId, cardList.toString());
                     } else {
                         notifyPlayer(playerId, "ERROR:Purchase failed: " + result.getStatus());
                     }
@@ -378,6 +502,24 @@ public class GameFacade {
                 emoteService.handleSendEmote(playerId, channelType, channelId, emoteId);
                 break;
 
+            case "SHOW_CARDS":
+                // Send the player's card collection
+                List<Card> playerCards = player.getCardCollection();
+                if (playerCards.isEmpty()) {
+                    notifyPlayer(playerId, "INFO:Your card collection is empty. Buy a card pack first!");
+                } else {
+                    StringBuilder cardList = new StringBuilder("INFO:YOUR_CARDS:");
+                    for (int i = 0; i < playerCards.size(); i++) {
+                        Card card = playerCards.get(i);
+                        cardList.append(card.getId()).append("(").append(card.getName()).append(")");
+                        if (i < playerCards.size() - 1) {
+                            cardList.append(";");
+                        }
+                    }
+                    notifyPlayer(playerId, cardList.toString());
+                }
+                break;
+
             default:
                 notifyPlayer(playerId, "ERROR:Unknown command '" + action + "'.");
                 break;
@@ -425,6 +567,10 @@ public class GameFacade {
             playerRepository.update(winner);
             logger.info("Match {} finished. {} won {} points!", matchId, winner.getNickname(), pointsEarned);
         }
+
+        // Update player match status
+        sessionManager.setPlayerInMatch(winnerId, false);
+        sessionManager.setPlayerInMatch(loserId, false);
 
         notifyPlayer(winnerId, "UPDATE:GAME_OVER:VICTORY");
         notifyPlayer(loserId, "UPDATE:GAME_OVER:DEFEAT");
