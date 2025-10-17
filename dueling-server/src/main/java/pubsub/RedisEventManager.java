@@ -155,6 +155,7 @@ public class RedisEventManager implements IEventManager {
      */
     public void subscribe(String topic, PrintWriter subscriber) {
         subscribers.put(topic, subscriber);
+        logger.debug("About to register handler for topic {} with subscriber hash {}", topic, subscriber.hashCode());
         redisMessageSubscriber.registerHandler(topic, subscriber);
         logger.info("New subscriber for topic {}", topic);
     }
@@ -179,6 +180,8 @@ public class RedisEventManager implements IEventManager {
      */
     public void publish(String topic, String message) {
         logger.debug("Publishing to Redis topic {}: {}", topic, message);
+        logger.debug("Currently have {} subscribers in map", subscribers.size());
+        logger.debug("Has subscriber for topic {}: {}", topic, subscribers.containsKey(topic));
         redisTemplate.convertAndSend(topic, message);
     }
 }
