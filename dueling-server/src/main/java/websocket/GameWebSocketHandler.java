@@ -5,7 +5,7 @@ import model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -42,6 +42,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String username = null;
 
+        logger.debug("WebSocket connection attempt from session: {}", session.getId());
+        
         // 1. Get username from session attributes (populated by HttpHandshakeInterceptor)
         Object userIdFromAttribute = session.getAttributes().get("userId");
         if (userIdFromAttribute != null) {
@@ -97,12 +99,28 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         eventManager.subscribe(playerId, writer);
 
         logger.info("WebSocket connection established for player {} (user: {}): session {}", playerId, username, session.getId());
-        writer.println("SUCCESS:CONNECTED");
-        writer.flush();
+        logger.debug("Debug: Registered session {} for player {} with writer {}", session.getId(), playerId, writer.hashCode());
+        logger.debug("About to send SUCCESS:CONNECTED to player {}", playerId);
+        
+        // Enviar mensagem de conexão e garantir que foi entregue
+        try {
+            writer.println("SUCCESS:CONNECTED");
+            writer.flush();
+            logger.debug("SUCCESS:CONNECTED successfully sent to player {}", playerId);
+        } catch (Exception e) {
+            logger.error("Failed to send SUCCESS:CONNECTED to player {}: {}", playerId, e.getMessage());
+            try {
+                session.close(CloseStatus.SERVER_ERROR.withReason("Cannot establish communication"));
+            } catch (Exception closeEx) {
+                logger.error("Failed to close session for player {}: {}", playerId, closeEx.getMessage());
+            }
+            return;
+        }
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+        logger.debug("Received WebSocket message: {} from session {}", message.getPayload(), session.getId());
         sessionManager.updateSessionActivity(session.getId().toString());
         String payload = message.getPayload();
 
@@ -117,7 +135,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        logger.debug("Received command from player {}: {}", playerId, payload);
+        logger.debug("Received command from player {}: {} (session: {})", playerId, payload, session.getId());
         String[] command = payload.split(":");
 
         String[] facadeCommand = new String[command.length + 2];
@@ -125,6 +143,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         facadeCommand[1] = playerId;
         System.arraycopy(command, 0, facadeCommand, 2, command.length);
 
+        logger.debug("Processing facade command for player {}: [{}]", playerId, String.join(", ", facadeCommand));
         gameFacade.processGameCommand(facadeCommand);
     }
 
@@ -158,20 +177,28 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private static class WebSocketWriter extends StringWriter {
         private final WebSocketSession session;
+        private static final Logger logger = LoggerFactory.getLogger(WebSocketWriter.class);
 
         public WebSocketWriter(WebSocketSession session) {
             this.session = session;
+            logger.debug("WebSocketWriter created for session: {}", session.getId());
         }
 
         @Override
         public void flush() {
             try {
+                logger.debug("WebSocketWriter.flush() called for session: {}, message: {}", session.getId(), this.toString());
                 if (session.isOpen()) {
                     String message = this.toString();
                     if (!message.isEmpty()) {
+                        logger.debug("Sending message via WebSocket: {} to session: {}", message, session.getId());
                         session.sendMessage(new TextMessage(message));
                         getBuffer().setLength(0);
+                    } else {
+                        logger.debug("No message to send, buffer is empty");
                     }
+                } else {
+                    logger.warn("Session is not open, cannot send message: {}", this.toString());
                 }
             } catch (IOException e) {
                 logger.warn("Error sending message via WebSocket for session {}: {}", session.getId().toString(), e.getMessage());
