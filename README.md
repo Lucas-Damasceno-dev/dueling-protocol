@@ -1,291 +1,820 @@
 # Dueling Protocol
 
-A server implementation for a multiplayer card game, built with a client-server architecture using TCP communication.
+A distributed multiplayer card game system built with microservices architecture, featuring cross-server matchmaking, atomic card trading using Two-Phase Commit protocol, and real-time WebSocket communication.
 
-## Table of Contents
+## 📑 Table of Contents
 
 - [Overview](#overview)
-- [Architecture](#architecture)
-- [Features](#features)
+- [Distributed Architecture](#distributed-architecture)
+  - [Component Diagram](#component-diagram)
+  - [Sequence Diagram](#sequence-diagram)
+- [Key Features](#key-features)
 - [Technologies](#technologies)
-- [Prerequisites](#prerequisites)
+- [System Requirements](#system-requirements)
 - [Installation](#installation)
 - [Running the Project](#running-the-project)
-  - [With Docker](#with-docker)
-  - [With Maven](#with-maven)
-  - [Locally (Development)](#locally-development)
+  - [Full Distributed Setup](#full-distributed-setup)
+  - [Local Development](#local-development)
+  - [Production Mode](#production-mode)
 - [Communication Protocol](#communication-protocol)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Overview
 
-Dueling Protocol is a server for a multiplayer card game that allows the creation of 1v1 matches between players. The server manages the entire game lifecycle, from matchmaking to match resolution, and also offers features like a card shop, character upgrade system, and latency measurement.
+**Dueling Protocol** is a production-ready distributed game server system that demonstrates modern microservices patterns and distributed systems concepts. The system supports multiple game servers running simultaneously, with players on different servers able to interact seamlessly through cross-server matchmaking, atomic card trading, and real-time match coordination.
 
-## Architecture
+### Core Capabilities
 
-The project follows a microservices architecture with a gateway pattern:
+- 🎮 **Cross-Server Matchmaking**: Players on different server instances can be matched together
+- 🔄 **Atomic Card Trading**: Two-Phase Commit (2PC) protocol ensures consistency across servers
+- 💳 **Card Shop System**: Buy cards with atomic stock management and transaction safety
+- ⚡ **Real-time Communication**: WebSocket-based bidirectional communication with Redis Pub/Sub
+- 🔐 **Distributed Locking**: Redisson-based distributed locks prevent race conditions
+- 📊 **High Availability**: Redis Sentinel for automatic failover
+- 🎯 **Horizontal Scalability**: Stateless server instances with shared persistence layer
 
-- **API Gateway**: An NGINX reverse proxy (replacing Spring Cloud Gateway) that acts as a reverse proxy, routing requests to the appropriate services and handling cross-cutting concerns like authentication and rate limiting. This change was made to resolve critical WebSocket connection issues with Spring Cloud Gateway.
-- **Game Server**: A Java application that manages the core game logic, including matchmaking, match sessions, card pack purchases, and player data persistence.
-- **Game Client**: A command-line client that connects to the gateway to interact with the game services.
-- **Database**: PostgreSQL for persistent data storage.
-- **Cache**: Redis for session management, distributed locks, and caching.
+## Distributed Architecture
 
-![Architecture Diagram](report/figuras/arquitetura.png)
+The system follows a **microservices architecture** with **shared-database** pattern for consistency and **event-driven communication** for real-time coordination.
 
-## Features
+### Architecture Overview
 
-- ✅ **Microservices Architecture**: Modular design with clear separation of concerns
-- ✅ **API Gateway**: Centralized entry point with authentication and routing
-- ✅ **JWT Authentication**: Secure token-based authentication
-- ✅ **1v1 Matchmaking**: Queue system to pair players
-- ✅ **1v1 Matches**: Complete match system between two players
-- ✅ **Card Shop**: Purchase card packs to expand the deck
-- ✅ **Upgrade System**: Improve character attributes with points earned from victories
-- ✅ **Data Persistence**: Storage of player data in PostgreSQL database
-- ✅ **Caching**: Redis-based caching for improved performance
-- ✅ **WebSocket Communication**: Real-time communication for game updates
-- ✅ **Thread-Safe Concurrency**: Multithreaded architecture with safe data structures
-- ✅ **Latency Measurement**: Ping system to monitor connection quality
-- ✅ **Disconnection Handling**: Management of abrupt client disconnections
+```
+┌─────────────┐
+│   Clients   │ (JavaFX GUI)
+└──────┬──────┘
+       │ WebSocket / HTTP
+       ▼
+┌─────────────┐
+│    NGINX    │ (Load Balancer / Reverse Proxy)
+│   Gateway   │
+└──────┬──────┘
+       │
+       ├──────────┬──────────┬──────────┐
+       ▼          ▼          ▼          ▼
+   ┌──────┐  ┌──────┐  ┌──────┐    ┌──────┐
+   │Server│  │Server│  │Server│... │Server│
+   │  1   │  │  2   │  │  3   │    │  N   │
+   │:8080 │  │:8083 │  │:808X │    │:808X │
+   └───┬──┘  └───┬──┘  └───┬──┘    └───┬──┘
+       │         │         │            │
+       └─────────┴─────────┴────────────┘
+                 │         │
+         ┌───────┴────┬────┴────────┐
+         ▼            ▼             ▼
+    ┌──────────┐ ┌─────────┐  ┌────────────┐
+    │PostgreSQL│ │  Redis  │  │   Redis    │
+    │ Database │ │ Master  │  │  Sentinel  │
+    │  :5432   │ │  :6379  │  │  Cluster   │
+    └──────────┘ └─────────┘  └────────────┘
+```
+
+### Component Diagram
+
+The following diagram shows the physical structure and relationships between system components:
+
+![Component Diagram](report/problem02/components.svg)
+
+**Key Components:**
+
+1. **Client Layer**: JavaFX-based GUI communicating via WebSocket
+2. **Gateway Layer**: NGINX reverse proxy for load balancing and routing
+3. **Server Cluster**: Multiple stateless server instances running game logic
+4. **Infrastructure Services**:
+   - **PostgreSQL**: Single source of truth for persistent data (players, matches, cards)
+   - **Redis Sentinel Cluster**: High-availability cache, Pub/Sub broker, and leader election
+   - **Sentinels**: Automatic failover and monitoring
+
+### Sequence Diagram
+
+The following diagram illustrates the complete flow of key operations:
+
+![Sequence Diagram](report/problem02/sequence.svg)
+
+**Flows Demonstrated:**
+
+1. **Phase 1-2**: Player connection and character setup
+2. **Phase 3**: Card purchase with atomic transaction
+3. **Phase 4**: Cross-server card trade using Two-Phase Commit (2PC)
+4. **Phase 5-6**: Cross-server matchmaking with HTTP coordination
+5. **Phase 7-8**: Match creation and game initialization with Redis Pub/Sub
+
+## Key Features
+
+### ✅ Distributed Systems Features
+
+- **Cross-Server Matchmaking**: 
+  - Players queue on different servers
+  - Servers coordinate via REST API to find partners
+  - Cooldown mechanism prevents race conditions
+  - Scheduled tasks ensure matches are created
+
+- **Atomic Card Trading (2PC Protocol)**:
+  - **Phase 1 (PREPARE)**: Both servers validate and lock resources
+  - **Phase 2 (COMMIT)**: Atomic commit on both servers
+  - Rollback on failure ensures consistency
+  - No partial trades possible
+
+- **Card Shop with Stock Management**:
+  - Atomic stock decrement with database locks
+  - Transaction-safe coin deduction
+  - Card collection serialization to JSON
+  - Prevents overselling
+
+- **Leader Election**:
+  - Redis-based distributed leader election
+  - Scheduled tasks run only on leader
+  - Automatic re-election on failure
+
+- **Server Discovery & Registration**:
+  - Servers automatically register with peers
+  - Health checks and heartbeats
+  - Dynamic cluster membership
+
+### ✅ Real-Time Communication
+
+- **WebSocket Protocol**: Bidirectional client-server communication
+- **Redis Pub/Sub**: Cross-server event propagation
+- **Event-Driven Architecture**: Async notifications for trades, matches, etc.
+- **Anonymous Sessions**: Support for unauthenticated test clients
+
+### ✅ Data Persistence & Consistency
+
+- **JPA/Hibernate**: ORM for database interactions
+- **PostgreSQL**: ACID-compliant transactions
+- **JSON Serialization**: Complex card collections stored as JSONB
+- **Optimistic Locking**: Prevent concurrent modification conflicts
+- **Database Migrations**: Version-controlled schema changes
+
+### ✅ High Availability & Fault Tolerance
+
+- **Redis Sentinel**: Automatic master failover
+- **Connection Pooling**: Efficient resource management
+- **Retry Logic**: Graceful handling of transient failures
+- **Health Checks**: Monitoring and alerting
+
+### ✅ Performance Optimizations
+
+- **Concurrent Data Structures**: Thread-safe queues and maps
+- **Distributed Caching**: Redis for session and state caching
+- **Lazy Loading**: JPA fetch strategies for optimal queries
+- **Connection Reuse**: HTTP client pooling
 
 ## Technologies
 
-- Java 21
-- Maven
-- Docker
-- Docker Compose
-- Spring Boot
-- NGINX (as reverse proxy, replacing Spring Cloud Gateway)
-- PostgreSQL
-- Redis (with Redisson for distributed locks)
-- JWT (JSON Web Tokens)
-- WebSocket
-- TCP/UDP Sockets
-- Gson (for JSON serialization)
-- SLF4J/Logback (for logging)
+### Core Technologies
 
-## Prerequisites
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Java | 21 | Programming language |
+| Spring Boot | 3.2.0 | Application framework |
+| Maven | 3.8+ | Dependency management & build |
+| PostgreSQL | 16 | Relational database |
+| Redis | 7.2 | Cache, Pub/Sub, distributed locks |
+| Redisson | 3.25.0 | Redis client with advanced features |
+| NGINX | latest | Reverse proxy & load balancer |
 
-- Java 21
-- Maven 3.8+
-- Docker (optional, but recommended)
-- Docker Compose (optional, but recommended)
+### Libraries & Frameworks
+
+- **Spring Data JPA**: Database abstraction layer
+- **Hibernate**: ORM implementation
+- **Spring WebSocket**: WebSocket support
+- **SLF4J/Logback**: Logging framework
+- **Gson**: JSON serialization
+- **Jackson**: JSON processing for REST APIs
+- **HikariCP**: JDBC connection pooling
+- **JUnit 5**: Unit testing framework
+
+### DevOps & Infrastructure
+
+- **Docker**: Containerization
+- **Docker Compose**: Multi-container orchestration
+- **Bash Scripts**: Automation and testing
+- **PlantUML**: Architecture diagrams
+
+## System Requirements
+
+### Development
+
+- **Java Development Kit (JDK)**: 21 or higher
+- **Maven**: 3.8 or higher
+- **Docker**: 20.10+ (optional but recommended)
+- **Docker Compose**: 2.0+ (optional but recommended)
+- **Git**: For version control
+
+### Production
+
+- **CPU**: 4+ cores recommended for multiple server instances
+- **RAM**: 4GB minimum, 8GB recommended
+- **Disk**: 10GB minimum (database + logs)
+- **Network**: Low-latency connection for cross-server communication
+
+### Operating Systems
+
+- ✅ Linux (Ubuntu 20.04+, Debian 11+, Fedora, etc.)
+- ✅ macOS (11+)
+- ✅ Windows 10/11 (with WSL2 recommended)
 
 ## Installation
 
-### With Docker (Recommended)
+### 1. Clone the Repository
 
 ```bash
-# Clone the repository
-git clone <repository-url>
+git clone https://github.com/yourusername/dueling-protocol.git
 cd dueling-protocol
-
-# Build the Docker images
-./build.sh
 ```
 
-### With Maven
+### 2. Build with Maven
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd dueling-protocol
+# Clean and build all modules
+mvn clean package -DskipTests
 
-# Compile the project
+# Or build with tests
 mvn clean package
+```
+
+### 3. Build Docker Images (Optional)
+
+```bash
+# Build all Docker images
+./scripts/build.sh
+
+# Or use Docker Compose
+cd docker
+docker compose build
 ```
 
 ## Running the Project
 
-### Quick Start with Menu System
+### Full Distributed Setup
 
-For an easy-to-use interface with all available options:
+Start the complete distributed system with all infrastructure services:
 
 ```bash
-# Run the main menu
+# Navigate to docker directory
+cd docker
+
+# Start all services (PostgreSQL, Redis Sentinel, Gateway, Servers)
+docker compose up -d
+
+# Check status
+docker compose ps
+
+# View logs
+docker compose logs -f
+```
+
+**Services Started:**
+- PostgreSQL (port 5432)
+- Redis Master (port 6379)
+- Redis Slaves (ports 6380-6381)
+- Redis Sentinels (ports 26379-26381)
+- NGINX Gateway (port 80)
+- Game Server 1 (port 8080)
+- Game Server 2 (port 8083)
+
+### Local Development
+
+For faster development iterations without Docker:
+
+```bash
+# Terminal 1: Start infrastructure
+cd docker
+docker compose up postgres redis-master redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 -d
+
+# Terminal 2: Start Server 1
+SERVER_PORT=8080 \
+SERVER_NAME=server-1 \
+POSTGRES_HOST=localhost \
+POSTGRES_PORT=5432 \
+REDIS_HOST=localhost \
+REDIS_PORT=6379 \
+java -Dspring.profiles.active=server,distributed,local-distributed \
+     -jar dueling-server/target/dueling-server-1.0-SNAPSHOT.jar
+
+# Terminal 3: Start Server 2
+SERVER_PORT=8083 \
+SERVER_NAME=server-2 \
+POSTGRES_HOST=localhost \
+POSTGRES_PORT=5432 \
+REDIS_HOST=localhost \
+REDIS_PORT=6379 \
+java -Dspring.profiles.active=server,distributed,local-distributed \
+     -jar dueling-server/target/dueling-server-1.0-SNAPSHOT.jar
+
+# Terminal 4: Run tests
+./test_scripts/test_cross_server_trade.sh
+```
+
+### Production Mode
+
+For production deployment with monitoring and logging:
+
+```bash
+# Start with production profile
+cd docker
+docker compose --profile production up -d
+
+# Enable detailed logging
+export LOGGING_LEVEL=INFO
+
+# Start servers with production settings
+java -Xmx2G -Xms1G \
+     -Dspring.profiles.active=server,distributed,production \
+     -jar dueling-server/target/dueling-server-1.0-SNAPSHOT.jar
+```
+
+### Interactive Menu
+
+Use the interactive menu for common operations:
+
+```bash
 ./menu.sh
 ```
 
-This provides access to all system functions including starting, testing, monitoring, and distributed deployment.
-
-### With Docker
-
-```bash
-# Start all services with Docker Compose
-cd docker && docker compose up -d
-
-# Or start individual services
-./run_server.sh
-./run_gateway.sh
-./run_client.sh
-```
-
-### With Maven
-
-```bash
-# Start infrastructure services (PostgreSQL and Redis)
-cd docker && docker compose up postgres redis-master redis-slave redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 -d
-
-# Start the gateway
-cd ../dueling-gateway
-mvn spring-boot:run
-
-# In another terminal, start the server
-cd ../dueling-server
-mvn spring-boot:run
-
-# In another terminal, start the client
-cd ../dueling-client
-mvn exec:java -Dexec.mainClass="client.GameClient"
-```
-
-### Locally (Development)
-
-For local development without Docker, you can use the simple startup scripts:
-
-1. **Easy Method (Recommended)**:
-   ```bash
-   # Use one of the simplified startup scripts:
-   ./start_game_local.sh          # Standard local startup
-   ./start_game_local_simple.sh   # With simple Redis (no Sentinel)
-   ./start_game_redis_disabled.sh # With Redis disabled
-   ```
-
-2. **Manual Method**:
-   ```bash
-   # Start infrastructure services
-   cd docker && docker compose up postgres redis-master -d
-   
-   # In one terminal, start the gateway
-   ./start_game_redis_disabled.sh
-   
-   # In another terminal, start the server manually
-   cd dueling-server
-   mvn spring-boot:run -Dspring.profiles.active=local-dev
-   ```
-
-3. **Run the Client**:
-   ```bash
-   # In another terminal, run the client
-   ./run_client.sh
-   ```
-
-Refer to [INSTRUCOES_EXECUCAO.md](INSTRUCOES_EXECUCAO.md) for detailed instructions on running the project locally.
+**Menu Options:**
+1. Start infrastructure only
+2. Start single server (development)
+3. Start two servers (distributed testing)
+4. Run cross-server trade test
+5. Run cross-server match test
+6. View server logs
+7. Stop all services
+8. Clean and rebuild
+9. Database migrations
+10. View system status
+11. Exit
 
 ## Communication Protocol
 
-The communication between client and server uses a combination of HTTP/REST for authentication and WebSocket for real-time gameplay.
+### WebSocket Protocol
 
-### Authentication Flow
+The system uses a custom text-based protocol over WebSocket:
 
-1. Client registers with `/api/auth/register`
-2. Client authenticates with `/api/auth/login` to receive a JWT token
-3. Client uses the JWT token in the `Authorization: Bearer <token>` header for all subsequent requests
+```
+GAME:{playerId}:{action}:{parameters...}
+```
 
-### WebSocket Communication
+#### Character Setup
+```
+GAME:player123:CHARACTER_SETUP:HeroName:Human:Warrior
+```
 
-After authentication, the client establishes a WebSocket connection to `/ws` with the JWT token as a query parameter.
+#### Matchmaking
+```
+GAME:player123:MATCHMAKING:ENTER
+```
+
+#### Card Purchase
+```
+GAME:player123:BUY_CARD:Fireball
+```
+
+#### Trade Proposal
+```
+GAME:player123:TRADE_PROPOSE:player456:Fireball:Ice Shard
+```
+
+#### Trade Response
+```
+GAME:player123:TRADE_ACCEPT:trade-id-123
+GAME:player123:TRADE_REJECT:trade-id-123
+```
 
 ### REST API Endpoints
 
-| Endpoint | Method | Description |
-| :--- | :--- | :--- |
-| `/api/auth/register` | POST | Registers a new user |
-| `/api/auth/login` | POST | Authenticates a user and returns a JWT token |
-| `/api/friends` | GET | Retrieves the list of friends for the authenticated user |
-| `/api/friends/request` | POST | Sends a friend request to another user |
-| `/api/friends/accept` | POST | Accepts a pending friend request |
-| `/api/friends/reject` | POST | Rejects a pending friend request |
-| `/api/match/create` | POST | Creates a new match |
-| `/api/move/play` | POST | Plays a card during a match |
-| `/api/state` | GET | Retrieves the current game state |
-| `/api/user/profile` | GET | Retrieves the authenticated user's profile |
-| `/api/user/stats` | GET | Retrieves the authenticated user's statistics |
+#### Cross-Server Matchmaking
+
+```http
+GET /api/matchmaking/find-and-lock-partner
+```
+
+Response:
+```json
+{
+  "id": "player123",
+  "nickname": "Hero",
+  "race": "Human",
+  "class": "Warrior",
+  "level": 5
+}
+```
+
+#### Trade Preparation (2PC Phase 1)
+
+```http
+POST /api/trade/prepare
+Content-Type: application/json
+
+{
+  "proposalId": "trade-123",
+  "target": "player456",
+  "requestedCard": "Ice Shard"
+}
+```
+
+Response:
+```json
+{
+  "status": "PREPARED"
+}
+```
+
+#### Trade Commit (2PC Phase 2)
+
+```http
+POST /api/trade/commit
+Content-Type: application/json
+
+{
+  "proposalId": "trade-123",
+  "decision": "COMMIT"
+}
+```
+
+Response:
+```json
+{
+  "status": "COMMITTED"
+}
+```
+
+### Redis Pub/Sub Channels
+
+```
+# Player-specific channels
+{playerId}:events
+
+# Cross-server coordination
+CROSS_SERVER:{playerId}
+
+# System events
+SYSTEM:matches
+SYSTEM:trades
+```
 
 ## Testing
 
-The project includes a complete suite of automated tests that cover various scenarios:
+### Automated Test Scripts
+
+The project includes comprehensive test scripts:
+
+```bash
+# Cross-server card trade
+./test_scripts/test_cross_server_trade.sh
+
+# Cross-server matchmaking
+./test_scripts/test_cross_server_match.sh
+
+# Card purchase
+./test_scripts/test_card_purchase.sh
+
+# All tests
+./test_scripts/run_all_tests.sh
+```
+
+### Manual Testing with WebSocket
+
+Using `websocat`:
+
+```bash
+# Install websocat
+cargo install websocat
+# or: brew install websocat
+
+# Connect to server
+websocat ws://localhost:8080/ws
+
+# Send commands
+GAME:testPlayer:CHARACTER_SETUP:Hero:Human:Warrior
+GAME:testPlayer:MATCHMAKING:ENTER
+```
 
 ### Unit Tests
 
 ```bash
 # Run all unit tests
 mvn test
+
+# Run specific test class
+mvn test -Dtest=MatchmakingServiceTest
+
+# Run with coverage
+mvn clean test jacoco:report
 ```
 
 ### Integration Tests
 
 ```bash
 # Run integration tests
-mvn verify
+mvn verify -P integration-tests
+
+# Run specific integration test
+mvn verify -Dtest=CrossServerMatchingIT
 ```
-
-### Scenario Tests
-
-```bash
-# Run all scenario tests
-./run_all_tests.sh
-```
-
-### Stress Test
-
-```bash
-# Run a stress test with 10 simultaneous clients
-./test_scripts/test_stress.sh
-```
-
-The tests cover:
-- Authentication flows
-- Friend management operations
-- Matchmaking scenarios
-- Game play sequences
-- Abrupt disconnections during matchmaking and matches
-- Race conditions in data persistence
-- Simultaneous moves
-- Handling of malformed inputs
 
 ## Project Structure
 
 ```
 dueling-protocol/
-├── docker/              # Docker configurations and compose files
-├── dueling-client/      # Command-line game client
-├── dueling-gateway/     # API Gateway implementation
-├── dueling-server/      # Main game server implementation
-├── scripts/             # Utility scripts for deployment and testing
-├── test_scripts/        # Automated test scripts
-├── report/              # Documentation and diagrams
-├── pom.xml              # Maven parent project configuration
-├── README.md            # Project documentation
-├── INSTRUCOES_EXECUCAO.md # Detailed execution instructions
-└── RESOLUCAO_PROBLEMAS.md # Problem resolution documentation
+├── dueling-server/          # Main game server module
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/
+│   │   │   │   ├── config/             # Spring configurations
+│   │   │   │   ├── controller/         # REST controllers & GameFacade
+│   │   │   │   ├── model/              # Domain entities
+│   │   │   │   ├── repository/         # JPA repositories
+│   │   │   │   ├── service/            # Business logic
+│   │   │   │   │   ├── matchmaking/    # Matchmaking services
+│   │   │   │   │   ├── registry/       # Server registration
+│   │   │   │   │   └── election/       # Leader election
+│   │   │   │   ├── websocket/          # WebSocket handlers
+│   │   │   │   └── pubsub/             # Redis Pub/Sub manager
+│   │   │   └── resources/
+│   │   │       ├── application.yml     # Base configuration
+│   │   │       ├── application-server.yml
+│   │   │       ├── application-distributed.yml
+│   │   │       └── application-local-distributed.yml
+│   │   └── test/                       # Unit tests
+│   └── pom.xml
+│
+├── dueling-client/          # JavaFX client (GUI)
+│   ├── src/
+│   │   └── main/
+│   │       └── java/
+│   │           ├── view/               # UI controllers
+│   │           ├── model/              # Client-side models
+│   │           └── service/            # Client services
+│   └── pom.xml
+│
+├── dueling-gateway/         # NGINX gateway configuration
+│   ├── nginx.conf
+│   └── Dockerfile.nginx
+│
+├── docker/                  # Docker Compose configurations
+│   ├── docker-compose.yml   # Main compose file
+│   ├── .env                 # Environment variables
+│   └── init-db.sql          # Database initialization
+│
+├── scripts/                 # Automation scripts
+│   ├── start_all_for_test.sh    # Start all services
+│   ├── start_server1.sh          # Start server 1
+│   ├── start_server2.sh          # Start server 2
+│   ├── stop_all.sh               # Stop all services
+│   └── build.sh                  # Build all modules
+│
+├── test_scripts/            # Test automation
+│   ├── test_cross_server_trade.sh
+│   ├── test_cross_server_match.sh
+│   ├── test_card_purchase.sh
+│   └── run_all_tests.sh
+│
+├── report/                  # Documentation & diagrams
+│   ├── problem02/
+│   │   ├── components.puml      # Component diagram
+│   │   ├── components.svg
+│   │   ├── sequence.puml        # Sequence diagram
+│   │   └── sequence.svg
+│   └── figuras/
+│
+├── menu.sh                  # Interactive menu
+├── pom.xml                  # Parent POM
+├── README.md                # This file
+├── CHANGELOG_ORGANIZATION.md # Detailed change log
+└── LICENSE
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Server Configuration
+SERVER_PORT=8080              # Server port
+SERVER_NAME=server-1          # Server instance name
+PEER_SERVERS=http://server-2:8083  # Other servers
+
+# Database Configuration
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=dueling_db
+POSTGRES_USER=dueling_user
+POSTGRES_PASSWORD=dueling_password
+
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_SENTINEL_MASTER=redis-master
+REDIS_SENTINEL_NODES=localhost:26379,localhost:26380,localhost:26381
+
+# Spring Profiles
+SPRING_PROFILES_ACTIVE=server,distributed,local-distributed
+
+# Logging
+LOGGING_LEVEL=INFO
+LOGGING_PATTERN=%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+```
+
+### Spring Profiles
+
+- **server**: Enable server-specific beans (vs gateway/client)
+- **distributed**: Enable distributed features (Redis Pub/Sub, cross-server)
+- **local-distributed**: Use single Redis instance (not Sentinel)
+- **local-dev**: Simplified configuration for local development
+- **production**: Production-grade settings (connection pools, timeouts)
+
+### Application Configuration
+
+See `dueling-server/src/main/resources/application-*.yml` for detailed configuration options.
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Port Already in Use
+
+```bash
+# Kill process using port 8080
+lsof -ti:8080 | xargs kill -9
+
+# Or use fuser
+fuser -k 8080/tcp
+```
+
+#### 2. Redis Connection Refused
+
+```bash
+# Check Redis is running
+docker compose ps redis-master
+
+# Check Redis logs
+docker compose logs redis-master
+
+# Restart Redis
+docker compose restart redis-master
+```
+
+#### 3. Database Connection Failed
+
+```bash
+# Check PostgreSQL is running
+docker compose ps postgres
+
+# Check credentials
+docker compose exec postgres psql -U dueling_user -d dueling_db
+
+# Reset database
+docker compose down -v
+docker compose up postgres -d
+```
+
+#### 4. WebSocket Connection Failed
+
+```bash
+# Check server logs
+tail -f logs/server.log
+
+# Test WebSocket with websocat
+websocat ws://localhost:8080/ws
+
+# Check NGINX is routing correctly
+docker compose logs nginx
+```
+
+#### 5. Cross-Server Match Not Working
+
+```bash
+# Check both servers are registered
+curl http://localhost:8080/api/health
+curl http://localhost:8083/api/health
+
+# Check server logs for [MATCH] entries
+grep "\[MATCH\]" logs/*.log
+
+# Verify cooldown mechanism
+grep "cooldown" logs/*.log
+```
+
+### Debug Mode
+
+Enable debug logging:
+
+```bash
+# In application.yml
+logging:
+  level:
+    controller: DEBUG
+    service: DEBUG
+    pubsub: DEBUG
+
+# Or via environment variable
+export LOGGING_LEVEL=DEBUG
+```
+
+### Health Checks
+
+```bash
+# Server health
+curl http://localhost:8080/actuator/health
+
+# Database health
+docker compose exec postgres pg_isready
+
+# Redis health
+docker compose exec redis-master redis-cli ping
 ```
 
 ## Contributing
 
-1. Fork the project
-2. Create a branch for your feature (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+We welcome contributions! Please follow these guidelines:
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'feat: add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
+
+### Commit Message Convention
+
+Follow semantic commit messages:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting)
+- `refactor`: Code refactoring
+- `test`: Adding/updating tests
+- `chore`: Build process, dependencies, tooling
+
+**Examples:**
+```
+feat(matchmaking): add cooldown mechanism to prevent race conditions
+fix(trade): ensure atomic rollback on 2PC failure
+docs(readme): add architecture diagrams
+refactor(service): extract common logic to base class
+test(integration): add cross-server trade test
+```
+
+### Code Style
+
+- Follow Java naming conventions
+- Use meaningful variable names
+- Add JavaDoc for public methods
+- Keep methods small and focused
+- Write unit tests for new features
+
+### Testing Requirements
+
+- All new features must have unit tests
+- Integration tests for cross-server features
+- Test coverage should not decrease
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
-## Project Structure Update
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-All scripts have been organized into a clean structure with only `menu.sh` in the root directory as the main entry point:
+---
 
-- **`menu.sh`** - Main menu interface (only script in root directory)
-- **`scripts/`** directory with organized subdirectories:
-  - `build/` - Build and test execution scripts
-  - `run/` - Runtime execution scripts
-  - `deploy/` - Deployment and startup scripts  
-  - `monitor/` - Monitoring scripts
-- **`test_scripts/`** - Organized test scripts (functional, integration, performance, etc.)
+## 📚 Additional Resources
 
-This structure makes the project cleaner and easier to navigate, with `./menu.sh` providing access to all functionality.
+- [Architecture Decision Records](docs/adr/)
+- [API Documentation](docs/api/)
+- [Deployment Guide](docs/deployment/)
+- [Performance Tuning](docs/performance/)
+- [Security Best Practices](docs/security/)
+
+## 🤝 Support
+
+- 📧 Email: support@duelingprotocol.com
+- 💬 Discord: [Join our server](https://discord.gg/duelingprotocol)
+- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/dueling-protocol/issues)
+- 📖 Wiki: [Project Wiki](https://github.com/yourusername/dueling-protocol/wiki)
+
+## 🙏 Acknowledgments
+
+- Spring Framework team for excellent documentation
+- Redis team for powerful distributed primitives
+- PlantUML for architecture diagram generation
+- The open-source community for inspiration and tools
+
+---
+
+**Made with ❤️ by the Dueling Protocol Team**
