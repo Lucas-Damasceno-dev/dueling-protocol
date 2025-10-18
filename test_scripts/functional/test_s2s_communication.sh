@@ -15,7 +15,9 @@ echo "Iniciando script de teste de comunicação S2S..."
 # Função para limpeza final (garantida mesmo em caso de falha)
 cleanup() {
     echo "Executando limpeza final..."
-    cd /home/lucas/Documentos/dev/projects/dueling-protocol/docker
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
+    cd "$PROJECT_DIR/docker"
     docker compose -f docker-compose.yml down --remove-orphans || true
     # Remover arquivos de log antigos
     rm -f server1.log server2.log || true
@@ -24,7 +26,9 @@ cleanup() {
 trap cleanup EXIT
 
 # Mudar para o diretório docker onde está o docker-compose.yml
-cd /home/lucas/Documentos/dev/projects/dueling-protocol/docker
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
+cd "$PROJECT_DIR/docker"
 
 # Etapa 1: Limpeza
 echo "1. Limpando containers em execução..."
