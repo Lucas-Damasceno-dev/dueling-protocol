@@ -45,4 +45,12 @@ public interface MatchmakingService {
      * @return true if the player is already in the queue, false otherwise
      */
     boolean isPlayerInQueue(Player player);
+    
+    /**
+     * Returns a player to the queue after a failed match attempt.
+     * Adds a cooldown to prevent immediate re-locking.
+     *
+     * @param player the player to return to the queue
+     */
+    void returnPlayerToQueue(Player player);
 }
