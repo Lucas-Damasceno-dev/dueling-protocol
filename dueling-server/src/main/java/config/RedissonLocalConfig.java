@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 @Configuration
-@Profile("local-dev")  // Perfil especial para desenvolvimento local
+@Profile({"local-dev", "local-distributed"})  // Perfil para desenvolvimento local (com ou sem distributed)
 public class RedissonLocalConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(RedissonLocalConfig.class);

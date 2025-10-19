@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 @Configuration
-@Profile("!test && !local-dev")  // Somente para perfis que não são teste nem desenvolvimento local
+@Profile("!test && !local-dev && !local-distributed")  // Não usar em testes ou desenvolvimento local
 public class RedissonSentinelConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(RedissonSentinelConfig.class);
