@@ -24,6 +24,10 @@ public class LocalDevMatchmakingService implements MatchmakingService {
     private final Queue<PlayerWithDeck> matchmakingQueue = new ConcurrentLinkedQueue<>();
     private final Object lock = new Object();
     private final MatchRepository matchRepository;
+    
+    // Track recently returned players to avoid immediate re-lock
+    private final java.util.Map<String, Long> recentlyReturnedPlayers = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long COOLDOWN_MS = 1000; // 1 second cooldown
 
     /**
      * Public constructor for Spring's dependency injection.
@@ -129,16 +133,47 @@ public class LocalDevMatchmakingService implements MatchmakingService {
     @Override
     public Optional<Player> findAndLockPartner() {
         synchronized (lock) {
-            if (!matchmakingQueue.isEmpty()) {
-                PlayerWithDeck partnerWithDeck = matchmakingQueue.poll();
-                if (partnerWithDeck != null) {
+            if (matchmakingQueue.isEmpty()) {
+                logger.debug("[MATCHMAKING] findAndLockPartner: Queue is empty");
+                return Optional.empty();
+            }
+            
+            logger.debug("[MATCHMAKING] findAndLockPartner: Queue size = {}", matchmakingQueue.size());
+            
+            // Clean up expired cooldowns
+            long now = System.currentTimeMillis();
+            recentlyReturnedPlayers.entrySet().removeIf(entry -> 
+                now - entry.getValue() > COOLDOWN_MS);
+            
+            // Try to find a player that is not in cooldown
+            PlayerWithDeck partnerWithDeck = null;
+            int skippedCount = 0;
+            for (PlayerWithDeck pwd : matchmakingQueue) {
+                String playerId = pwd.getPlayer().getId();
+                Long returnTime = recentlyReturnedPlayers.get(playerId);
+                
+                if (returnTime == null || (now - returnTime) > COOLDOWN_MS) {
+                    // Player is not in cooldown, can be matched
+                    matchmakingQueue.remove(pwd);
+                    partnerWithDeck = pwd;
                     logger.info("Found and locked partner {} for remote match with deck {}.", 
-                                partnerWithDeck.getPlayer().getNickname(), 
-                                partnerWithDeck.getDeckId());
-                    return Optional.ofNullable(partnerWithDeck.getPlayer());
+                                pwd.getPlayer().getNickname(), 
+                                pwd.getDeckId());
+                    break;
+                } else {
+                    skippedCount++;
+                    logger.debug("Skipping player {} due to cooldown ({} ms remaining)", 
+                                playerId, COOLDOWN_MS - (now - returnTime));
                 }
             }
-            return Optional.empty();
+            
+            if (partnerWithDeck == null && skippedCount > 0) {
+                logger.info("[MATCHMAKING] Could not find partner: {} players in queue but all in cooldown", skippedCount);
+            }
+            
+            return partnerWithDeck != null ? 
+                Optional.ofNullable(partnerWithDeck.getPlayer()) : 
+                Optional.empty();
         }
     }
     
@@ -155,5 +190,23 @@ public class LocalDevMatchmakingService implements MatchmakingService {
         }
         // Check for the player with any deck
         return matchmakingQueue.stream().anyMatch(p -> p.getPlayer() != null && p.getPlayer().getId().equals(player.getId()));
+    }
+    
+    @Override
+    public void returnPlayerToQueue(Player player) {
+        if (player == null) {
+            logger.warn("Attempt to return null player to queue");
+            return;
+        }
+        
+        synchronized (lock) {
+            // Mark player as recently returned with cooldown
+            recentlyReturnedPlayers.put(player.getId(), System.currentTimeMillis());
+            
+            // Add back to queue
+            matchmakingQueue.offer(new PlayerWithDeck(player, null));
+            logger.info("[MATCHMAKING] Returned player {} to queue with {} ms cooldown", 
+                        player.getNickname(), COOLDOWN_MS);
+        }
     }
 }
