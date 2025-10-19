@@ -98,7 +98,13 @@ public class LocalDevWebSocketHandler extends TextWebSocketHandler {
         String payload = message.getPayload();
 
         if ("PING".equals(payload)) {
-            session.sendMessage(new TextMessage("PONG"));
+            try {
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage("PONG"));
+                }
+            } catch (IOException e) {
+                logger.debug("Failed to send PONG to session {}: {}", session.getId(), e.getMessage());
+            }
             return;
         }
 
@@ -176,12 +182,24 @@ public class LocalDevWebSocketHandler extends TextWebSocketHandler {
                 if (session.isOpen()) {
                     String message = this.toString();
                     if (!message.isEmpty()) {
-                        session.sendMessage(new TextMessage(message));
+                        synchronized (session) {
+                            if (session.isOpen()) {
+                                session.sendMessage(new TextMessage(message));
+                            }
+                        }
                         getBuffer().setLength(0);
                     }
                 }
             } catch (IOException e) {
-                logger.warn("Error sending message via WebSocket for session {}: {}", session.getId().toString(), e.getMessage());
+                if (e.getMessage() != null && 
+                    (e.getMessage().contains("Broken pipe") || 
+                     e.getMessage().contains("Connection reset"))) {
+                    logger.debug("Connection already closed for session {}", session.getId());
+                } else {
+                    logger.warn("Error sending message via WebSocket for session {}: {}", session.getId().toString(), e.getMessage());
+                }
+            } catch (IllegalStateException e) {
+                logger.debug("Session {} already closed", session.getId());
             }
         }
     }

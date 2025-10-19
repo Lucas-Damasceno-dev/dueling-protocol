@@ -49,11 +49,7 @@ public class WebSocketHeartbeatService {
             if (!playerInMatch) {
                 // For players in menu, only send PONG if needed for connection health
                 // but don't check for timeouts
-                try {
-                    session.sendMessage(PONG_MESSAGE);
-                } catch (IOException e) {
-                    logger.warn("Failed to send PONG to session {}: {}", session.getId(), e.getMessage());
-                }
+                sendPongSafely(session);
                 continue;
             }
 
@@ -61,20 +57,58 @@ public class WebSocketHeartbeatService {
             Long lastActivity = activity.get(session.getId());
             if (lastActivity == null || (now - lastActivity) > MATCH_INACTIVITY_TIMEOUT_MS) {
                 logger.warn("Closing session {} due to inactivity during match.", session.getId());
-                try {
-                    session.close(CloseStatus.SESSION_NOT_RELIABLE.withReason("Inactivity timeout during match"));
-                } catch (IOException e) {
-                    logger.error("Error closing inactive session {}: {}", session.getId(), e.getMessage());
-                }
+                closeSessionSafely(session, CloseStatus.SESSION_NOT_RELIABLE.withReason("Inactivity timeout during match"));
             } else {
-                try {
-                    // Envia uma mensagem PONG para manter a conexão viva e permitir que o cliente detecte problemas
-                    // during matches when timeout is active
-                    session.sendMessage(PONG_MESSAGE);
-                } catch (IOException e) {
-                    logger.warn("Failed to send PONG to session {}: {}", session.getId(), e.getMessage());
+                // Envia uma mensagem PONG para manter a conexão viva e permitir que o cliente detecte problemas
+                // during matches when timeout is active
+                sendPongSafely(session);
+            }
+        }
+    }
+
+    private void sendPongSafely(WebSocketSession session) {
+        try {
+            if (session.isOpen()) {
+                synchronized (session) {
+                    if (session.isOpen()) {
+                        session.sendMessage(PONG_MESSAGE);
+                    }
                 }
             }
+        } catch (IOException e) {
+            // Silently handle broken pipe and connection reset errors
+            if (e.getMessage() != null && 
+                (e.getMessage().contains("Broken pipe") || 
+                 e.getMessage().contains("Connection reset"))) {
+                logger.debug("Connection already closed for session {}", session.getId());
+            } else {
+                logger.warn("Failed to send PONG to session {}: {}", session.getId(), e.getMessage());
+            }
+        } catch (IllegalStateException e) {
+            logger.debug("Session {} already closed", session.getId());
+        }
+    }
+
+    private void closeSessionSafely(WebSocketSession session, CloseStatus status) {
+        try {
+            if (session.isOpen()) {
+                synchronized (session) {
+                    if (session.isOpen()) {
+                        session.close(status);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            // Silently handle errors when closing already broken connections
+            if (e.getMessage() != null && 
+                (e.getMessage().contains("Broken pipe") || 
+                 e.getMessage().contains("Connection reset"))) {
+                logger.debug("Connection already closed for session {}", session.getId());
+            } else {
+                logger.error("Error closing inactive session {}: {}", session.getId(), e.getMessage());
+            }
+        } catch (IllegalStateException e) {
+            logger.debug("Session {} already closed", session.getId());
         }
     }
 }

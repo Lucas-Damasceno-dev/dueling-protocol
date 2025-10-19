@@ -28,6 +28,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final WebSocketSessionManager sessionManager;
+    
+    @org.springframework.beans.factory.annotation.Value("${websocket.auth.required:true}")
+    private boolean authRequired;
 
     @Autowired
     public GameWebSocketHandler(GameFacade gameFacade, UserRepository userRepository, JwtUtil jwtUtil, WebSocketSessionManager sessionManager) {
@@ -42,7 +45,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String username = null;
 
-        logger.debug("WebSocket connection attempt from session: {}", session.getId());
+        logger.info("WebSocket connection attempt from session: {}", session.getId());
         
         // 1. Get username from session attributes (populated by HttpHandshakeInterceptor)
         Object userIdFromAttribute = session.getAttributes().get("userId");
@@ -53,12 +56,26 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
         // 2. Fallback for direct connections (no gateway) or if interceptor fails
         if (username == null) {
-            logger.warn("Could not find user in session attribute. Falling back to token validation.");
+            logger.info("Could not find user in session attribute. Falling back to token validation.");
             String token = getJwtTokenFromSession(session);
             if (token == null) {
-                logger.error("Authentication failed: No token found in query parameters for session: {}", session.getId());
-                session.close(CloseStatus.POLICY_VIOLATION.withReason("Authentication token is required"));
-                return;
+                // Allow anonymous connections if auth is not required (test mode)
+                if (!authRequired) {
+                    String anonymousId = "anonymous_" + session.getId();
+                    logger.warn("Authentication NOT required (test mode). Allowing anonymous connection for session: {}", session.getId());
+                    // Store session without authentication - playerId will be extracted from first message
+                    sessionManager.registerSession(session, anonymousId);
+                    
+                    // Setup PrintWriter for anonymous session so it can receive messages
+                    PrintWriter writer = new PrintWriter(new WebSocketWriter(session));
+                    sessionManager.storePlayerWriter(anonymousId, writer);
+                    logger.info("Anonymous session setup complete with PrintWriter");
+                    return;
+                } else {
+                    logger.error("Authentication failed: No token found in query parameters for session: {}", session.getId());
+                    session.close(CloseStatus.POLICY_VIOLATION.withReason("Authentication token is required"));
+                    return;
+                }
             }
 
             try {
@@ -95,18 +112,21 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         PrintWriter writer = new PrintWriter(new WebSocketWriter(session));
         sessionManager.storePlayerWriter(playerId, writer);
 
+        System.out.println("[DEBUG] About to call gameFacade.registerPlayer for player: " + playerId);
         gameFacade.registerPlayer(playerId);
+        System.out.println("[DEBUG] Called gameFacade.registerPlayer, now subscribing for player: " + playerId);
         eventManager.subscribe(playerId, writer);
+        System.out.println("[DEBUG] Subscribed player: " + playerId);
 
         logger.info("WebSocket connection established for player {} (user: {}): session {}", playerId, username, session.getId());
-        logger.debug("Debug: Registered session {} for player {} with writer {}", session.getId(), playerId, writer.hashCode());
-        logger.debug("About to send SUCCESS:CONNECTED to player {}", playerId);
+        logger.info("info: Registered session {} for player {} with writer {}", session.getId(), playerId, writer.hashCode());
+        logger.info("About to send SUCCESS:CONNECTED to player {}", playerId);
         
         // Enviar mensagem de conexão e garantir que foi entregue
         try {
             writer.println("SUCCESS:CONNECTED");
             writer.flush();
-            logger.debug("SUCCESS:CONNECTED successfully sent to player {}", playerId);
+            logger.info("SUCCESS:CONNECTED successfully sent to player {}", playerId);
         } catch (Exception e) {
             logger.error("Failed to send SUCCESS:CONNECTED to player {}: {}", playerId, e.getMessage());
             try {
@@ -120,30 +140,72 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        logger.debug("Received WebSocket message: {} from session {}", message.getPayload(), session.getId());
+        logger.info("Received WebSocket message: {} from session {}", message.getPayload(), session.getId());
         sessionManager.updateSessionActivity(session.getId().toString());
         String payload = message.getPayload();
 
         if ("PING".equals(payload)) {
-            session.sendMessage(new TextMessage("PONG"));
+            try {
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage("PONG"));
+                }
+            } catch (IOException e) {
+                logger.info("Failed to send PONG to session {}: {}", session.getId(), e.getMessage());
+            }
             return;
         }
 
         String playerId = sessionManager.getPlayerId(session.getId().toString());
+        
+        // Handle anonymous sessions (test mode)
+        if (playerId != null && playerId.startsWith("anonymous_")) {
+            // Extract playerId from message: GAME:playerId:ACTION:...
+            String[] messageParts = payload.split(":", 3);
+            if (messageParts.length >= 2 && "GAME".equals(messageParts[0])) {
+                String extractedPlayerId = messageParts[1];
+                logger.info("Anonymous session - extracted playerId from message: {}", extractedPlayerId);
+                
+                // Get existing writer and transfer to new playerId
+                PrintWriter existingWriter = sessionManager.getPlayerWriter(playerId);
+                
+                // Update session mapping with real playerId
+                sessionManager.registerSession(session, extractedPlayerId);
+                
+                // Transfer writer to real playerId
+                if (existingWriter != null) {
+                    sessionManager.storePlayerWriter(extractedPlayerId, existingWriter);
+                    logger.info("Transferred PrintWriter from {} to {}", playerId, extractedPlayerId);
+                }
+                
+                playerId = extractedPlayerId;
+            } else {
+                logger.warn("Anonymous session but cannot extract playerId from message: {}", payload);
+                return;
+            }
+        }
+        
         if (playerId == null) {
-            logger.warn("Received message from unknown session: {}", session.getId().toString());
+            logger.info("Received message from unknown session: {}", session.getId().toString());
             return;
         }
 
-        logger.debug("Received command from player {}: {} (session: {})", playerId, payload, session.getId());
+        logger.info("Received command from player {}: {} (session: {})", playerId, payload, session.getId());
         String[] command = payload.split(":");
 
-        String[] facadeCommand = new String[command.length + 2];
-        facadeCommand[0] = "GAME";
-        facadeCommand[1] = playerId;
-        System.arraycopy(command, 0, facadeCommand, 2, command.length);
+        // If message already starts with "GAME:playerId:", just use it as-is
+        String[] facadeCommand;
+        if (command.length >= 2 && "GAME".equals(command[0]) && playerId.equals(command[1])) {
+            facadeCommand = command;
+            logger.info("Message already in facade format, using as-is");
+        } else {
+            // Add GAME and playerId prefix
+            facadeCommand = new String[command.length + 2];
+            facadeCommand[0] = "GAME";
+            facadeCommand[1] = playerId;
+            System.arraycopy(command, 0, facadeCommand, 2, command.length);
+        }
 
-        logger.debug("Processing facade command for player {}: [{}]", playerId, String.join(", ", facadeCommand));
+        logger.info("Processing facade command for player {}: [{}]", playerId, String.join(", ", facadeCommand));
         gameFacade.processGameCommand(facadeCommand);
     }
 
@@ -181,27 +243,39 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
         public WebSocketWriter(WebSocketSession session) {
             this.session = session;
-            logger.debug("WebSocketWriter created for session: {}", session.getId());
+            logger.info("WebSocketWriter created for session: {}", session.getId());
         }
 
         @Override
         public void flush() {
             try {
-                logger.debug("WebSocketWriter.flush() called for session: {}, message: {}", session.getId(), this.toString());
+                logger.info("WebSocketWriter.flush() called for session: {}, message: {}", session.getId(), this.toString());
                 if (session.isOpen()) {
                     String message = this.toString();
                     if (!message.isEmpty()) {
-                        logger.debug("Sending message via WebSocket: {} to session: {}", message, session.getId());
-                        session.sendMessage(new TextMessage(message));
+                        logger.info("Sending message via WebSocket: {} to session: {}", message, session.getId());
+                        synchronized (session) {
+                            if (session.isOpen()) {
+                                session.sendMessage(new TextMessage(message));
+                            }
+                        }
                         getBuffer().setLength(0);
                     } else {
-                        logger.debug("No message to send, buffer is empty");
+                        logger.info("No message to send, buffer is empty");
                     }
                 } else {
-                    logger.warn("Session is not open, cannot send message: {}", this.toString());
+                    logger.info("Session is not open, cannot send message");
                 }
             } catch (IOException e) {
-                logger.warn("Error sending message via WebSocket for session {}: {}", session.getId().toString(), e.getMessage());
+                if (e.getMessage() != null && 
+                    (e.getMessage().contains("Broken pipe") || 
+                     e.getMessage().contains("Connection reset"))) {
+                    logger.info("Connection already closed for session {}", session.getId());
+                } else {
+                    logger.info("Error sending message via WebSocket for session {}: {}", session.getId().toString(), e.getMessage());
+                }
+            } catch (IllegalStateException e) {
+                logger.info("Session {} already closed", session.getId());
             }
         }
     }
