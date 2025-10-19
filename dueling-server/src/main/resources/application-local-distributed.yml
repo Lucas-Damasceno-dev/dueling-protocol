@@ -1,0 +1,89 @@
+server:
+  port: ${SERVER_PORT:8083}
+  name: ${SERVER_NAME:localhost}
+
+# Local distributed mode - uses Redis Pub/Sub but with single Redis server
+distributed:
+  enabled: true  # Enable distributed features including cross-server matchmaking
+  
+ping:
+  server:
+    enabled: false
+
+websocket:
+  auth:
+    required: false  # Allow anonymous connections for testing
+
+spring:
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:dueling_db}
+    username: ${POSTGRES_USER:dueling_user}
+    password: ${POSTGRES_PASSWORD:dueling_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+      use-second-level-cache: true
+      use-query-cache: true
+      cache:
+        use-minimal-puts: true
+        region.factory_class: org.redisson.hibernate.RedissonRegionFactory
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        cache.redisson.instance_name: redissonClient 
+
+jwt:
+  secret: ${JWT_SECRET:mySecretKeyForDuelingProtocolThatShouldBeLongerThan256Bits}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: dueling-protocol
+
+logging:
+  level:
+    root: WARN
+    # Silenciar frameworks
+    org.springframework: WARN
+    org.hibernate: WARN
+    org.apache: WARN
+    io.lettuce: WARN
+    io.netty: WARN
+    com.zaxxer.hikari: WARN
+    org.postgresql: WARN
+    # Silenciar avisos de modo standalone
+    ping: ERROR
+    service.registry: INFO  # Show registry for debugging
+    service.election: INFO
+    service.matchmaking: INFO  # Show matchmaking logs
+    # Seus logs da aplicação - DEBUG para TRADE
+    api: INFO
+    config: INFO
+    controller: INFO
+    dto: INFO
+    exception: INFO
+    mapper: INFO
+    model: INFO
+    pubsub: DEBUG
+    repository: INFO
+    security: INFO
+    service: INFO
+    websocket: INFO
+
+client:
+  default-host: ${SERVER_HOST:localhost}
+  default-port: ${SERVER_PORT:8083}

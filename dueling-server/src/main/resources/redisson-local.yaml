@@ -1,0 +1,7 @@
+sentinelServersConfig:
+  masterName: "mymaster"
+  sentinelAddresses:
+    - "redis://localhost:26379"
+    - "redis://localhost:26380" 
+    - "redis://localhost:26381"
+  database: 0 
