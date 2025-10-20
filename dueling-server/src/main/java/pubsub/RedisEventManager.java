@@ -182,6 +182,37 @@ public class RedisEventManager implements IEventManager {
         logger.debug("Publishing to Redis topic {}: {}", topic, message);
         logger.debug("Currently have {} subscribers in map", subscribers.size());
         logger.debug("Has subscriber for topic {}: {}", topic, subscribers.containsKey(topic));
+        
+        // Log trade-related messages for debugging
+        if (message != null && message.contains("TRADE")) {
+            logger.info("[TRADE-PUBSUB] Publishing trade message to topic {}: {}", topic, message);
+            logger.info("[TRADE-PUBSUB] Local subscriber present: {}", subscribers.containsKey(topic));
+        }
+        
+        // OPTIMIZATION: Send directly to local subscriber if present
+        // This avoids Redis PubSub issues for same-server communication
+        PrintWriter localSubscriber = subscribers.get(topic);
+        if (localSubscriber != null) {
+            try {
+                localSubscriber.println(message);
+                localSubscriber.flush();
+                logger.debug("Message sent directly to local subscriber for topic {}", topic);
+                if (message != null && message.contains("TRADE")) {
+                    logger.info("[TRADE-PUBSUB] Trade message delivered locally to topic {}", topic);
+                }
+                return; // Don't use Redis if local delivery succeeded
+            } catch (Exception e) {
+                logger.warn("Failed to send to local subscriber for topic {}, falling back to Redis: {}", topic, e.getMessage());
+            }
+        }
+        
+        // Fall back to Redis for cross-server communication or if local delivery failed
+        if (message != null && message.contains("TRADE")) {
+            logger.info("[TRADE-PUBSUB] Sending trade message via Redis to topic {} (cross-server)", topic);
+        }
         redisTemplate.convertAndSend(topic, message);
+        if (message != null && message.contains("TRADE")) {
+            logger.info("[TRADE-PUBSUB] Trade message sent via Redis successfully");
+        }
     }
 }

@@ -16,6 +16,9 @@ import org.springframework.stereotype.Component;
 import java.io.PrintWriter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Listener component that receives messages from Redis Pub/Sub channels
@@ -26,6 +29,9 @@ public class RedisMessageSubscriber implements MessageListener {
     
     private static final Logger logger = LoggerFactory.getLogger(RedisMessageSubscriber.class);
     private static final String PRIVATE_MESSAGE_CHANNEL_PREFIX = "private-messages:";
+    
+    // Dedicated thread pool for Redis subscriptions to avoid blocking
+    private static final ExecutorService subscriptionExecutor = Executors.newFixedThreadPool(10);
     
     private final Map<String, PrintWriter> sessionHandlers = new ConcurrentHashMap<>();
     private final Map<String, PrivateMessageHandler> privateMessageHandlers = new ConcurrentHashMap<>();
@@ -44,11 +50,42 @@ public class RedisMessageSubscriber implements MessageListener {
     public void registerHandler(String topic, PrintWriter handler) {
         sessionHandlers.put(topic, handler);
         
-        // Subscribe to the Redis topic
-        ChannelTopic channelTopic = new ChannelTopic(topic);
-        redisMessageListenerContainer.addMessageListener(this, channelTopic);
+        // Subscribe to the Redis topic ASYNCHRONOUSLY using dedicated thread pool
+        // This prevents deadlocks when multiple clients connect simultaneously
+        CompletableFuture.runAsync(() -> {
+            logger.debug("Starting async registration for topic {} in thread: {}", topic, Thread.currentThread().getName());
+            int maxRetries = 3;
+            int attempt = 0;
+            boolean success = false;
+            
+            while (attempt < maxRetries && !success) {
+                try {
+                    logger.debug("Attempting to register Redis listener for topic {} (attempt {}/{})", topic, attempt + 1, maxRetries);
+                    ChannelTopic channelTopic = new ChannelTopic(topic);
+                    redisMessageListenerContainer.addMessageListener(this, channelTopic);
+                    logger.info("Registered handler for topic: {}", topic);
+                    success = true;
+                } catch (Exception e) {
+                    attempt++;
+                    logger.error("Error registering handler for topic {} (attempt {}/{}): {}", topic, attempt, maxRetries, e.getMessage(), e);
+                    
+                    if (attempt < maxRetries) {
+                        try {
+                            Thread.sleep(500); // Wait 500ms before retry
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    } else {
+                        // Handler is already in the map, so local messages will still work
+                        logger.warn("Failed to register Redis listener for topic {} after {} attempts. Handler kept in memory for local messaging.", topic, maxRetries);
+                    }
+                }
+            }
+        }, subscriptionExecutor); // Use dedicated executor instead of common pool
         
-        logger.info("Registered handler for topic: {}", topic);
+        // Log immediately to show registration started (actual subscription happens async)
+        logger.info("Handler registration initiated for topic: {}", topic);
     }
     
     /**
@@ -109,14 +146,25 @@ public class RedisMessageSubscriber implements MessageListener {
         
         String messageBody = new String(message.getBody());
         
+        // Log trade-related messages for debugging
+        if (messageBody != null && messageBody.contains("TRADE")) {
+            logger.info("[TRADE-PUBSUB] Received trade message from Redis for topic {}: {}", topic, messageBody);
+        }
+        
         // Use the topic as the key to get the appropriate PrintWriter handler
         PrintWriter handler = sessionHandlers.get(topic);
         if (handler != null) {
             logger.debug("Received message for topic {}: {}", topic, messageBody);
             handler.println(messageBody);
             handler.flush();
+            if (messageBody != null && messageBody.contains("TRADE")) {
+                logger.info("[TRADE-PUBSUB] Trade message delivered to handler for topic {}", topic);
+            }
         } else {
             logger.warn("No handler found for topic: {}", topic);
+            if (messageBody != null && messageBody.contains("TRADE")) {
+                logger.warn("[TRADE-PUBSUB] No handler for trade message on topic: {}", topic);
+            }
         }
     }
     
