@@ -22,6 +22,9 @@ public class ServerRegistrationService implements ApplicationListener<Applicatio
 
     @Value("${server.port}")
     private int serverPort;
+    
+    @Value("${distributed.enabled:true}")
+    private boolean distributedEnabled;
 
     @Autowired
     private ServerApiClient serverApiClient;
@@ -31,11 +34,22 @@ public class ServerRegistrationService implements ApplicationListener<Applicatio
 
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
-        String selfUrl = "http://" + serverName + ":" + serverPort;
+        // Use localhost for local-distributed mode, hostname otherwise
+        String hostname = serverName.contains("server-") ? "localhost" : serverName;
+        String selfUrl = "http://" + hostname + ":" + serverPort;
         serverRegistry.registerServer(selfUrl);
+        logger.info("Registered self as: {}", selfUrl);
+        
+        // Skip peer registration if running in standalone mode
+        if (!distributedEnabled) {
+            logger.info("Running in standalone mode - peer registration skipped");
+            return;
+        }
 
-        String peerName = "server-1".equals(serverName) ? "server-2" : "server-1";
-        String peerUrl = "http://" + peerName + ":8080";
+        // Determine peer port (the other server)
+        int peerPort = (serverPort == 8080) ? 8083 : 8080;
+        String peerUrl = "http://localhost:" + peerPort;
+        logger.info("Will attempt to register with peer: {}", peerUrl);
         
         // Use a new thread to avoid blocking startup
         new Thread(() -> {
