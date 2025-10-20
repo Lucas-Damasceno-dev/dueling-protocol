@@ -53,7 +53,7 @@ public class PlayerStateManager implements Serializable {
         
         List<Card> drawnCards = new ArrayList<>();
         for (int i = 0; i < count && !deck.isEmpty(); i++) {
-            Card newCard = deck.remove(0);
+            Card newCard = deck.removeFirst();
             hand.add(newCard);
             drawnCards.add(newCard);
         }

@@ -71,6 +71,8 @@ public class Player implements Serializable {
         this.upgradePoints = 0;
         this.playerRanking = new PlayerRanking(this);
         initializeStarterDeck();
+        // Serialize cards immediately after creation
+        serializeCardCollectionNow();
         logger.debug("New player created: {} ({})", nickname, id);
     }
 
@@ -78,15 +80,16 @@ public class Player implements Serializable {
     private List<Card> cardCollection;
 
     public List<Card> getCardCollection() {
-        if (cardCollection == null && cardCollectionJson != null) {
+        if (cardCollection == null) {
             cardCollection = new ArrayList<>();
         }
-        return cardCollection != null ? cardCollection : new ArrayList<>();
+        return cardCollection;
     }
 
     public void setCardCollection(List<Card> cardCollection) {
         this.cardCollection = cardCollection;
-        this.cardCollectionJson = cardCollection != null ? cardCollection.toString() : "[]";
+        // Serialize immediately when collection is set
+        serializeCardCollectionNow();
     }
 
     public void setCharacter(String race, String playerClassParam) {
@@ -94,6 +97,64 @@ public class Player implements Serializable {
         this.playerClass = playerClassParam;
         applyAttributeBonuses();
         logger.info("Character set: {} as {} {}", id, race, playerClassParam);
+    }
+
+    /**
+     * Serializes card collection to JSON before persisting to database
+     */
+    /**
+     * Serialize card collection immediately (not waiting for PrePersist)
+     */
+    private void serializeCardCollectionNow() {
+        if (cardCollection != null && !cardCollection.isEmpty()) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                this.cardCollectionJson = mapper.writeValueAsString(cardCollection);
+                logger.info("[CARD-PERSIST] Serialized {} cards to JSON for player {}", cardCollection.size(), id);
+            } catch (Exception e) {
+                logger.error("[CARD-PERSIST] Failed to serialize card collection for player {}: {}", id, e.getMessage(), e);
+                this.cardCollectionJson = "[]";
+            }
+        } else {
+            logger.warn("[CARD-PERSIST] No cards to serialize for player {}", id);
+            this.cardCollectionJson = "[]";
+        }
+    }
+    
+    @PrePersist
+    @PreUpdate
+    private void serializeCardCollection() {
+        // Only serialize if cardCollection exists in memory
+        // Don't overwrite existing JSON if cardCollection is transient-null
+        if (cardCollection != null && !cardCollection.isEmpty()) {
+            serializeCardCollectionNow();
+        }
+        // If cardCollection is null but cardCollectionJson is empty, it means cards weren't loaded yet
+        // Keep existing JSON in database
+    }
+    
+    /**
+     * Deserializes card collection from JSON after loading from database
+     */
+    @PostLoad
+    private void deserializeCardCollection() {
+        logger.info("[CARD-LOAD] PostLoad called for player {}, JSON length: {}", 
+            id, cardCollectionJson != null ? cardCollectionJson.length() : 0);
+        if (cardCollectionJson != null && !cardCollectionJson.isEmpty() && !"[]".equals(cardCollectionJson)) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.core.type.TypeReference<List<Card>> typeRef = 
+                    new com.fasterxml.jackson.core.type.TypeReference<List<Card>>() {};
+                this.cardCollection = mapper.readValue(cardCollectionJson, typeRef);
+                logger.info("[CARD-LOAD] Deserialized {} cards from JSON for player {}", cardCollection.size(), id);
+            } catch (Exception e) {
+                logger.error("[CARD-LOAD] Failed to deserialize card collection for player {}: {}", id, e.getMessage(), e);
+                this.cardCollection = new ArrayList<>();
+            }
+        } else {
+            logger.warn("[CARD-LOAD] No cards JSON to deserialize for player {}", id);
+            this.cardCollection = new ArrayList<>();
+        }
     }
 
     private void initializeStarterDeck() {
@@ -132,7 +193,7 @@ public class Player implements Serializable {
             3
         ));
 
-        logger.debug("Starter deck created with {} cards for player {}", starterDeckCards.size(), id);
+        logger.info("[CARD-INIT] Starter deck created with {} cards for player {}", starterDeckCards.size(), id);
     }
 
     private void applyAttributeBonuses() {
