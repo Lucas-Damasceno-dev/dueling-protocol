@@ -7,7 +7,7 @@ BEGIN
       SELECT FROM pg_catalog.pg_roles
       WHERE rolname = 'dueling_user') THEN
 
-      CREATE ROLE dueling_user LOGIN PASSWORD 'dueling_pass';
+      CREATE ROLE dueling_user LOGIN PASSWORD 'dueling_password';
    END IF;
 END
 $do$;

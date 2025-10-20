@@ -174,18 +174,21 @@ services:
     build:
       context: ..
       dockerfile: dueling-client/Dockerfile
+    container_name: client-1
     depends_on:
       nginx-gateway:
         condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: |
-      echo 'Waiting for gateway server to be ready...'
-      until curl -f http://$GATEWAY_HOST:$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
-        echo 'Actuator health not ready yet, waiting...'
-        sleep 2
-      done
-      echo 'Gateway is ready, starting client...'
-      java -jar app.jar
+    command:
+      - /bin/sh
+      - -c
+      - |
+        echo 'Waiting for gateway server to be ready...'
+        until curl -f http://$$GATEWAY_HOST:$$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
+          echo 'Actuator health not ready yet, waiting...'
+          sleep 2
+        done
+        echo 'Gateway is ready, starting client...'
+        java -jar app.jar
     environment:
       - GATEWAY_HOST=nginx-gateway
       - GATEWAY_PORT=8080
@@ -199,74 +202,27 @@ services:
     build:
       context: ..
       dockerfile: dueling-client/Dockerfile
+    container_name: client-2
     depends_on:
       nginx-gateway:
         condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: |
-      echo 'Waiting for gateway server to be ready...'
-      until curl -f http://$GATEWAY_HOST:$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
-        echo 'Actuator health not ready yet, waiting...'
-        sleep 2
-      done
-      echo 'Gateway is ready, starting client...'
-      java -jar app.jar
+    command:
+      - /bin/sh
+      - -c
+      - |
+        echo 'Waiting for gateway server to be ready...'
+        until curl -f http://$$GATEWAY_HOST:$$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
+          echo 'Actuator health not ready yet, waiting...'
+          sleep 2
+        done
+        echo 'Gateway is ready, starting client...'
+        java -jar app.jar
     environment:
       - GATEWAY_HOST=nginx-gateway
       - GATEWAY_PORT=8080
       - DOCKER_ENV=true
       - CLIENT_USERNAME=client2
       - CLIENT_PASSWORD=password2
-    networks:
-      - dueling-network
-
-  client-3:
-    build:
-      context: ..
-      dockerfile: dueling-client/Dockerfile
-    depends_on:
-      nginx-gateway:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: |
-      echo 'Waiting for gateway server to be ready...'
-      until curl -f http://$GATEWAY_HOST:$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
-        echo 'Actuator health not ready yet, waiting...'
-        sleep 2
-      done
-      echo 'Gateway is ready, starting client...'
-      java -jar app.jar
-    environment:
-      - GATEWAY_HOST=nginx-gateway
-      - GATEWAY_PORT=8080
-      - DOCKER_ENV=true
-      - CLIENT_USERNAME=client3
-      - CLIENT_PASSWORD=password3
-    networks:
-      - dueling-network
-
-  client-4:
-    build:
-      context: ..
-      dockerfile: dueling-client/Dockerfile
-    depends_on:
-      nginx-gateway:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: |
-      echo 'Waiting for gateway server to be ready...'
-      until curl -f http://$GATEWAY_HOST:$GATEWAY_PORT/actuator/health >/dev/null 2>&1; do
-        echo 'Actuator health not ready yet, waiting...'
-        sleep 2
-      done
-      echo 'Gateway is ready, starting client...'
-      java -jar app.jar
-    environment:
-      - GATEWAY_HOST=nginx-gateway
-      - GATEWAY_PORT=8080
-      - DOCKER_ENV=true
-      - CLIENT_USERNAME=client4
-      - CLIENT_PASSWORD=password4
     networks:
       - dueling-network
 
