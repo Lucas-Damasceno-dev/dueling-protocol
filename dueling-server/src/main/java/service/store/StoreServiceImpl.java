@@ -25,6 +25,7 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     public PurchaseResult purchaseCardPack(Player player, String packType) {
+        logger.debug("Attempting to purchase pack of type '{}' for player '{}'", packType, player != null ? player.getId() : "null");
         CardPack pack = cardPackFactory.createCardPack(packType);
 
         if (player.getCoins() < pack.getCost()) {
@@ -47,7 +48,18 @@ public class StoreServiceImpl implements StoreService {
             if (newCards.isEmpty()) {
                 logger.warn("{} failed to get cards from pack {}. Probably out of stock.", 
                            player.getNickname(), pack.getName());
-                return PurchaseResult.failure(PurchaseResult.PurchaseStatus.OUT_OF_STOCK);
+                // Tentar resetar o estoque e tentar novamente
+                cardPackFactory.getCardRepository().resetStockIfDepleted();
+                // Tentar abrir o pacote novamente após o reset
+                newCards = pack.open();
+                if (newCards.isEmpty()) {
+                    logger.error("{} failed again to get cards from pack {} after stock reset.", 
+                               player.getNickname(), pack.getName());
+                    return PurchaseResult.failure(PurchaseResult.PurchaseStatus.OUT_OF_STOCK);
+                } else {
+                    logger.info("Stock reset successful, {} got {} cards after reset", 
+                               player.getNickname(), newCards.size());
+                }
             }
             
             // Atualiza o jogador (isso também pode precisar de sincronização dependendo de como Player é gerenciado)

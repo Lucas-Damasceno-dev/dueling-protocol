@@ -16,12 +16,16 @@ import java.util.Optional;
 @Component
 public class CardPackFactory {
 
-    private static final Logger logger = LoggerFactory.getLogger(CardPackFactory.class);
+    protected static final Logger logger = LoggerFactory.getLogger(CardPackFactory.class);
     private final CardRepository cardRepository;
 
     @Autowired
     public CardPackFactory(CardRepository cardRepository) {
         this.cardRepository = cardRepository;
+    }
+    
+    public CardRepository getCardRepository() {
+        return this.cardRepository;
     }
 
     public CardPack createCardPack(String type) {
@@ -40,7 +44,8 @@ public class CardPackFactory {
 
 class BasicCardPack implements CardPack {
     private final CardRepository cardRepository;
-    
+    protected static final Logger logger = LoggerFactory.getLogger(CardPack.class);
+
     public BasicCardPack(CardRepository cardRepository) { 
         this.cardRepository = cardRepository;
     }
@@ -53,16 +58,23 @@ class BasicCardPack implements CardPack {
     @Override
     public List<Card> open() {
         List<Card> cards = new ArrayList<>();
+        logger.debug("Opening BasicCardPack...");
         for (int i = 0; i < 5; i++) {
             // Try to get a Common card, fallback to any available card if out of stock
-            Optional<Card> card = cardRepository.getRandomCardByRarity("Common");
-            if (card.isPresent()) {
-                cards.add(card.get());
+            Optional<Card> cardOpt = cardRepository.getRandomCardByRarity("Common");
+            if (cardOpt.isPresent()) {
+                Card newCard = cardOpt.get();
+                cards.add(newCard);
+                logger.trace("Added card to pack: {}", newCard.getName());
             } else {
                 // If Common cards are out of stock, get any card
-                cardRepository.getRandomCard().ifPresent(cards::add);
+                cardRepository.getRandomCard().ifPresent(fallbackCard -> {
+                    cards.add(fallbackCard);
+                    logger.trace("Added fallback card to pack: {}", fallbackCard.getName());
+                });
             }
         }
+        logger.debug("BasicCardPack opened with {} cards.", cards.size());
         Collections.shuffle(cards);
         return cards;
     }
