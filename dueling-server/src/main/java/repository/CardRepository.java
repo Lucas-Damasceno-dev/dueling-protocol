@@ -36,6 +36,9 @@ public class CardRepository {
             // Inicializa o estoque no Redis apenas se estiver vazio
             if (cardStock.isEmpty()) {
                 initializeStock();
+            } else {
+                // Se o estoque não está vazio, verificar se está muito baixo e resetar se necessário
+                resetStockIfDepleted();
             }
 
             logger.info("Card repository initialized with {} card types.", allCards.size());
@@ -76,6 +79,30 @@ public class CardRepository {
         cardStock.putAll(initialStock);
         logger.info("Initialized Redis card stock with {} entries.", initialStock.size());
     }
+    
+    public void resetStockIfDepleted() {
+        // Check if all or most cards are out of stock
+        long nonZeroStockCount = cardStock.values().stream()
+            .mapToInt(Integer::intValue)
+            .filter(stock -> stock > 0)
+            .count();
+        
+        logger.info("Checking stock status: {} cards with stock > 0 out of {} total card types", nonZeroStockCount, allCards.size());
+        
+        // If very few cards are available (less than 25% of total card types), reset the stock
+        if (nonZeroStockCount < allCards.size() * 0.25) {
+            logger.info("Low stock detected ({} cards available), resetting card stock", nonZeroStockCount);
+            initializeStock();
+            // Re-check after reset
+            long newNonZeroStockCount = cardStock.values().stream()
+                .mapToInt(Integer::intValue)
+                .filter(stock -> stock > 0)
+                .count();
+            logger.info("After reset: {} cards with stock > 0", newNonZeroStockCount);
+        } else {
+            logger.info("Stock level acceptable, no reset needed");
+        }
+    }
 
     public Optional<Card> findById(String id) {
         return Optional.ofNullable(allCards.get(id));
@@ -86,50 +113,24 @@ public class CardRepository {
     }
 
     public Optional<Card> claimCard(String id) {
-        // Usando uma abordagem com script Lua para garantir atomicidade
-        // Isso evita o problema com HINCRBYFLOAT e garante que a operação seja realmente atômica
-        String luaScript = 
-            "local key = KEYS[1] " +
-            "local field = ARGV[1] " +
-            "local amount = tonumber(ARGV[2]) " +
-            "" +
-            "local current = redis.call('HGET', key, field) " +
-            "if not current then " +
-            "    current = 0 " +
-            "else " +
-            "    current = tonumber(current) " +
-            "end " +
-            "" +
-            "if current and current > 0 then " +
-            "    local new_val = current + amount " +
-            "    if new_val >= 0 then " +
-            "        redis.call('HSET', key, field, new_val) " +
-            "        return new_val " +
-            "    else " +
-            "        return -1 " +
-            "    end " +
-            "else " +
-            "    return -1 " +
-            "end";
-
+        // Using RMap directly instead of Lua script to avoid serialization issues
+        // Redisson's RMap handles serialization correctly
         try {
-            Object result = redissonClient.getScript().eval(
-                org.redisson.api.RScript.Mode.READ_WRITE,
-                luaScript,
-                org.redisson.api.RScript.ReturnType.INTEGER,
-                java.util.Arrays.asList(CARD_STOCK_KEY),
-                id, "-1"
-            );
-
-            Integer newStock = result != null ? ((Long) result).intValue() : -1;
-
-            if (newStock >= 0) {
-                logger.info("Card {} claimed. Remaining stock: {}", id, newStock);
-                return findById(id);
-            } else {
-                logger.warn("Attempt to claim card {}, but it is out of stock.", id);
+            Integer currentStock = cardStock.get(id);
+            logger.debug("Attempting to claim card {}. Current stock in RMap: {}", id, currentStock);
+            
+            if (currentStock == null || currentStock <= 0) {
+                logger.warn("Attempt to claim card {}, but it is out of stock. Stock value: {}", id, currentStock);
                 return Optional.empty();
             }
+            
+            // Use fastPut for better performance
+            int newStock = currentStock - 1;
+            cardStock.fastPut(id, newStock);
+            
+            logger.info("Card {} claimed. Remaining stock: {} -> {}", id, currentStock, newStock);
+            return findById(id);
+            
         } catch (Exception e) {
             logger.error("Error claiming card {}: {}", id, e.getMessage(), e);
             return Optional.empty();
@@ -143,12 +144,24 @@ public class CardRepository {
             .collect(Collectors.toList());
 
         if (availableCards.isEmpty()) {
-            logger.warn("No cards of rarity {} available in stock.", rarity);
-            return Optional.empty();
+            logger.warn("No cards of rarity {} available in stock. Attempting to reset stock.", rarity);
+            // Try to reset stock if it's depleted
+            resetStockIfDepleted();
+            
+            // After resetting, check again
+            availableCards = allCards.values().stream()
+                .filter(c -> c.getRarity().equalsIgnoreCase(rarity) && cardStock.getOrDefault(c.getId(), 0) > 0)
+                .map(Card::getId)
+                .collect(Collectors.toList());
+
+            if (availableCards.isEmpty()) {
+                logger.error("No cards of rarity {} available even after stock reset.", rarity);
+                return Optional.empty();
+            }
         }
 
         String randomCardId = availableCards.get(random.nextInt(availableCards.size()));
-        // claimCard já é atômico e seguro para concorrência
+        // claimCard already is atomic and thread-safe
         return claimCard(randomCardId);
     }
     
@@ -159,12 +172,24 @@ public class CardRepository {
             .collect(Collectors.toList());
 
         if (availableCards.isEmpty()) {
-            logger.warn("No cards available in stock.");
-            return Optional.empty();
+            logger.warn("No cards available in stock. Attempting to reset stock.");
+            // Try to reset stock if it's depleted
+            resetStockIfDepleted();
+            
+            // After resetting, check again
+            availableCards = allCards.values().stream()
+                .filter(c -> cardStock.getOrDefault(c.getId(), 0) > 0)
+                .map(Card::getId)
+                .collect(Collectors.toList());
+
+            if (availableCards.isEmpty()) {
+                logger.error("No cards available even after stock reset.");
+                return Optional.empty();
+            }
         }
 
         String randomCardId = availableCards.get(random.nextInt(availableCards.size()));
-        // claimCard já é atômico e seguro para concorrência
+        // claimCard already is atomic and thread-safe
         return claimCard(randomCardId);
     }
 }
