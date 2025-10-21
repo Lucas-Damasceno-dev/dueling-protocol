@@ -2,6 +2,14 @@ server:
   port: ${SERVER_PORT:8083}
   name: ${SERVER_NAME:localhost}
 
+# Standalone mode - disable distributed features
+distributed:
+  enabled: false
+  
+ping:
+  server:
+    enabled: false
+
 spring:
   redis:
     host: ${REDIS_HOST:localhost}
@@ -9,7 +17,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:dueling_db}
     username: ${POSTGRES_USER:dueling_user}
-    password: ${POSTGRES_PASSWORD:dueling_pass}
+    password: ${POSTGRES_PASSWORD:dueling_password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -19,11 +27,11 @@ spring:
       cache:
         use-minimal-puts: true
         region.factory_class: org.redisson.hibernate.RedissonRegionFactory
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false
         cache.redisson.instance_name: redissonClient 
 
 jwt:
@@ -44,12 +52,32 @@ management:
 
 logging:
   level:
-    root: INFO
-    org.springframework.web: DEBUG
-    org.springframework.web.socket: DEBUG
-    service.matchmaking: DEBUG
-    api: DEBUG
-    websocket: DEBUG
+    root: WARN
+    # Silenciar frameworks
+    org.springframework: WARN
+    org.hibernate: WARN
+    org.apache: WARN
+    io.lettuce: WARN
+    io.netty: WARN
+    com.zaxxer.hikari: WARN
+    org.postgresql: WARN
+    # Silenciar avisos de modo standalone
+    ping: ERROR
+    service.registry: ERROR
+    service.election: INFO
+    # Seus logs da aplicação
+    api: INFO
+    config: INFO
+    controller: INFO
+    dto: INFO
+    exception: INFO
+    mapper: INFO
+    model: INFO
+    pubsub: INFO
+    repository: INFO
+    security: INFO
+    service: INFO
+    websocket: INFO
 
 client:
   default-host: ${SERVER_HOST:localhost}

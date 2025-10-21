@@ -83,5 +83,10 @@ jwt:
 
 logging:
   level:
-    org.springframework.cloud.gateway: DEBUG
-    org.springframework.web.reactive: DEBUG
+    root: WARN
+    org.springframework: WARN
+    org.apache: WARN
+    io.netty: WARN
+    reactor: WARN
+    # Seus logs do gateway
+    com.dueling.gateway: INFO

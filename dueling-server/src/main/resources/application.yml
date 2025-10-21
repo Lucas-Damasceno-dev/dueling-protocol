@@ -22,11 +22,11 @@ spring:
       cache:
         use-minimal-puts: true
         region.factory_class: org.redisson.hibernate.RedissonRegionFactory
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false
         cache.redisson.instance_name: redissonClient 
 
 jwt:
@@ -47,11 +47,28 @@ management:
 
 logging:
   level:
-    root: INFO
-    org.springframework.web: DEBUG
-    org.springframework.web.socket: DEBUG
-    service.matchmaking: DEBUG
+    root: WARN
+    # Silenciar frameworks
+    org.springframework: WARN
+    org.hibernate: WARN
+    org.apache: WARN
+    io.lettuce: WARN
+    io.netty: WARN
+    com.zaxxer.hikari: WARN
+    org.postgresql: WARN
+    # Seus logs da aplicação
     api: DEBUG
+    config: DEBUG
+    controller: DEBUG
+    dto: DEBUG
+    exception: DEBUG
+    mapper: DEBUG
+    model: DEBUG
+    ping: DEBUG
+    pubsub: DEBUG
+    repository: DEBUG
+    security: DEBUG
+    service: DEBUG
     websocket: DEBUG
 
 client:
