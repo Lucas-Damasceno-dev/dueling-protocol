@@ -29,6 +29,11 @@ mvn clean package -DskipTests
 echo "Iniciando sistema com NGINX como gateway..."
 cd docker
 
+# Carregar as variáveis de ambiente do arquivo .env
+if [ -f .env ]; then
+    export $(cat .env | sed 's/#.*//g' | xargs)
+fi
+
 # Iniciar o sistema com docker-compose
 docker compose up --build -d
 

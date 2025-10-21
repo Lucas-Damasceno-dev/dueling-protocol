@@ -29,11 +29,27 @@ monitor_file_logs() {
     fi
 }
 
-# Função para monitorar logs do Docker
+# Função para monitorar logs do Docker - Foco nos 2 clientes jogáveis
 monitor_docker_logs() {
     if command -v docker &> /dev/null && docker compose &> /dev/null; then
-        echo "Monitorando logs do Docker (todos os containers):"
-        docker compose -f "$PROJECT_DIR/docker/docker-compose.yml" logs -f --tail=50
+        echo "Monitorando logs dos clientes jogáveis (client-1 e client-2):"
+        echo "E suas interações nos servidores (server-1, server-2, server-3, server-4)"
+        echo "============================================================================"
+        echo ""
+        # Monitorar apenas os containers dos 2 clientes e os 4 servidores
+        # Filtrar logs relacionados a client1 e client2 nos servidores
+        docker compose -f "$PROJECT_DIR/docker/docker-compose.yml" logs -f --tail=100 client-1 client-2 server-1 server-2 server-3 server-4 2>&1 | \
+        while IFS= read -r line; do
+            # Mostrar todas as linhas dos clientes
+            if echo "$line" | grep -q -E "client-[12] "; then
+                echo "$line"
+            # Mostrar linhas dos servidores que mencionam client1 ou client2
+            elif echo "$line" | grep -q -E "server-[1-4] "; then
+                if echo "$line" | grep -q -iE "(client1|client2|username.*client[12]|user.*client[12]|player.*client[12])"; then
+                    echo "$line"
+                fi
+            fi
+        done
     else
         echo "Docker ou docker-compose não está disponível (continuando com outros logs...)"
     fi
