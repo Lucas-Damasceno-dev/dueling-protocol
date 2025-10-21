@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-@Profile({"server", "!distributed-db"}) // Use this when NOT using distributed-db profile
+@Profile("!distributed-db")
 @Repository
 public class DistributedPlayerRepository implements PlayerRepository {
 
@@ -31,7 +31,7 @@ public class DistributedPlayerRepository implements PlayerRepository {
     private String selfUrl;
 
     @Autowired
-    public DistributedPlayerRepository(@Qualifier("playerRepositoryJson") PlayerRepository localRepository,
+    public DistributedPlayerRepository(@Qualifier("playerRepositoryJson") PlayerRepository localRepository, 
                                        ServerRegistry serverRegistry,
                                        ServerApiClient serverApiClient) {
         this.localRepository = localRepository;
