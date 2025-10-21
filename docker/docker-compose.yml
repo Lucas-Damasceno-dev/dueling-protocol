@@ -1,4 +1,4 @@
-
+# Caminho: docker/docker-compose.yml
 services:
   server-1:
     build:
@@ -10,19 +10,26 @@ services:
       - "8081:8080"
       - "7778:7778/udp"
     environment:
-      - SERVER_PORT=8080
-      - SERVER_NAME=server-1
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=dueling_db
-      - POSTGRES_USER=dueling_user
-      - POSTGRES_PASSWORD=dueling_password
+      SERVER_PORT: 8080
+      SERVER_NAME: server-1
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - postgres
+      - redis
     networks:
       - dueling-network
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 30s
 
   server-2:
     build:
@@ -44,8 +51,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - postgres
+      - redis
     networks:
       - dueling-network
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 30s
 
   server-3:
     build:
@@ -67,20 +81,30 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - postgres
+      - redis
     networks:
       - dueling-network
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 30s
 
   client-1:
     build:
       context: ..
       dockerfile: dueling-client/Dockerfile
-    command: autobot
     depends_on:
-      - server-1
-      - server-2
+      server-1:
+        condition: service_healthy
+      server-2:
+        condition: service_healthy
+      server-3:
+        condition: service_healthy 
     environment:
-      - GATEWAY_HOST=server-1
-      - GATEWAY_PORT=8080
+      - GATEWAY_HOST=${GATEWAY_HOST:-server-1}
+      - GATEWAY_PORT=${GATEWAY_PORT:-8081}
     networks:
       - dueling-network
 
@@ -88,17 +112,18 @@ services:
     build:
       context: ..
       dockerfile: dueling-client/Dockerfile
-    command: autobot
     depends_on:
       server-1:
         condition: service_healthy
       server-2:
         condition: service_healthy
+      server-3:
+        condition: service_healthy
       redis:
         condition: service_started
     environment:
-      - GATEWAY_HOST=server-2
-      - GATEWAY_PORT=8080
+      - GATEWAY_HOST=${GATEWAY_HOST:-server-2}
+      - GATEWAY_PORT=${GATEWAY_PORT:-8082} 
     networks:
       - dueling-network
 
@@ -109,6 +134,11 @@ services:
       - "6379:6379"
     networks:
       - dueling-network
+    healthcheck:
+        test: ["CMD", "redis-cli", "ping"]
+        interval: 5s
+        timeout: 2s
+        retries: 5
 
   postgres:
     image: postgres:15
@@ -116,13 +146,18 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_DB=dueling_db
-      - POSTGRES_USER=dueling_user
-      - POSTGRES_PASSWORD=dueling_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER} 
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - dueling-network
+    healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
 
   prometheus:
     image: prom/prometheus:latest
@@ -133,15 +168,14 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
     networks:
       - dueling-network
     depends_on:
       server-1:
         condition: service_healthy
       server-2:
+        condition: service_healthy
+      server-3:
         condition: service_healthy
 
   grafana:
