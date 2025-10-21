@@ -6,13 +6,34 @@
         </encoder>
     </appender>
 
-    <root level="INFO">
+    <!-- Silenciar dependências externas -->
+    <root level="WARN">
         <appender-ref ref="STDOUT" />
     </root>
     
-    <!-- Set specific log levels for packages -->
+    <!-- Silenciar completamente frameworks e bibliotecas -->
+    <logger name="org.springframework" level="WARN" />
+    <logger name="org.hibernate" level="WARN" />
+    <logger name="org.apache" level="WARN" />
+    <logger name="io.lettuce" level="WARN" />
+    <logger name="io.netty" level="WARN" />
+    <logger name="com.zaxxer.hikari" level="WARN" />
+    <logger name="org.postgresql" level="WARN" />
+    <logger name="reactor" level="WARN" />
+    <logger name="org.redisson" level="WARN" />
+    
+    <!-- Logs da aplicação - SEUS LOGS -->
+    <logger name="api" level="DEBUG" />
+    <logger name="config" level="DEBUG" />
     <logger name="controller" level="DEBUG" />
+    <logger name="dto" level="DEBUG" />
+    <logger name="exception" level="DEBUG" />
+    <logger name="mapper" level="DEBUG" />
     <logger name="model" level="DEBUG" />
-    <logger name="service" level="INFO" />
-    <logger name="repository" level="INFO" />
+    <logger name="ping" level="DEBUG" />
+    <logger name="pubsub" level="DEBUG" />
+    <logger name="repository" level="DEBUG" />
+    <logger name="security" level="DEBUG" />
+    <logger name="service" level="DEBUG" />
+    <logger name="websocket" level="DEBUG" />
 </configuration>
