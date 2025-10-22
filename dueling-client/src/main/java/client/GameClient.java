@@ -57,12 +57,12 @@ public final class GameClient {
 
     private static void handleUserAuthentication() {
         if (IS_DOCKER_ENV && !AUTO_USERNAME.isEmpty() && !AUTO_PASSWORD.isEmpty()) {
-            logger.info("Running in Docker environment, attempting auto-login with provided credentials");
+            System.out.println("Running in Docker environment, attempting auto-login with provided credentials");
             autoLogin();
         } else {
             Scanner scanner = new Scanner(System.in);
             while (jwtToken == null && !isExiting) {
-                System.out.println();
+                System.out.println("");
                 System.out.println("--- AUTHENTICATION ---");
                 System.out.println("1. Login");
                 System.out.println("2. Register");
@@ -159,14 +159,14 @@ public final class GameClient {
             System.out.print("Username: > ");
             String username = scanner.nextLine().trim();
             if (username.isEmpty()) {
-                System.out.println("[ERROR] ✗ Username cannot be empty");
+                logger.error("[ERROR] ✗ Username cannot be empty");
                 return;
             }
             
             System.out.print("Password: > ");
             String password = scanner.nextLine().trim();
             if (password.isEmpty()) {
-                System.out.println("[ERROR] ✗ Password cannot be empty");
+                logger.error("[ERROR] ✗ Password cannot be empty");
                 return;
             }
 
@@ -179,13 +179,13 @@ public final class GameClient {
             if (response.statusCode == 200) {
                 JsonObject responseJson = new Gson().fromJson(response.body, JsonObject.class);
                 jwtToken = responseJson.get("token").getAsString();
-                System.out.println("[SUCCESS] ✓ Login successful!");
+                logger.info("[SUCCESS] ✓ Login successful!");
             } else {
                 String errorMessage = response.body != null && !response.body.isEmpty() ? response.body : "Invalid credentials";
-                System.out.println("[ERROR] ✗ Login failed: " + errorMessage + " (Code: " + response.statusCode + ")");
+                logger.error("[ERROR] ✗ Login failed: {} (Code: {})", errorMessage, response.statusCode);
             }
         } catch (IOException e) {
-            System.out.println("[ERROR] ✗ IOException during login: " + e.getMessage());
+            logger.error("[ERROR] ✗ IOException during login: {}", e.getMessage());
         }
     }
 
@@ -214,7 +214,7 @@ public final class GameClient {
 
     private static void autoRegister() {
         try {
-            logger.info("Attempting auto-registration with username: {}", AUTO_USERNAME);
+            System.out.println("Attempting auto-registration with username: " + AUTO_USERNAME);
 
             JsonObject credentials = new JsonObject();
             credentials.addProperty("username", AUTO_USERNAME);
@@ -296,7 +296,7 @@ public final class GameClient {
                     authenticationFailureOnConnect = false;
                     return;
                 } else {
-                    System.out.println("Failed to connect to the WebSocket server on attempt " + (retryCount + 1) + "/" + maxRetries);
+                    logger.warn("Failed to connect to the WebSocket server on attempt {}/{}", (retryCount + 1), maxRetries);
                     // Don't set jwtToken to null here as it may still be valid; only set to null on authentication error
                 }
             } catch (URISyntaxException e) {
@@ -319,7 +319,7 @@ public final class GameClient {
             
             retryCount++;
             if (retryCount < maxRetries) {
-                logger.info("Waiting 3 seconds before retry...");
+                System.out.println("Waiting 3 seconds before retry...");
                 try {
                     Thread.sleep(3000);
                 } catch (InterruptedException e) {
@@ -384,7 +384,7 @@ public final class GameClient {
             while (!isExiting && webSocketClient != null && webSocketClient.isOpen()) {
                 // Check for game timeout only when in game
                 if (inGame && isGameTimeout()) {
-                    System.out.println("[TIMEOUT] Game session timed out due to inactivity.");
+                    logger.warn("[TIMEOUT] Game session timed out due to inactivity.");
                     isExiting = true;
                     break;
                 }
@@ -402,7 +402,7 @@ public final class GameClient {
             while (!isExiting && webSocketClient != null && webSocketClient.isOpen()) {
                 // Check for game timeout only when in game
                 if (inGame && isGameTimeout()) {
-                    System.out.println("[TIMEOUT] Game session timed out due to inactivity.");
+                    logger.warn("[TIMEOUT] Game session timed out due to inactivity.");
                     isExiting = true;
                     break;
                 }
@@ -415,7 +415,7 @@ public final class GameClient {
                 awaitingUserInput = false;
                 
                 if (jwtToken == null) {
-                    System.out.println("[WARNING] Your session has expired. Please restart the client to log in again.");
+                    logger.warn("[WARNING] Your session has expired. Please restart the client to log in again.");
                     isExiting = true;
                     break;
                 }
@@ -436,7 +436,7 @@ public final class GameClient {
                             // Refresh connection start time when playing card
                             connectionStartTime = System.currentTimeMillis();
                         } else {
-                            System.out.println("You need to be in a match to play cards!");
+                            logger.warn("You need to be in a match to play cards!");
                         }
                         break;
                     case "7": upgradeAttributes(scanner); break;
@@ -476,7 +476,7 @@ public final class GameClient {
             return;
         }
         
-        System.out.println();
+        System.out.println("");
         System.out.println("--- CHARACTER SETUP ---");
         
         System.out.print("Enter your nickname: > ");
@@ -545,7 +545,7 @@ public final class GameClient {
             return;
         }
         
-        System.out.println();
+        System.out.println("");
         System.out.println("--- DECK SELECTION ---");
         System.out.println("Available decks:");
         System.out.println("1. none (default deck)");
@@ -586,6 +586,11 @@ public final class GameClient {
     }
 
     private static void buyCardPack(Scanner scanner) {
+        if (webSocketClient == null || !webSocketClient.isOpen()) {
+            System.out.println("[ERROR] ✗ WebSocket connection is not active. Please reconnect.");
+            return;
+        }
+        
         System.out.println("Available card packages:");
         System.out.println("1. BASIC - Basic card pack");
         System.out.println("2. PREMIUM - Premium card pack");
@@ -604,7 +609,15 @@ public final class GameClient {
                 return;
         }
         
-        webSocketClient.send("STORE:BUY:" + packType);
+        String command = "STORE:BUY:" + packType;
+        System.out.println("[CLIENT] Sending purchase command: " + command);
+        try {
+            webSocketClient.send(command);
+            System.out.println("[CLIENT] Purchase command sent. Waiting for server response...");
+        } catch (Exception e) {
+            System.out.println("[ERROR] ✗ Failed to send command: " + e.getMessage());
+            logger.error("Failed to send purchase command", e);
+        }
     }
 
     private static void playCard(Scanner scanner) {
@@ -640,7 +653,7 @@ public final class GameClient {
     }
 
     private static void tradeCards(Scanner scanner) {
-        System.out.println();
+        System.out.println("");
         System.out.println("--- TRADE CARDS ---");
         System.out.print("Enter the username of the player you want to trade with: > ");
         String targetUsername = scanner.nextLine().trim();
@@ -673,7 +686,7 @@ public final class GameClient {
 
     private static void checkPing(Scanner scanner) {
         pingModeActive = true;
-        System.out.println();
+        System.out.println("");
         System.out.println("--- REAL-TIME PING MODE ---");
         System.out.println("Press Enter to return to main menu...");
 
@@ -692,7 +705,7 @@ public final class GameClient {
                 } else {
                     pingDisplay = "N/A";
                 }
-                System.out.printf("\rCurrent ping: %-20s", pingDisplay);
+                System.out.print("\rCurrent ping: " + pingDisplay);
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {
@@ -721,6 +734,7 @@ public final class GameClient {
     }
 
     private static void processServerMessage(String message) {
+        logger.debug("Received message from server: {}", message);
         String[] parts = message.split(":");
         String type = parts[0];
 
@@ -759,7 +773,8 @@ public final class GameClient {
                 // Reset connection start time after game ends
                 connectionStartTime = System.currentTimeMillis();
             }
-        } else if ("CARD_UPDATE".equals(type) || message.contains("PURCHASE_SUCCESS") || message.contains("CARDS_GRANTED")) {
+        } else if ("CARD_UPDATE".equals(type) || message.contains("PURCHASE_SUCCESS") || message.contains("CARDS_GRANTED") || 
+                   (message.startsWith("SUCCESS:Pack purchased") || message.contains("Cards received"))) {
             hasCards = true;
         }
         
@@ -836,7 +851,7 @@ public final class GameClient {
         @Override
         public void onClose(int code, String reason, boolean remote) {
             if (!isExiting) {
-                System.out.println("Connection lost. Code: " + code + ", Reason: " + reason + ". Please restart the client.");
+                logger.error("Connection lost. Code: {}, Reason: {}. Please restart the client.", code, reason);
             }
             
             // If we're in a connection attempt and getting 401, it's an authentication issue
@@ -854,7 +869,7 @@ public final class GameClient {
         @Override
         public void onError(Exception ex) {
             if (!isExiting) {
-                System.out.println("WebSocket error: " + ex.getMessage());
+                logger.error("WebSocket error: {}", ex.getMessage());
             }
         }
     }

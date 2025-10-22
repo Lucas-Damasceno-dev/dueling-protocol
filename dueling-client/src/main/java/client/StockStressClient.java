@@ -2,6 +2,8 @@ package client;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.URI;
@@ -17,6 +19,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 public class StockStressClient implements WebSocket.Listener {
+    private static final Logger logger = LoggerFactory.getLogger(StockStressClient.class);
     private final CompletableFuture<Void> closed = new CompletableFuture<>();
     private final String username;
     private final String password;
@@ -33,7 +36,7 @@ public class StockStressClient implements WebSocket.Listener {
         authenticate();
         
         if (jwtToken == null || jwtToken.isEmpty()) {
-            System.err.println("[" + username + "] Failed to obtain JWT token. Cannot connect to WebSocket.");
+            logger.error("[{}] Failed to obtain JWT token. Cannot connect to WebSocket.", username);
             return;
         }
         
@@ -50,12 +53,12 @@ public class StockStressClient implements WebSocket.Listener {
             closed.orTimeout(30, TimeUnit.SECONDS).join();
         } catch (java.util.concurrent.CompletionException e) {
             if (e.getCause() instanceof java.util.concurrent.TimeoutException) {
-                System.out.println("[" + username + "] Operation timed out, closing connection...");
+                logger.info("[{}] Operation timed out, closing connection...", username);
                 if (webSocket != null) {
                     try {
                         webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Operation timed out");
                     } catch (Exception e2) {
-                        System.err.println("[" + username + "] Error closing WebSocket: " + e2.getMessage());
+                        logger.error("[{}] Error closing WebSocket: {}", username, e2.getMessage());
                     }
                 }
                 // Complete the future if it's not already completed
@@ -90,10 +93,10 @@ public class StockStressClient implements WebSocket.Listener {
         if (response.statusCode() == 200) {
             JsonObject responseJson = JsonParser.parseString(response.body()).getAsJsonObject();
             this.jwtToken = responseJson.get("token").getAsString();
-            System.out.println("[" + username + "] Successfully obtained JWT token.");
+            logger.info("[{}] Successfully obtained JWT token.", username);
         } else {
             // Try to register first if login fails
-            System.out.println("[" + username + "] Login failed, attempting to register...");
+            logger.info("[{}] Login failed, attempting to register...", username);
             registerAndLogin();
         }
     }
@@ -116,36 +119,36 @@ public class StockStressClient implements WebSocket.Listener {
         HttpResponse<String> registerResponse = client.send(registerRequest, HttpResponse.BodyHandlers.ofString());
         
         if (registerResponse.statusCode() == 200) {
-            System.out.println("[" + username + "] Successfully registered, now attempting to login...");
+            logger.info("[{}] Successfully registered, now attempting to login...", username);
             // Then login
             authenticate(); // Call login again after registration
         } else {
-            System.err.println("[" + username + "] Registration failed with status: " + registerResponse.statusCode() + ", body: " + registerResponse.body());
+            logger.error("[{}] Registration failed with status: {}, body: {}", username, registerResponse.statusCode(), registerResponse.body());
         }
     }
 
     @Override
     public void onOpen(WebSocket webSocketParam) {
-        System.out.println("[" + username + "] WebSocket connection opened.");
+        logger.info("[{}] WebSocket connection opened.", username);
         this.webSocket = webSocketParam;  // Atribui o WebSocket ao campo
         webSocketParam.request(1);
         
         // First, set up the character profile
         String characterSetupCommand = "CHARACTER_SETUP:" + username + ":HUMAN:WARRIOR";
-        System.out.println("[" + username + "] Sending: " + characterSetupCommand);
+        logger.info("[{}] Sending: {}", username, characterSetupCommand);
         webSocketParam.sendText(characterSetupCommand, true);
     }
 
     @Override
     public CompletionStage<?> onText(WebSocket webSocketParam, CharSequence data, boolean last) {
         String message = data.toString();
-        System.out.println("[" + username + "] Received: " + message);
+        logger.info("[{}] Received: {}", username, message);
         webSocketParam.request(1);
 
         if (message.contains("SUCCESS:Character created.")) {
             // Character setup successful, now send the buy command
-            String buyCommand = "STORE:BUY:LEGENDARY";
-            System.out.println("[" + username + "] Sending: " + buyCommand);
+            String buyCommand = "STORE:" + username + ":STORE:BUY:BASIC";
+            logger.info("[{}] Sending: {}", username, buyCommand);
             webSocketParam.sendText(buyCommand, true);
         } else if (message.contains("SUCCESS:Pack purchased") || message.contains("OUT_OF_STOCK") || message.contains("ERROR")) {
             // Close the connection after receiving the result
@@ -157,29 +160,27 @@ public class StockStressClient implements WebSocket.Listener {
 
     @Override
     public CompletionStage<?> onClose(WebSocket webSocketParam, int statusCode, String reason) {
-        System.out.println("[" + username + "] WebSocket connection closed. Reason: " + reason);
+        logger.info("[{}] WebSocket connection closed. Reason: {}", username, reason);
         closed.complete(null);
         return null;
     }
 
     @Override
     public void onError(WebSocket webSocketParam, Throwable error) {
-        System.err.println("[" + username + "] WebSocket error: " + error.getMessage());
-        error.printStackTrace();
+        logger.error("[{}] WebSocket error: {}", username, error.getMessage(), error);
         closed.completeExceptionally(error);
     }
 
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.err.println("Usage: java StockStressClient <username> <password>");
+            logger.error("Usage: java StockStressClient <username> <password>");
             return;
         }
         try {
             StockStressClient client = new StockStressClient(args[0], args[1]);
             client.connectAndBuy();
         } catch (Exception e) {
-            System.err.println("Stress client failed: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Stress client failed: {}", e.getMessage(), e);
         }
     }
 }
