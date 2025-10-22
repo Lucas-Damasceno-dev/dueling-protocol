@@ -48,22 +48,31 @@ show_menu() {
     echo "23. Test Cross Server Matchmaking"
     echo "24. Test Global Coordination"
     echo "25. Test Distributed Matchmaking"
-    echo "26. Test Purchase Global"
+    echo "26. Test Purchase"
     echo "27. Test Redis Failover"
     echo "28. Test Advanced Security"
+    echo "29. Test Matchmaking"
+    echo "30. Test Trade Functionality"
+    echo "31. Test Cross-Server Trade"
+    echo "32. Test Cross-Server Match" 
     echo
     echo -e "${YELLOW}System Control:${NC}"
-    echo "29. Stop All Services"
-    echo "30. Build Project"
-    echo "31. View Running Containers"
+    echo "33. Stop All Services"
+    echo "34. Build Project"
+    echo "35. View Running Containers"
+    echo
+    echo -e "${YELLOW}Utilities:${NC}"
+    echo "36. Check WebSocket Status"
+    echo "37. Reset Card Stock"
+    echo "38. View Logs"
     echo
     echo -e "${YELLOW}Help & Info:${NC}"
-    echo "32. View Documentation"
-    echo "33. System Status Check"
+    echo "39. View Documentation"
+    echo "40. System Status Check"
     echo
     echo -e "${RED}0. Exit${NC}"
     echo
-    echo -n "Choose an option (0-33): "
+    echo -n "Choose an option (0-40): "
 }
 
 # Function to handle system status check
@@ -172,17 +181,17 @@ while true; do
             ;;
         9)
             echo -e "${GREEN}Running All Tests...${NC}"
-            bash ./scripts/build/run_all_tests.sh
+            bash ./test_scripts/run_all_tests.sh
             read -p "Press Enter to continue..."
             ;;
         10)
             echo -e "${GREEN}Running Client...${NC}"
-            bash ./scripts/run/run_client.sh
+            bash ./scripts/run_client.sh
             read -p "Press Enter to continue..."
             ;;
         11)
             echo -e "${GREEN}Running Server...${NC}"
-            bash ./scripts/run/run_server.sh
+            bash ./scripts/run_server.sh
             read -p "Press Enter to continue..."
             ;;
         12)
@@ -256,8 +265,8 @@ while true; do
             read -p "Press Enter to continue..."
             ;;
         26)
-            echo -e "${GREEN}Testing Purchase Global...${NC}"
-            bash ./test_scripts/distributed/test_purchase_global.sh
+            echo -e "${GREEN}Testing Purchase...${NC}"
+            bash ./test_scripts/functional/test_purchase.sh
             read -p "Press Enter to continue..."
             ;;
         27)
@@ -271,24 +280,59 @@ while true; do
             read -p "Press Enter to continue..."
             ;;
         29)
+            echo -e "${GREEN}Testing Matchmaking...${NC}"
+            bash ./test_scripts/functional/test_matchmaking.sh
+            read -p "Press Enter to continue..."
+            ;;
+        30)
+            echo -e "${GREEN}Testing Trade Functionality...${NC}"
+            bash ./test_scripts/functional/test_trade.sh
+            read -p "Press Enter to continue..."
+            ;;
+        31)
+            echo -e "${GREEN}Testing Cross-Server Trade...${NC}"
+            bash ./test_scripts/functional/test_cross_server_trade.sh
+            read -p "Press Enter to continue..."
+            ;;
+        32)
+            echo -e "${GREEN}Testing Cross-Server Match...${NC}"
+            bash ./test_scripts/functional/test_cross_server_match.sh
+            read -p "Press Enter to continue..."
+            ;;
+        33)
             echo -e "${GREEN}Stopping All Services...${NC}"
             bash ./scripts/deploy/stop_all_services.sh
             read -p "Press Enter to continue..."
             ;;
-        30)
+        34)
             echo -e "${GREEN}Building Project...${NC}"
             bash ./scripts/build/build.sh
             read -p "Press Enter to continue..."
             ;;
-        31)
+        35)
             view_containers
             read -p "Press Enter to continue..."
             ;;
-        32)
+        36)
+            echo -e "${GREEN}Checking WebSocket Status...${NC}"
+            bash ./scripts/check_websocket_status.sh
+            read -p "Press Enter to continue..."
+            ;;
+        37)
+            echo -e "${GREEN}Resetting Card Stock...${NC}"
+            bash ./scripts/reset_stock.sh
+            read -p "Press Enter to continue..."
+            ;;
+        38)
+            echo -e "${GREEN}Viewing Logs...${NC}"
+            bash ./test_scripts/functional/test_logs.sh
+            read -p "Press Enter to continue..."
+            ;;
+        39)
             view_docs
             read -p "Press Enter to continue..."
             ;;
-        33)
+        40)
             system_status
             read -p "Press Enter to continue..."
             ;;
