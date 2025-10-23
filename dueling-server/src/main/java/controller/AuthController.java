@@ -4,7 +4,6 @@ import dto.AuthenticationResponse;
 import dto.ErrorResponse;
 import dto.LoginRequest;
 import dto.RegisterRequest;
-import model.Player;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,8 +12,6 @@ import repository.PlayerRepository;
 import service.auth.AuthenticationService;
 
 import jakarta.validation.Valid;
-
-import java.util.Optional;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -81,18 +78,7 @@ public class AuthController {
         String password = registerRequest.getPassword();
         String playerId = registerRequest.getPlayerId();
 
-        // If playerId is provided, check if the player exists in the system
-        if (playerId != null && !playerId.trim().isEmpty()) {
-            Optional<Player> playerOpt = playerRepository.findById(playerId);
-            if (playerOpt.isEmpty()) {
-                ErrorResponse response = new ErrorResponse("Player ID does not exist in the system", "PLAYER_NOT_FOUND");
-                return ResponseEntity.badRequest().body(new AuthenticationResponse(response.getError()));
-            }
-        } else {
-            // If no playerId is provided, we can generate one or use username as playerId
-            playerId = username; // Simple approach: use username as playerId
-        }
-
+        // AuthenticationService will handle player creation if needed
         boolean success = authenticationService.registerUser(username, password, playerId);
         if (success) {
             AuthenticationResponse response = new AuthenticationResponse("User registered successfully");

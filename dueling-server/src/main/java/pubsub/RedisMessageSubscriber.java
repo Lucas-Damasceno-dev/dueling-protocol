@@ -10,13 +10,14 @@ import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import java.io.PrintWriter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 
@@ -45,47 +46,33 @@ public class RedisMessageSubscriber implements MessageListener {
     private final ObjectMapper objectMapper = new ObjectMapper();
     
     /**
+     * Initialize global pattern subscription for all player messages
+     * This replaces per-player topic subscriptions to avoid RedisMessageListenerContainer deadlock
+     */
+    @PostConstruct
+    public void init() {
+        logger.info("Initializing RedisMessageSubscriber with wildcard pattern for all player topics");
+        try {
+            // Subscribe to all numeric topics (player IDs are numbers)
+            // Pattern "[0-9]*" matches any sequence of digits
+            PatternTopic pattern = new PatternTopic("[0-9]*");
+            redisMessageListenerContainer.addMessageListener(this, pattern);
+            logger.info("Successfully subscribed to pattern '[0-9]*' for all player messages");
+        } catch (Exception e) {
+            logger.error("Failed to subscribe to wildcard pattern: {}", e.getMessage(), e);
+        }
+    }
+    
+    /**
      * Register a WebSocket handler for a specific topic
      */
     public void registerHandler(String topic, PrintWriter handler) {
+        logger.info("Registering handler for topic: {} (hash: {})", topic, handler.hashCode());
         sessionHandlers.put(topic, handler);
         
-        // Subscribe to the Redis topic ASYNCHRONOUSLY using dedicated thread pool
-        // This prevents deadlocks when multiple clients connect simultaneously
-        CompletableFuture.runAsync(() -> {
-            logger.debug("Starting async registration for topic {} in thread: {}", topic, Thread.currentThread().getName());
-            int maxRetries = 3;
-            int attempt = 0;
-            boolean success = false;
-            
-            while (attempt < maxRetries && !success) {
-                try {
-                    logger.debug("Attempting to register Redis listener for topic {} (attempt {}/{})", topic, attempt + 1, maxRetries);
-                    ChannelTopic channelTopic = new ChannelTopic(topic);
-                    redisMessageListenerContainer.addMessageListener(this, channelTopic);
-                    logger.info("Registered handler for topic: {}", topic);
-                    success = true;
-                } catch (Exception e) {
-                    attempt++;
-                    logger.error("Error registering handler for topic {} (attempt {}/{}): {}", topic, attempt, maxRetries, e.getMessage(), e);
-                    
-                    if (attempt < maxRetries) {
-                        try {
-                            Thread.sleep(500); // Wait 500ms before retry
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        }
-                    } else {
-                        // Handler is already in the map, so local messages will still work
-                        logger.warn("Failed to register Redis listener for topic {} after {} attempts. Handler kept in memory for local messaging.", topic, maxRetries);
-                    }
-                }
-            }
-        }, subscriptionExecutor); // Use dedicated executor instead of common pool
-        
-        // Log immediately to show registration started (actual subscription happens async)
-        logger.info("Handler registration initiated for topic: {}", topic);
+        // NO LONGER subscribe to individual topics - we use a wildcard pattern instead
+        // This prevents RedisMessageListenerContainer deadlock/hang when adding many listeners
+        logger.info("Handler registered in memory for topic: {} (Redis subscription handled by wildcard pattern)", topic);
     }
     
     /**

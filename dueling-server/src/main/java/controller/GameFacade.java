@@ -11,10 +11,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import pubsub.IEventManager;
 import repository.CardRepository;
 import repository.GameSessionRepository;
 import repository.PlayerRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import service.chat.ChatGroupService;
 import service.deck.DeckService;
 import service.election.LeaderElectionService;
@@ -53,6 +57,7 @@ public class GameFacade {
     private final RankingService rankingService;
     private final AchievementService achievementService;
     private final WebSocketSessionManager sessionManager;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Value("${server.name}")
     private String serverName;
@@ -65,6 +70,11 @@ public class GameFacade {
     private final ChatGroupService chatGroupService;
     private final service.lock.LockService lockService;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    private TransactionTemplate transactionTemplate;
+
     @Autowired
     public GameFacade(MatchmakingService matchmakingService, StoreService storeService,
                       PlayerRepository playerRepository, repository.JpaPlayerRepository jpaPlayerRepository,
@@ -73,7 +83,8 @@ public class GameFacade {
                       CardRepository cardRepository, DeckService deckService, GameSessionRepository gameSessionRepository,
                       RedissonClient redissonClient, RankingService rankingService, AchievementService achievementService,
                       ChatGroupService chatGroupService, InGameChatService inGameChatService, EmoteService emoteService,
-                      service.lock.LockService lockService, WebSocketSessionManager sessionManager) {
+                      service.lock.LockService lockService, WebSocketSessionManager sessionManager,
+                      TransactionTemplate transactionTemplate, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
@@ -94,6 +105,8 @@ public class GameFacade {
         this.achievementService = achievementService;
         this.lockService = lockService;
         this.sessionManager = sessionManager;
+        this.transactionTemplate = transactionTemplate;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     private String getSelfUrl() {
@@ -193,9 +206,9 @@ public class GameFacade {
 
         // Try two-way matching: local player with remote partner AND remote player with local partner
         List<String> remoteServers = new ArrayList<>(serverRegistry.getRegisteredServers());
-        String selfUrl = getSelfUrl();
-        remoteServers.remove(selfUrl);
-        logger.info("[MATCH] Attempting cross-server matching. Self: {}, Remote servers: {}", selfUrl, remoteServers);
+        String currentSelfUrl = getSelfUrl();
+        remoteServers.remove(currentSelfUrl);
+        logger.info("[MATCH] Attempting cross-server matching. Self: {}, Remote servers: {}", currentSelfUrl, remoteServers);
         
         // Strategy 1: Try to find a local player and match with a remote partner
         Optional<Player> localPlayerOpt = matchmakingService.findAndLockPartner();
@@ -389,8 +402,8 @@ public class GameFacade {
                 playerRepository.save(newPlayer);
                 // Refresh the player object for use in subsequent operations
                 player = newPlayer;
-                logger.debug("Character created for player {}, sending response: SUCCESS:Character created.", playerId);
-                notifyPlayer(playerId, "SUCCESS:Character created.");
+                logger.debug("Character created for player {}, sending response: SUCCESS:Character created. Player ID: {}", playerId, playerId);
+                notifyPlayer(playerId, "SUCCESS:Character created. Player ID: " + playerId);
                 logger.debug("Response sent to player {}", playerId);
                 break;
 
@@ -453,8 +466,11 @@ public class GameFacade {
                     logger.debug("Processing BUY request for pack type: {} by player: {}", packType, playerId);
                     PurchaseResult result = buyPack(player, packType);
                     if (result.isSuccess()) {
+                        // Reload player from database to get updated card collection
+                        player = playerRepository.findById(playerId).orElse(player);
                         List<Card> cards = result.getCards();
                         logger.info("Purchase successful for player {}: received {} cards from {} pack", playerId, cards.size(), packType);
+                        logger.debug("Player {} now has {} total cards", playerId, player.getCardCollection().size());
                         StringBuilder cardList = new StringBuilder("SUCCESS:Pack purchased. Cards received: ");
                         for (int i = 0; i < cards.size(); i++) {
                             Card card = cards.get(i);
@@ -572,16 +588,47 @@ public class GameFacade {
         return playerRepository.findById(playerId).orElse(null);
     }
 
+    @Transactional
     public PurchaseResult buyPack(Player player, String packType) {
         logger.debug("buyPack called for player {} with packType: {}", player.getId(), packType);
         PurchaseResult result = storeService.purchaseCardPack(player, packType);
         if (result.isSuccess()) {
-            playerRepository.save(player);
-            logger.info("Player {} bought pack of type {}", player.getId(), packType);
+            // Force serialization and save to DB
+            player.serializeCardCollectionNow();
+            String json = player.getCardCollectionJson();
+            logger.debug("Cards in player {} collection after purchase: {} (JSON length: {})", 
+                        player.getId(), player.getCardCollection().size(), json != null ? json.length() : 0);
+            
+            // Update DB using transactional method
+            updatePlayerCardsInDb(player.getId(), json);
+            
+            // Reload from DB to verify
+            entityManager.clear();
+            Player reloaded = jpaPlayerRepository.findById(player.getId()).orElse(player);
+            logger.info("Player {} bought pack. Memory: {} cards, DB: {} cards", 
+                       player.getId(), player.getCardCollection().size(), reloaded.getCardCollection().size());
         } else {
             logger.warn("Failed to buy pack for player {}: {}", player.getId(), result.getStatus());
         }
         return result;
+    }
+
+    public void updatePlayerCardsInDb(String playerId, String cardCollectionJson) {
+        logger.debug("Updating player {} cards in DB with JSON length: {}", playerId, cardCollectionJson != null ? cardCollectionJson.length() : 0);
+        
+        try {
+            // Use JdbcTemplate which handles transactions automatically
+            // Player ID in DB is VARCHAR, so pass as String directly
+            int updated = jdbcTemplate.update(
+                "UPDATE players SET card_collection = ? WHERE id = ?",
+                cardCollectionJson,
+                playerId
+            );
+            logger.info("Player {} - JDBC UPDATE executed: {} rows affected", playerId, updated);
+        } catch (Exception e) {
+            logger.error("Error updating player {} cards: {}", playerId, e.getMessage(), e);
+            e.printStackTrace();
+        }
     }
 
     public void finishGame(String matchId, String winnerId, String loserId) {
@@ -610,6 +657,25 @@ public class GameFacade {
         logger.info("Match {} finished. Winner: {}, Loser: {}", matchId, winnerId, loserId);
     }
 
+    /**
+     * Executes trade with proposal already in memory (no Redis lookup).
+     * Used when we just updated the proposal to ACCEPTED to avoid race condition.
+     */
+    public boolean executeTradeWithProposal(TradeProposal proposal) {
+        logger.info("[TRADE-EXEC] === Starting trade execution with proposal ===");
+        logger.info("[TRADE-EXEC] Trade ID: {}", proposal.getTradeId());
+        logger.info("[TRADE-EXEC] Trade found - Proposer: {}, Target: {}, Status: {}", 
+                proposal.getProposingPlayerId(), proposal.getTargetPlayerId(), proposal.getStatus());
+
+        if (proposal.getStatus() != TradeProposal.Status.ACCEPTED) {
+            logger.warn("[TRADE-EXEC] Trade {} status is not ACCEPTED, cannot execute. Current status: {}", 
+                    proposal.getTradeId(), proposal.getStatus());
+            return false;
+        }
+
+        return executeTradeInternal(proposal);
+    }
+
     public boolean executeTrade(String tradeId) {
         logger.info("[TRADE-EXEC] === Starting trade execution ===");
         logger.info("[TRADE-EXEC] Trade ID: {}", tradeId);
@@ -629,6 +695,12 @@ public class GameFacade {
             return false;
         }
 
+        return executeTradeInternal(proposal);
+    }
+
+    private boolean executeTradeInternal(TradeProposal proposal) {
+        String tradeId = proposal.getTradeId();
+
         boolean lockAcquired = false;
         try {
             logger.info("[TRADE-EXEC] Attempting to acquire distributed lock for trade {}", tradeId);
@@ -639,17 +711,12 @@ public class GameFacade {
             }
             logger.info("[TRADE-EXEC] Lock acquired for trade {}", tradeId);
 
-            // Re-fetch proposal inside the lock to ensure we have the latest state
-            Optional<TradeProposal> lockedProposalOpt = tradeService.findTradeById(tradeId);
-            if (lockedProposalOpt.isEmpty() || lockedProposalOpt.get().getStatus() != TradeProposal.Status.ACCEPTED) {
-                logger.warn("[TRADE-EXEC] Trade {} is no longer valid for execution after acquiring lock.", tradeId);
-                return false;
-            }
-            TradeProposal lockedProposal = lockedProposalOpt.get();
+            // Use the proposal we already have (already verified as ACCEPTED)
+            logger.info("[TRADE-EXEC] Using proposal with status: {}", proposal.getStatus());
 
             logger.info("[TRADE-EXEC] Fetching players from repository");
-            Player p1 = playerRepository.findById(lockedProposal.getProposingPlayerId()).orElse(null);
-            Player p2 = playerRepository.findById(lockedProposal.getTargetPlayerId()).orElse(null);
+            Player p1 = playerRepository.findById(proposal.getProposingPlayerId()).orElse(null);
+            Player p2 = playerRepository.findById(proposal.getTargetPlayerId()).orElse(null);
 
             if (p1 == null || p2 == null) {
                 logger.error("[TRADE-EXEC] Could not find one or both players for trade {}. P1: {}, P2: {}", 
@@ -664,15 +731,15 @@ public class GameFacade {
             synchronized (p1) {
                 synchronized (p2) {
                     logger.info("[TRADE-EXEC] Verifying card ownership");
-                    logger.info("[TRADE-EXEC] P1 offered cards: {}", lockedProposal.getOfferedCardIds());
-                    logger.info("[TRADE-EXEC] P2 requested cards: {}", lockedProposal.getRequestedCardIds());
+                    logger.info("[TRADE-EXEC] P1 offered cards: {}", proposal.getOfferedCardIds());
+                    logger.info("[TRADE-EXEC] P2 requested cards: {}", proposal.getRequestedCardIds());
                     logger.info("[TRADE-EXEC] P1 has {} cards in collection", p1.getCardCollection().size());
                     logger.info("[TRADE-EXEC] P2 has {} cards in collection", p2.getCardCollection().size());
                     
-                    if (!p1.hasCards(lockedProposal.getOfferedCardIds()) || !p2.hasCards(lockedProposal.getRequestedCardIds())) {
+                    if (!p1.hasCards(proposal.getOfferedCardIds()) || !p2.hasCards(proposal.getRequestedCardIds())) {
                         logger.warn("[TRADE-EXEC] Trade {} invalid: one or both players missing cards.", tradeId);
-                        logger.warn("[TRADE-EXEC] P1 has offered cards: {}", p1.hasCards(lockedProposal.getOfferedCardIds()));
-                        logger.warn("[TRADE-EXEC] P2 has requested cards: {}", p2.hasCards(lockedProposal.getRequestedCardIds()));
+                        logger.warn("[TRADE-EXEC] P1 has offered cards: {}", p1.hasCards(proposal.getOfferedCardIds()));
+                        logger.warn("[TRADE-EXEC] P2 has requested cards: {}", p2.hasCards(proposal.getRequestedCardIds()));
                         notifyPlayer(p1.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
                         notifyPlayer(p2.getId(), "UPDATE:TRADE_COMPLETE:FAILED_MISSING_CARDS");
                         return false;
@@ -680,8 +747,8 @@ public class GameFacade {
                     logger.info("[TRADE-EXEC] Both players have required cards");
 
                     logger.info("[TRADE-EXEC] Filtering cards to exchange");
-                    List<Card> p1OfferedCards = p1.getCardCollection().stream().filter(c -> lockedProposal.getOfferedCardIds().contains(c.getId())).collect(Collectors.toList());
-                    List<Card> p2RequestedCards = p2.getCardCollection().stream().filter(c -> lockedProposal.getRequestedCardIds().contains(c.getId())).collect(Collectors.toList());
+                    List<Card> p1OfferedCards = p1.getCardCollection().stream().filter(c -> proposal.getOfferedCardIds().contains(c.getId())).collect(Collectors.toList());
+                    List<Card> p2RequestedCards = p2.getCardCollection().stream().filter(c -> proposal.getRequestedCardIds().contains(c.getId())).collect(Collectors.toList());
                     logger.info("[TRADE-EXEC] P1 offering {} cards, P2 offering {} cards", 
                             p1OfferedCards.size(), p2RequestedCards.size());
 
@@ -702,7 +769,7 @@ public class GameFacade {
                 }
             }
 
-            lockedProposal.setStatus(TradeProposal.Status.COMPLETED);
+            proposal.setStatus(TradeProposal.Status.COMPLETED);
             logger.info("[TRADE-EXEC] Trade {} status changed to COMPLETED", tradeId);
 
             logger.info("[TRADE-EXEC] Notifying both players of success");
@@ -810,13 +877,15 @@ public class GameFacade {
         }
 
         proposal.setStatus(TradeProposal.Status.ACCEPTED);
-        logger.info("[TRADE] Trade {} status changed to ACCEPTED", tradeId);
+        // CRITICAL: Save updated status to Redis before executing
+        tradeService.updateTrade(proposal);
+        logger.info("[TRADE] Trade {} status changed to ACCEPTED and saved to Redis", tradeId);
 
         logger.info("[TRADE] Notifying proposer {} that trade was accepted", proposal.getProposingPlayerId());
         notifyPlayer(proposal.getProposingPlayerId(), "UPDATE:TRADE_ACCEPTED:" + tradeId);
 
-        logger.info("[TRADE] Executing trade {}", tradeId);
-        boolean success = executeTrade(tradeId);
+        logger.info("[TRADE] Executing trade {} (passing proposal directly)", tradeId);
+        boolean success = executeTradeWithProposal(proposal);
 
         if (!success) {
             logger.error("[TRADE] Trade execution failed for trade {}, reverting status", tradeId);
