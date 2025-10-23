@@ -189,8 +189,7 @@ public class RedisEventManager implements IEventManager {
             logger.info("[TRADE-PUBSUB] Local subscriber present: {}", subscribers.containsKey(topic));
         }
         
-        // OPTIMIZATION: Send directly to local subscriber if present
-        // This avoids Redis PubSub issues for same-server communication
+        // Send to local subscriber if present (fast path for same-server)
         PrintWriter localSubscriber = subscribers.get(topic);
         if (localSubscriber != null) {
             try {
@@ -200,13 +199,12 @@ public class RedisEventManager implements IEventManager {
                 if (message != null && message.contains("TRADE")) {
                     logger.info("[TRADE-PUBSUB] Trade message delivered locally to topic {}", topic);
                 }
-                return; // Don't use Redis if local delivery succeeded
             } catch (Exception e) {
-                logger.warn("Failed to send to local subscriber for topic {}, falling back to Redis: {}", topic, e.getMessage());
+                logger.warn("Failed to send to local subscriber for topic {}: {}", topic, e.getMessage());
             }
         }
         
-        // Fall back to Redis for cross-server communication or if local delivery failed
+        // ALWAYS send via Redis for cross-server communication
         if (message != null && message.contains("TRADE")) {
             logger.info("[TRADE-PUBSUB] Sending trade message via Redis to topic {} (cross-server)", topic);
         }
