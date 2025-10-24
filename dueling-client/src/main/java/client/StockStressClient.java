@@ -147,7 +147,7 @@ public class StockStressClient implements WebSocket.Listener {
 
         if (message.contains("SUCCESS:Character created.")) {
             // Character setup successful, now send the buy command
-            String buyCommand = "STORE:" + username + ":STORE:BUY:BASIC";
+            String buyCommand = "STORE:BUY:BASIC";
             logger.info("[{}] Sending: {}", username, buyCommand);
             webSocketParam.sendText(buyCommand, true);
         } else if (message.contains("SUCCESS:Pack purchased") || message.contains("OUT_OF_STOCK") || message.contains("ERROR")) {

@@ -37,6 +37,7 @@ public final class GameClient {
 
     private static MyWebSocketClient webSocketClient;
     private static String jwtToken;
+    private static String currentUsername;
     private static String currentMatchId;
     private static boolean inGame;
     private static boolean characterSet = false;
@@ -179,6 +180,7 @@ public final class GameClient {
             if (response.statusCode == 200) {
                 JsonObject responseJson = new Gson().fromJson(response.body, JsonObject.class);
                 jwtToken = responseJson.get("token").getAsString();
+                currentUsername = username;
                 logger.info("[SUCCESS] ✓ Login successful!");
             } else {
                 String errorMessage = response.body != null && !response.body.isEmpty() ? response.body : "Invalid credentials";
@@ -202,6 +204,7 @@ public final class GameClient {
             if (response.statusCode == 200) {
                 JsonObject responseJson = new Gson().fromJson(response.body, JsonObject.class);
                 jwtToken = responseJson.get("token").getAsString();
+                currentUsername = AUTO_USERNAME;
                 System.out.println("[SUCCESS] ✓ Auto-login successful!");
             } else {
                 System.out.println("[ERROR] ✗ Auto-login failed: " + response.body + " (Code: " + response.statusCode + ")");
@@ -653,8 +656,36 @@ public final class GameClient {
     }
 
     private static void tradeCards(Scanner scanner) {
+        if (currentUsername == null || currentUsername.isEmpty()) {
+            System.out.println("[ERROR] You must be logged in to trade cards!");
+            return;
+        }
+        
         System.out.println("");
         System.out.println("--- TRADE CARDS ---");
+        System.out.println("1. Propose a new trade");
+        System.out.println("2. Accept a trade (you need the trade ID)");
+        System.out.println("3. Reject a trade (you need the trade ID)");
+        System.out.print("Choose an option (1-3): > ");
+        String choice = scanner.nextLine().trim();
+        
+        switch (choice) {
+            case "1":
+                proposeNewTrade(scanner);
+                break;
+            case "2":
+                acceptTrade(scanner);
+                break;
+            case "3":
+                rejectTrade(scanner);
+                break;
+            default:
+                System.out.println("Invalid option!");
+                break;
+        }
+    }
+    
+    private static void proposeNewTrade(Scanner scanner) {
         System.out.print("Enter the username of the player you want to trade with: > ");
         String targetUsername = scanner.nextLine().trim();
         if (targetUsername.isEmpty()) {
@@ -664,24 +695,62 @@ public final class GameClient {
 
         // First, request the player's card collection to help with selection
         System.out.println("Requesting your card collection to help with card selection...");
-        webSocketClient.send("SHOW_CARDS:PLACEHOLDER:"); // The server will replace PLACEHOLDER with actual playerId
+        webSocketClient.send("SHOW_CARDS");
+        
+        // Give server time to respond with card list
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         
         System.out.print("Enter the ID of the card you want to offer (comma-separated if multiple): > ");
-        System.out.println("(Note: Card list will be displayed above after server response)");
-        String offeredCards = scanner.nextLine().trim();
+        String offeredCards = scanner.nextLine().trim().toLowerCase();
         if (offeredCards.isEmpty()) {
             System.out.println("You must offer at least one card!");
             return;
         }
 
         System.out.print("Enter the ID of the card you want to request (comma-separated if multiple): > ");
-        String requestedCards = scanner.nextLine().trim();
+        String requestedCards = scanner.nextLine().trim().toLowerCase();
         if (requestedCards.isEmpty()) {
             System.out.println("You must request at least one card!");
             return;
         }
 
-        webSocketClient.send("TRADE:PROPOSE:" + targetUsername + ":" + offeredCards + ":" + requestedCards);
+        // Send trade proposal - WebSocketHandler will add GAME:playerId prefix automatically
+        String tradeCommand = "TRADE:PROPOSE:" + targetUsername + ":" + offeredCards + ":" + requestedCards;
+        System.out.println("[DEBUG] Sending trade command: " + tradeCommand);
+        webSocketClient.send(tradeCommand);
+        System.out.println("[TRADE] Trade proposal sent! Wait for response from " + targetUsername);
+    }
+    
+    private static void acceptTrade(Scanner scanner) {
+        System.out.print("Enter the Trade ID to accept: > ");
+        String tradeId = scanner.nextLine().trim();
+        if (tradeId.isEmpty()) {
+            System.out.println("Trade ID cannot be empty!");
+            return;
+        }
+        
+        String command = "TRADE:ACCEPT:" + tradeId;
+        System.out.println("[DEBUG] Sending: " + command);
+        webSocketClient.send(command);
+        System.out.println("[TRADE] Trade acceptance sent! Wait for confirmation...");
+    }
+    
+    private static void rejectTrade(Scanner scanner) {
+        System.out.print("Enter the Trade ID to reject: > ");
+        String tradeId = scanner.nextLine().trim();
+        if (tradeId.isEmpty()) {
+            System.out.println("Trade ID cannot be empty!");
+            return;
+        }
+        
+        String command = "TRADE:REJECT:" + tradeId;
+        System.out.println("[DEBUG] Sending: " + command);
+        webSocketClient.send(command);
+        System.out.println("[TRADE] Trade rejection sent!");
     }
 
     private static void checkPing(Scanner scanner) {
@@ -734,7 +803,9 @@ public final class GameClient {
     }
 
     private static void processServerMessage(String message) {
-        logger.debug("Received message from server: {}", message);
+        if (!"PONG".equals(message)) {
+            logger.debug("Received message from server: {}", message);
+        }
         String[] parts = message.split(":");
         String type = parts[0];
 
