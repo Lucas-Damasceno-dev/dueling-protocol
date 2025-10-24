@@ -28,7 +28,7 @@ PLAYER_A="match_a_${TIMESTAMP}"
 PLAYER_B="match_b_${TIMESTAMP}"
 
 echo -e "${YELLOW}Configuração:${NC}"
-echo "  Server 1 (8080): Player A = $PLAYER_A"
+echo "  Server 1 (8081): Player A = $PLAYER_A"
 echo "  Server 2 (8083): Player B = $PLAYER_B"
 echo ""
 
@@ -39,7 +39,7 @@ LOG_B="${TMP_DIR}/player_b.log"
 
 # Passo 1: Criar Player A no Server 1
 echo -e "${BLUE}═══ Passo 1: Criar Player A no Server 1 ═══${NC}"
-echo "GAME:${PLAYER_A}:CHARACTER_SETUP:PlayerA:Human:Warrior" | websocat -n "ws://localhost:8080/ws" &
+echo "GAME:${PLAYER_A}:CHARACTER_SETUP:PlayerA:Human:Warrior" | websocat -n "ws://localhost:8081/ws" &
 sleep 5
 echo -e "${GREEN}✓ Player A criado${NC}"
 
@@ -51,7 +51,7 @@ echo -e "${GREEN}✓ Player B criado${NC}"
 
 # Passo 3: Conectar listeners persistentes
 echo -e "${BLUE}═══ Passo 3: Iniciar Listeners Persistentes ═══${NC}"
-timeout 60s websocat "ws://localhost:8080/ws" > "$LOG_A" 2>&1 &
+timeout 60s websocat "ws://localhost:8081/ws" > "$LOG_A" 2>&1 &
 PID_A=$!
 timeout 60s websocat "ws://localhost:8083/ws" > "$LOG_B" 2>&1 &
 PID_B=$!
@@ -60,7 +60,7 @@ echo -e "${GREEN}✓ Listeners iniciados${NC}"
 
 # Passo 4: Player A entra em matchmaking
 echo -e "${BLUE}═══ Passo 4: Player A Entra em Matchmaking ═══${NC}"
-echo "GAME:${PLAYER_A}:MATCHMAKING:ENTER" | websocat -n "ws://localhost:8080/ws" &
+echo "GAME:${PLAYER_A}:MATCHMAKING:ENTER" | websocat -n "ws://localhost:8081/ws" &
 sleep 3
 echo -e "${GREEN}✓ Player A na fila${NC}"
 

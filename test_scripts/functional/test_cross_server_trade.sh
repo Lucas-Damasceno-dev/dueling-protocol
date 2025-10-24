@@ -13,9 +13,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configurações dos servidores
-SERVER1_URL="${SERVER1_URL:-http://localhost:8080}"
+SERVER1_URL="${SERVER1_URL:-http://localhost:8081}"
 SERVER2_URL="${SERVER2_URL:-http://localhost:8083}"
-WS1_URL="${WS1_URL:-ws://localhost:8080/ws}"
+WS1_URL="${WS1_URL:-ws://localhost:8081/ws}"
 WS2_URL="${WS2_URL:-ws://localhost:8083/ws}"
 
 # Nomes únicos de usuários
@@ -46,7 +46,8 @@ register_user() {
         -H "Content-Type: application/json" \
         -d "{\"username\": \"$username\", \"password\": \"$password\", \"playerId\": \"$username\"}")
     
-    if echo "$response" | grep -q "error\|Error"; then
+    # Check if response contains actual error message (not null error field)
+    if echo "$response" | jq -e '.error != null and .error != ""' > /dev/null 2>&1; then
         echo -e "${RED}Erro ao registrar $username: $response${NC}"
         return 1
     fi

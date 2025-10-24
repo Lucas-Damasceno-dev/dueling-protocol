@@ -3,8 +3,16 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-PROJECT_ROOT="$SCRIPT_DIR/.."
+PROJECT_ROOT="$SCRIPT_DIR/../.."
 DOCKER_COMPOSE_FILE="$PROJECT_ROOT/docker/docker-compose.yml"
+
+# Validate paths
+if [ ! -f "$DOCKER_COMPOSE_FILE" ]; then
+    echo "ERROR: docker-compose.yml not found at $DOCKER_COMPOSE_FILE"
+    echo "SCRIPT_DIR: $SCRIPT_DIR"
+    echo "PROJECT_ROOT: $PROJECT_ROOT"
+    exit 1
+fi
 
 echo "======================================================="
 echo ">>> STARTING DISTRIBUTED MATCHMAKING INTEGRATION TEST"

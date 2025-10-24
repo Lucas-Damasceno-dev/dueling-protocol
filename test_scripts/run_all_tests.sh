@@ -19,7 +19,9 @@ echo "======================================================="
 
 # Step 1: Compile and build Docker images (only needs to be done once)
 echo ">>> [STEP 1/4] Building Docker images..."
-./scripts/build.sh
+echo ">>> Building project with Maven..."
+mvn clean package -DskipTests -q
+echo ">>> Building Docker images..."
 # Create a temporary .env file with default values for docker-compose build
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
