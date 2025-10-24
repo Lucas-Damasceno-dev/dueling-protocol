@@ -66,6 +66,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/matchmaking/**").permitAll() // Allow internal matchmaking communication
                 .requestMatchers("/api/lock/**").permitAll() // Allow internal lock communication
                 .requestMatchers("/api/trades/**").permitAll() // Allow internal trade communication
+                .requestMatchers("/api/test/**").permitAll() // Allow test endpoints for integration testing
                 .anyRequest().authenticated() // Todas as outras requisições exigem autenticação
             )
             .sessionManagement(session -> session

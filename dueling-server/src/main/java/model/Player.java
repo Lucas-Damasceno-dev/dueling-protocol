@@ -105,7 +105,7 @@ public class Player implements Serializable {
     /**
      * Serialize card collection immediately (not waiting for PrePersist)
      */
-    private void serializeCardCollectionNow() {
+    public void serializeCardCollectionNow() {
         if (cardCollection != null && !cardCollection.isEmpty()) {
             try {
                 com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
