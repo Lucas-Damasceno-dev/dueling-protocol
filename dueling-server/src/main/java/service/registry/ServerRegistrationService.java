@@ -34,9 +34,8 @@ public class ServerRegistrationService implements ApplicationListener<Applicatio
 
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
-        // Use localhost for local-distributed mode, hostname otherwise
-        String hostname = serverName.contains("server-") ? "localhost" : serverName;
-        String selfUrl = "http://" + hostname + ":" + serverPort;
+        // Use container name for Docker, localhost for local development
+        String selfUrl = "http://" + serverName + ":" + serverPort;
         serverRegistry.registerServer(selfUrl);
         logger.info("Registered self as: {}", selfUrl);
         
@@ -46,9 +45,17 @@ public class ServerRegistrationService implements ApplicationListener<Applicatio
             return;
         }
 
-        // Determine peer port (the other server)
-        int peerPort = (serverPort == 8080) ? 8083 : 8080;
-        String peerUrl = "http://localhost:" + peerPort;
+        // Register all known server peers in Docker environment
+        String[] knownServers = {"server-1", "server-2", "server-3", "server-4"};
+        for (String peerName : knownServers) {
+            if (!peerName.equals(serverName)) {
+                String peerUrl = "http://" + peerName + ":" + serverPort;
+                registerPeer(peerUrl, selfUrl);
+            }
+        }
+    }
+    
+    private void registerPeer(String peerUrl, String selfUrl) {
         logger.info("Will attempt to register with peer: {}", peerUrl);
         
         // Use a new thread to avoid blocking startup
@@ -59,11 +66,12 @@ public class ServerRegistrationService implements ApplicationListener<Applicatio
                 try {
                     Thread.sleep(3000); // wait 3s before retrying
                     logger.info("Attempting to register with peer at {}", peerUrl);
+                    serverRegistry.registerServer(peerUrl);
                     serverApiClient.registerWithServer(peerUrl, selfUrl);
                     registered = true;
-                    logger.info("Successfully registered with peer {}", peerUrl);
+                    logger.info("✓ Successfully registered with peer {}", peerUrl);
                 } catch (Exception e) {
-                    logger.warn("Could not register with peer {}. Retrying...", peerUrl);
+                    logger.debug("Could not register with peer {} (may not be ready): {}", peerUrl, e.getMessage());
                     retries--;
                 }
             }
