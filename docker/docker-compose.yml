@@ -45,6 +45,7 @@ services:
     environment:
       SERVER_PORT: 8080
       SERVER_NAME: server-1
+      SERVER_URL: http://server-1:8080
       REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
       REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
       POSTGRES_HOST: ${POSTGRES_HOST}
@@ -80,6 +81,7 @@ services:
     environment:
       SERVER_PORT: 8080
       SERVER_NAME: server-2
+      SERVER_URL: http://server-2:8080
       REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
       REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
       POSTGRES_HOST: ${POSTGRES_HOST}
@@ -115,6 +117,7 @@ services:
     environment:
       SERVER_PORT: 8080
       SERVER_NAME: server-3
+      SERVER_URL: http://server-3:8080
       REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
       REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
       POSTGRES_HOST: ${POSTGRES_HOST}
@@ -150,6 +153,7 @@ services:
     environment:
       SERVER_PORT: 8080
       SERVER_NAME: server-4
+      SERVER_URL: http://server-4:8080
       REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
       REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
       POSTGRES_HOST: ${POSTGRES_HOST}
