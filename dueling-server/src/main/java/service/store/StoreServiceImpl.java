@@ -1,5 +1,6 @@
 package service.store;
 
+import java.util.ArrayList;
 import java.util.List;
 import model.Card;
 import model.CardPack;
@@ -8,9 +9,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import service.lock.LockService;
 
 @Service
+@Transactional
 public class StoreServiceImpl implements StoreService {
     
     private static final Logger logger = LoggerFactory.getLogger(StoreServiceImpl.class);
@@ -64,10 +67,15 @@ public class StoreServiceImpl implements StoreService {
             
             // Atualiza o jogador (isso também pode precisar de sincronização dependendo de como Player é gerenciado)
             player.setCoins(player.getCoins() - pack.getCost());
-            player.getCardCollection().addAll(newCards);
-
-            logger.info("{} bought a {} for {} coins and got {} cards.", 
-                       player.getNickname(), pack.getName(), pack.getCost(), newCards.size());
+            // Create new list to force JPA to detect change
+            int cardsBefore = player.getCardCollection().size();
+            List<Card> updatedCards = new ArrayList<>(player.getCardCollection());
+            updatedCards.addAll(newCards);
+            player.setCardCollection(updatedCards);
+            int cardsAfter = player.getCardCollection().size();
+            
+            logger.info("{} bought a {} for {} coins and got {} cards. Cards before: {}, after: {}", 
+                       player.getNickname(), pack.getName(), pack.getCost(), newCards.size(), cardsBefore, cardsAfter);
             return PurchaseResult.success(newCards);
 
         } catch (Exception e) {
