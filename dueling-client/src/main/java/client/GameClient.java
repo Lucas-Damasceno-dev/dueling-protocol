@@ -803,9 +803,6 @@ public final class GameClient {
     }
 
     private static void processServerMessage(String message) {
-        if (!"PONG".equals(message)) {
-            logger.debug("Received message from server: {}", message);
-        }
         String[] parts = message.split(":");
         String type = parts[0];
 
