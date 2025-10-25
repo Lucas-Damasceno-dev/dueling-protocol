@@ -4,118 +4,88 @@ import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.WebSocketSession;
 
+import java.io.PrintWriter;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class WebSocketSessionManager {
     private static final Logger logger = LoggerFactory.getLogger(WebSocketSessionManager.class);
-    
-    private final RedissonClient redissonClient;
-    
-    // Local cache for quick access to active sessions
-    private final ConcurrentHashMap<String, String> localSessionToPlayerId = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, java.io.PrintWriter> localPlayerWriters = new ConcurrentHashMap<>();
 
-    @Autowired
+    private final RedissonClient redissonClient;
+
+    // Mapeamentos locais para sessões ativas nesta instância
+    private final ConcurrentHashMap<String, WebSocketSession> activeSessions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> sessionToPlayerId = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, PrintWriter> playerWriters = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> sessionActivity = new ConcurrentHashMap<>();
+
     public WebSocketSessionManager(RedissonClient redissonClient) {
         this.redissonClient = redissonClient;
     }
 
-    /**
-     * Store the mapping between WebSocket session ID and player ID in Redis
-     * 
-     * @param sessionId The WebSocket session ID
-     * @param playerId The player ID associated with this session
-     */
-    public void storeSessionMapping(String sessionId, String playerId) {
-        RMap<String, String> sessionMap = redissonClient.getMap("websocket:sessions");
-        sessionMap.put(sessionId, playerId);
-        localSessionToPlayerId.put(sessionId, playerId);
-        logger.debug("Stored session mapping: {} -> {}", sessionId, playerId);
+    public void registerSession(WebSocketSession session, String playerId) {
+        String sessionId = session.getId();
+        activeSessions.put(sessionId, session);
+        sessionToPlayerId.put(sessionId, playerId);
+        sessionActivity.put(sessionId, System.currentTimeMillis());
+
+        // Armazena o mapeamento em Redis para ser visível globalmente
+        RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
+        redisSessionMap.put(sessionId, playerId);
+
+        logger.debug("Registered session {} for player {}", sessionId, playerId);
     }
 
-    /**
-     * Retrieve the player ID associated with a WebSocket session ID
-     * 
-     * @param sessionId The WebSocket session ID
-     * @return The player ID associated with this session, or null if not found
-     */
-    public String getPlayerIdBySessionId(String sessionId) {
-        // Check local cache first
-        String playerId = localSessionToPlayerId.get(sessionId);
+    public String unregisterSession(String sessionId) {
+        activeSessions.remove(sessionId);
+        sessionActivity.remove(sessionId);
+        String playerId = sessionToPlayerId.remove(sessionId);
+
         if (playerId != null) {
-            return playerId;
-        }
-        
-        // If not in local cache, check Redis
-        RMap<String, String> sessionMap = redissonClient.getMap("websocket:sessions");
-        playerId = sessionMap.get(sessionId);
-        if (playerId != null) {
-            localSessionToPlayerId.put(sessionId, playerId);
+            playerWriters.remove(playerId);
+            // Remove o mapeamento do Redis
+            RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
+            redisSessionMap.remove(sessionId);
+            logger.debug("Unregistered session {} for player {}", sessionId, playerId);
         }
         return playerId;
     }
 
-    /**
-     * Remove the mapping for a WebSocket session ID
-     * 
-     * @param sessionId The WebSocket session ID to remove
-     * @return The player ID that was associated with this session, or null if not found
-     */
-    public String removeSessionMapping(String sessionId) {
-        localSessionToPlayerId.remove(sessionId);
-        
-        RMap<String, String> sessionMap = redissonClient.getMap("websocket:sessions");
-        return sessionMap.remove(sessionId);
-    }
-
-    /**
-     * Store the PrintWriter for a player ID in local cache
-     * 
-     * @param playerId The player ID
-     * @param writer The PrintWriter for this player
-     */
-    public void storePlayerWriter(String playerId, java.io.PrintWriter writer) {
-        localPlayerWriters.put(playerId, writer);
-    }
-
-    /**
-     * Retrieve the PrintWriter for a player ID
-     * 
-     * @param playerId The player ID
-     * @return The PrintWriter for this player, or null if not found
-     */
-    public java.io.PrintWriter getPlayerWriter(String playerId) {
-        return localPlayerWriters.get(playerId);
-    }
-
-    /**
-     * Remove the PrintWriter for a player ID
-     * 
-     * @param playerId The player ID
-     * @return The PrintWriter that was associated with this player, or null if not found
-     */
-    public java.io.PrintWriter removePlayerWriter(String playerId) {
-        return localPlayerWriters.remove(playerId);
-    }
-    
-    /**
-     * Check if a player has an active session (either local or in Redis)
-     * 
-     * @param playerId The player ID to check
-     * @return true if the player has an active session, false otherwise
-     */
-    public boolean hasActiveSession(String playerId) {
-        // Check local cache first
-        if (localPlayerWriters.containsKey(playerId)) {
-            return true;
+    public void updateSessionActivity(String sessionId) {
+        if (sessionActivity.containsKey(sessionId)) {
+            sessionActivity.put(sessionId, System.currentTimeMillis());
         }
-        
-        // Check Redis for session mappings
-        RMap<String, String> sessionMap = redissonClient.getMap("websocket:sessions");
-        return sessionMap.readAllValues().contains(playerId);
+    }
+
+    public String getPlayerId(String sessionId) {
+        return sessionToPlayerId.get(sessionId);
+    }
+
+    public WebSocketSession getSession(String sessionId) {
+        return activeSessions.get(sessionId);
+    }
+
+    public Map<String, WebSocketSession> getActiveSessions() {
+        return Map.copyOf(activeSessions);
+    }
+
+    public Map<String, Long> getSessionActivity() {
+        return Map.copyOf(sessionActivity);
+    }
+
+    public void storePlayerWriter(String playerId, PrintWriter writer) {
+        playerWriters.put(playerId, writer);
+    }
+
+    public PrintWriter getPlayerWriter(String playerId) {
+        return playerWriters.get(playerId);
+    }
+
+    public PrintWriter removePlayerWriter(String playerId) {
+        return playerWriters.remove(playerId);
     }
 }

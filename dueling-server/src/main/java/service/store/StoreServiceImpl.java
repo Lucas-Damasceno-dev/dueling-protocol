@@ -7,27 +7,20 @@ import model.Player;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
-import service.election.LeaderElectionService;
-import api.ServerApiClient;
+import service.lock.LockService;
 
-@Profile("server")
 @Service
 public class StoreServiceImpl implements StoreService {
     
     private static final Logger logger = LoggerFactory.getLogger(StoreServiceImpl.class);
     private final CardPackFactory cardPackFactory;
-    private final LeaderElectionService leaderElectionService;
-    private final ServerApiClient serverApiClient;
+    private final LockService lockService;
 
     @Autowired
-    public StoreServiceImpl(CardPackFactory cardPackFactory, 
-                            LeaderElectionService leaderElectionService, 
-                            ServerApiClient serverApiClient) {
+    public StoreServiceImpl(CardPackFactory cardPackFactory, LockService lockService) {
         this.cardPackFactory = cardPackFactory;
-        this.leaderElectionService = leaderElectionService;
-        this.serverApiClient = serverApiClient;
+        this.lockService = lockService;
     }
 
     @Override
@@ -40,20 +33,16 @@ public class StoreServiceImpl implements StoreService {
             return PurchaseResult.failure(PurchaseResult.PurchaseStatus.INSUFFICIENT_FUNDS);
         }
 
-        String leader = leaderElectionService.getLeader();
-        if (leader == null) {
-            logger.error("No leader found for distributed lock.");
-            return PurchaseResult.failure(PurchaseResult.PurchaseStatus.PACK_NOT_FOUND);
-        }
-
         boolean lockAcquired = false;
         try {
-            lockAcquired = serverApiClient.acquireLock(leader);
+            lockAcquired = lockService.acquire();
             if (!lockAcquired) {
                 logger.warn("Could not acquire distributed lock for purchase by {}.", player.getNickname());
-                return PurchaseResult.failure(PurchaseResult.PurchaseStatus.PACK_NOT_FOUND);
+                // Retornar um status mais apropriado, como SERVER_BUSY ou CONFLICT
+                return PurchaseResult.failure(PurchaseResult.PurchaseStatus.SERVER_BUSY);
             }
 
+            // A lógica de abrir o pacote agora usa o CardRepository com estoque no Redis
             List<Card> newCards = pack.open();
             if (newCards.isEmpty()) {
                 logger.warn("{} failed to get cards from pack {}. Probably out of stock.", 
@@ -61,6 +50,7 @@ public class StoreServiceImpl implements StoreService {
                 return PurchaseResult.failure(PurchaseResult.PurchaseStatus.OUT_OF_STOCK);
             }
             
+            // Atualiza o jogador (isso também pode precisar de sincronização dependendo de como Player é gerenciado)
             player.setCoins(player.getCoins() - pack.getCost());
             player.getCardCollection().addAll(newCards);
 
@@ -71,10 +61,10 @@ public class StoreServiceImpl implements StoreService {
         } catch (Exception e) {
             logger.error("Error buying pack {} for player {}: {}", 
                         packType, player.getId(), e.getMessage(), e);
-            return PurchaseResult.failure(PurchaseResult.PurchaseStatus.PACK_NOT_FOUND);
+            return PurchaseResult.failure(PurchaseResult.PurchaseStatus.INTERNAL_SERVER_ERROR);
         } finally {
             if (lockAcquired) {
-                serverApiClient.releaseLock(leader);
+                lockService.release();
             }
         }
     }
