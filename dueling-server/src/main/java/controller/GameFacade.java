@@ -772,6 +772,10 @@ public class GameFacade {
             proposal.setStatus(TradeProposal.Status.COMPLETED);
             logger.info("[TRADE-EXEC] Trade {} status changed to COMPLETED", tradeId);
 
+            // Remove the trade from Redis to prevent double execution attempts
+            tradeService.removeTrade(tradeId);
+            logger.info("[TRADE-EXEC] Trade {} removed from Redis", tradeId);
+
             logger.info("[TRADE-EXEC] Notifying both players of success");
             notifyPlayer(p1.getId(), "UPDATE:TRADE_COMPLETE:SUCCESS");
             logger.info("[TRADE-EXEC] P1 notified");
@@ -917,11 +921,14 @@ public class GameFacade {
         }
 
         proposal.setStatus(TradeProposal.Status.REJECTED);
+        
+        // Remove the trade from Redis to prevent further actions on it
+        tradeService.removeTrade(tradeId);
 
         notifyPlayer(proposal.getTargetPlayerId(), "UPDATE:TRADE_REJECTED:" + tradeId);
         notifyPlayer(proposal.getProposingPlayerId(), "UPDATE:TRADE_REJECTED_BY_TARGET:" + tradeId);
 
-        logger.info("Trade {} rejected by player {}", tradeId, playerId);
+        logger.info("Trade {} rejected by player {} and removed from Redis", tradeId, playerId);
     }
 
     @Scheduled(fixedRate = 2000)
