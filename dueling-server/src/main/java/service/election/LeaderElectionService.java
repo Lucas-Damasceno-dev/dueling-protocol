@@ -56,4 +56,8 @@ public class LeaderElectionService {
     public boolean isLeader() {
         return leaderElector.isLeader();
     }
+
+    public String getSelfUrl() {
+        return selfUrl;
+    }
 }

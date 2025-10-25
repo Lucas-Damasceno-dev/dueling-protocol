@@ -21,8 +21,8 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
 
     private final Queue<PlayerWithDeck> matchmakingQueue = new ConcurrentLinkedQueue<>();
     private final Object lock = new Object();
-    
-    private static final Logger logger = LoggerFactory.getLogger(ConcurrentMatchmakingService.class);
+    private final LeaderElectionService leaderElectionService;
+    private final MatchRepository matchRepository;
 
     /**
      * Public constructor for Spring's dependency injection.
@@ -111,6 +111,7 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
                                 player1.getNickname(), player1Elo,
                                 player2.getNickname(), player2Elo);
                     Match match = new Match(player1, player2);
+                    match.setServerUrl(leaderElectionService.getSelfUrl());
                     return Optional.of(match);
                 }
             }

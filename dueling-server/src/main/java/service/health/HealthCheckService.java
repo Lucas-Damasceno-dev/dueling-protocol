@@ -96,4 +96,39 @@ public class HealthCheckService {
             return false;
         }
     }
+
+    private void handleServerFailure(String serverUrl) {
+        logger.info("Handling failure of server: {}", serverUrl);
+        List<Match> matches = matchRepository.findByServerUrl(serverUrl);
+        for (Match match : matches) {
+            if (match.getStatus() == Match.Status.IN_PROGRESS) {
+                logger.info("Match {} was in progress on failed server. Notifying opponent.", match.getId());
+
+                Player player1 = match.getPlayer1();
+                Player player2 = match.getPlayer2();
+
+                // Find the opponent of the player on the failed server
+                Player opponent = null;
+                if (match.getServerUrl().equals(player1.getSession().getServerUrl())) {
+                    opponent = player2;
+                } else {
+                    opponent = player1;
+                }
+
+                // Notify the opponent
+                java.io.PrintWriter opponentWriter = webSocketSessionManager.getPlayerWriter(opponent.getId());
+                if (opponentWriter != null) {
+                    opponentWriter.println("OPPONENT_DISCONNECTED");
+                    opponentWriter.flush();
+                }
+
+                // Update the match status
+                match.setStatus(Match.Status.FINISHED);
+                match.setWinner(opponent);
+                matchRepository.save(match);
+
+                logger.info("Match {} finished due to server failure. Winner: {}", match.getId(), opponent.getNickname());
+            }
+        }
+    }
 }
