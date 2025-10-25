@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
+import service.lock.LockService;
 
 import javax.annotation.PostConstruct;
 
@@ -21,13 +22,16 @@ public class LeaderElectionService {
     private final RedissonClient redissonClient;
     private final RLeaderElector leaderElector;
     private final String selfUrl;
+    private final LockService lockService;
 
     public LeaderElectionService(RedissonClient redissonClient,
                                  @Value("${server.name}") String serverName,
-                                 @Value("${server.port}") String serverPort) {
+                                 @Value("${server.port}") String serverPort,
+                                 LockService lockService) {
         this.redissonClient = redissonClient;
         this.selfUrl = "http://" + serverName + ":" + serverPort;
         this.leaderElector = redissonClient.getLeaderElector(LEADER_ELECTION_KEY);
+        this.lockService = lockService;
     }
 
     @PostConstruct
@@ -38,6 +42,9 @@ public class LeaderElectionService {
                 if (selfUrl.equals(leader)) {
                     logger.info("This server ({}) has been elected as the new leader.", selfUrl);
                     redissonClient.getBucket(LEADER_URL_KEY).set(selfUrl);
+
+                    // Clean up potentially orphaned locks from a previous leader
+                    lockService.cleanOrphanedPurchaseLock();
                 } else {
                     logger.info("A new leader has been elected: {}. This server is a follower.", leader);
                 }
