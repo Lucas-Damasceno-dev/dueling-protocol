@@ -23,26 +23,10 @@ if [ ! -f "dueling-gateway/target/dueling-gateway-1.0-SNAPSHOT.jar" ] || [ ! -f 
     mvn clean package -DskipTests
 fi
 
-# Iniciar o gateway
-echo "Iniciando Gateway na porta 8080..."
-cd dueling-gateway
-java -DGATEWAY_HOST=localhost \
-     -DGATEWAY_PORT=8080 \
-     -DSERVER_HOST=localhost \
-     -DSERVER_PORT=8083 \
-     -jar target/dueling-gateway-1.0-SNAPSHOT.jar > gateway.log 2>&1 &
-GATEWAY_PID=$!
-cd ..
-
-echo "Gateway iniciado com PID: $GATEWAY_PID"
-
-# Aguardar o gateway iniciar
-sleep 10
-
-# Iniciar o servidor com perfil local mas mantendo componentes necessários
-echo "Iniciando Servidor na porta 8083..."
+# Iniciar o servidor DIRETO na porta 8080 (sem gateway para simplificar)
+echo "Iniciando Servidor na porta 8080..."
 cd dueling-server
-java -DSERVER_PORT=8083 \
+java -DSERVER_PORT=8080 \
      -DPOSTGRES_HOST=localhost \
      -DPOSTGRES_PORT=5432 \
      -DPOSTGRES_DB=dueling_db \
@@ -61,10 +45,9 @@ echo "Servidor iniciado com PID: $SERVER_PID"
 sleep 25
 
 echo ""
-echo "=== Serviços iniciados com sucesso ==="
-echo "Gateway: http://localhost:8080"
+echo "=== Servidor iniciado com sucesso ==="
+echo "Servidor: http://localhost:8080"
 echo "WebSocket: ws://localhost:8080/ws"
-echo "Servidor: http://localhost:8083"
 echo ""
 echo "Para iniciar o cliente, execute: ./run_client.sh"
 echo ""
