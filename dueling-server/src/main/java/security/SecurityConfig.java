@@ -64,6 +64,7 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/api/servers/**", "/servers/**").permitAll()
                 .requestMatchers("/api/matchmaking/**").permitAll() // Allow internal matchmaking communication
+                .requestMatchers("/api/players/**").permitAll() // Allow player API for testing
                 .requestMatchers("/api/lock/**").permitAll() // Allow internal lock communication
                 .requestMatchers("/api/trades/**").permitAll() // Allow internal trade communication
                 .requestMatchers("/api/test/**").permitAll() // Allow test endpoints for integration testing
