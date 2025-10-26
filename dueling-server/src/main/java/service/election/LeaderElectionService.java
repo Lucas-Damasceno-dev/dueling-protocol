@@ -1,6 +1,6 @@
 package service.election;
 
-import org.redisson.api.RLeaderElector;
+import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import service.lock.LockService;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
 @Profile("server")
 @Service
@@ -20,9 +20,9 @@ public class LeaderElectionService {
     private static final String LEADER_URL_KEY = "leader:url";
 
     private final RedissonClient redissonClient;
-    private final RLeaderElector leaderElector;
     private final String selfUrl;
     private final LockService lockService;
+    private RLock leaderLock;
 
     public LeaderElectionService(RedissonClient redissonClient,
                                  @Value("${server.name}") String serverName,
@@ -30,30 +30,59 @@ public class LeaderElectionService {
                                  LockService lockService) {
         this.redissonClient = redissonClient;
         this.selfUrl = "http://" + serverName + ":" + serverPort;
-        this.leaderElector = redissonClient.getLeaderElector(LEADER_ELECTION_KEY);
+        this.leaderLock = redissonClient.getLock(LEADER_ELECTION_KEY);
         this.lockService = lockService;
     }
 
     @PostConstruct
     public void start() {
-        leaderElector.addListener(new org.redisson.api.listener.LeaderElectionListener() {
-            @Override
-            public void onLeaderElection(String leader) {
-                if (selfUrl.equals(leader)) {
-                    logger.info("This server ({}) has been elected as the new leader.", selfUrl);
-                    redissonClient.getBucket(LEADER_URL_KEY).set(selfUrl);
+        // Attempt to become leader by acquiring the leader lock
+        tryToBecomeLeader();
+        logger.info("This server ({}) has joined the leader election.", selfUrl);
+    }
 
-                    // Clean up potentially orphaned locks from a previous leader
-                    lockService.cleanOrphanedPurchaseLock();
-                } else {
-                    logger.info("A new leader has been elected: {}. This server is a follower.", leader);
+    private void tryToBecomeLeader() {
+        // Use a background task to periodically try to acquire the leader lock
+        Thread leaderThread = new Thread(() -> {
+            while (true) {
+                try {
+                    // Attempt to acquire the leader lock with a timeout
+                    if (leaderLock.tryLock()) {
+                        logger.info("This server ({}) has been elected as the new leader.", selfUrl);
+                        redissonClient.getBucket(LEADER_URL_KEY).set(selfUrl);
+
+                        // Clean up potentially orphaned locks from a previous leader
+                        lockService.cleanOrphanedPurchaseLock();
+
+                        // Keep the lock as long as we're running
+                        try {
+                            Thread.sleep(Long.MAX_VALUE); // Keep the lock indefinitely (until interrupted)
+                        } catch (InterruptedException e) {
+                            logger.warn("Leader thread interrupted, releasing lock");
+                            leaderLock.unlock();
+                            break;
+                        }
+                    } else {
+                        logger.debug("Failed to acquire leader lock, another server is the leader");
+                        Thread.sleep(5000); // Wait 5 seconds before trying again
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.warn("Leader election thread interrupted");
+                    break;
+                } catch (Exception e) {
+                    logger.error("Error during leader election: {}", e.getMessage(), e);
+                    try {
+                        Thread.sleep(5000); // Wait 5 seconds before retrying
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                 }
             }
         });
-
-        // Tenta se tornar o líder
-        leaderElector.tryToBecomeLeader(selfUrl);
-        logger.info("This server ({}) has joined the leader election.", selfUrl);
+        leaderThread.setDaemon(true);
+        leaderThread.start();
     }
 
     public String getLeader() {
@@ -61,7 +90,7 @@ public class LeaderElectionService {
     }
 
     public boolean isLeader() {
-        return leaderElector.isLeader();
+        return leaderLock.isHeldByCurrentThread();
     }
 
     public String getSelfUrl() {

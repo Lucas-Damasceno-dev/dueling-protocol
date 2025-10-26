@@ -61,6 +61,7 @@ public class GameFacade {
     private static final Logger logger = LoggerFactory.getLogger(GameFacade.class);
 
     private final ChatGroupService chatGroupService;
+    private final service.lock.LockService lockService;
 
     @Autowired
     public GameFacade(MatchmakingService matchmakingService, StoreService storeService,
@@ -69,7 +70,8 @@ public class GameFacade {
                       TradeService tradeService, LeaderElectionService leaderElectionService,
                       CardRepository cardRepository, DeckService deckService, GameSessionRepository gameSessionRepository,
                       RedissonClient redissonClient, RankingService rankingService, AchievementService achievementService,
-                      ChatGroupService chatGroupService, InGameChatService inGameChatService, EmoteService emoteService) {
+                      ChatGroupService chatGroupService, InGameChatService inGameChatService, EmoteService emoteService,
+                      service.lock.LockService lockService) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
@@ -88,6 +90,7 @@ public class GameFacade {
         this.emoteService = emoteService;
         this.rankingService = rankingService;
         this.achievementService = achievementService;
+        this.lockService = lockService;
     }
 
     private String getSelfUrl() {

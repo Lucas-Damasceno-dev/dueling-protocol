@@ -10,14 +10,17 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.client.TestRestTemplate.HttpClientOption;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import repository.PlayerRepository;
+import repository.UserRepository;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 public class AuthControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -26,30 +29,40 @@ public class AuthControllerIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private PlayerRepository playerRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @BeforeEach
     void setUp() {
-        // Configuração padrão sem errorHandler personalizado
+        userRepository.deleteAll();
     }
 
     @Test
     void testRegisterUser_Success() {
         // Arrange
-        String playerId = "player1";
-        playerRepository.save(new Player(playerId, "testplayer"));
+        String playerId = TestDataUtil.generateUniquePlayerId("player");
+        String username = TestDataUtil.generateUniqueUsername("testuser_reg");
+        String password = TestDataUtil.generateUniquePassword();
+        
+        // The player should already be mocked in TestConfig with unique ID
+        // Let's add the unique player to the mock in TestConfig via method call or update
 
-        RegisterRequest request = new RegisterRequest("testuser", "password", playerId);
+        RegisterRequest request = new RegisterRequest(username, password, playerId);
 
         // Act
         ResponseEntity<Map> response = restTemplate.postForEntity("/api/auth/register", request, Map.class);
 
         // Assert
+        // Since we're using unique data, we should get success
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsEntry("message", "User registered successfully");
     }
 
     @Test
     void testRegisterUser_PlayerNotFound() {
         // Arrange
-        RegisterRequest request = new RegisterRequest("testuser", "password", "nonexistentplayer");
+        String playerId = TestDataUtil.generateUniquePlayerId("nonexistentplayer");
+        RegisterRequest request = new RegisterRequest(TestDataUtil.generateUniqueUsername("testuser"), "password", playerId);
 
         // Act
         ResponseEntity<Map> response = restTemplate.postForEntity("/api/auth/register", request, Map.class);
@@ -61,12 +74,18 @@ public class AuthControllerIntegrationTest extends AbstractIntegrationTest {
     @Test
     void testLoginUser_Success() {
         // Arrange
-        String playerId = "player2";
-        playerRepository.save(new Player(playerId, "loginuser"));
-        RegisterRequest registerRequest = new RegisterRequest("loginuser", "password", playerId);
-        restTemplate.postForEntity("/api/auth/register", registerRequest, Map.class);
-
-        LoginRequest loginRequest = new LoginRequest("loginuser", "password");
+        String playerId = TestDataUtil.generateUniquePlayerId("player");
+        String username = TestDataUtil.generateUniqueUsername("loginuser");
+        String password = TestDataUtil.generateUniquePassword();
+        
+        // Register the user first
+        RegisterRequest registerRequest = new RegisterRequest(username, password, playerId);
+        ResponseEntity<Map> regResponse = restTemplate.postForEntity("/api/auth/register", registerRequest, Map.class);
+        
+        // Confirm registration was successful
+        assertThat(regResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        
+        LoginRequest loginRequest = new LoginRequest(username, password);
 
         // Act
         ResponseEntity<Map> response = restTemplate.postForEntity("/api/auth/login", loginRequest, Map.class);
@@ -74,30 +93,21 @@ public class AuthControllerIntegrationTest extends AbstractIntegrationTest {
         // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsKey("token");
+        assertThat(response.getBody()).containsEntry("message", "Login successful");
     }
 
     @Test
     void testLoginUser_InvalidCredentials() {
         // Arrange
-        LoginRequest request = new LoginRequest("wronguser", "wrongpassword");
+        String username = TestDataUtil.generateUniqueUsername("wronguser");
+        String password = TestDataUtil.generateUniquePassword();
+        LoginRequest request = new LoginRequest(username, password);
 
-        try {
-            // Act
-            ResponseEntity<Map> response = restTemplate.postForEntity("/api/auth/login", request, Map.class);
+        // Act
+        ResponseEntity<Map> response = restTemplate.postForEntity("/api/auth/login", request, Map.class);
 
-            // If no exception was thrown, check the status code directly
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        } catch (org.springframework.web.client.ResourceAccessException e) {
-            // If we get the retry exception, it likely means we got a 401 response
-            // which is what we expect, so check that the message contains expected content
-            if (e.getMessage().contains("cannot retry due to server authentication")) {
-                // This confirms the response was a 401, which is what we expect
-                // The test should pass since we got the expected error response
-                assertThat(HttpStatus.UNAUTHORIZED).isEqualTo(HttpStatus.UNAUTHORIZED); // Always true, but documents intent
-            } else {
-                throw e; // Re-throw if it's a different error
-            }
-        }
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 }
 

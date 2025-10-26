@@ -11,8 +11,10 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import repository.PlayerRepository;
+import repository.UserRepository;
 
 import java.time.Duration;
 import java.util.Map;
@@ -25,6 +27,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.util.Timeout;
 
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 public class FriendControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -33,92 +36,99 @@ public class FriendControllerIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private PlayerRepository playerRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @BeforeEach
     void setUp() {
-        // Configure the restTemplate with a custom request factory that avoids connection reuse issues
-        // This helps prevent authentication retry problems that occur in test environments
-        RequestConfig config = RequestConfig.custom()
-            .setConnectTimeout(Timeout.ofMilliseconds(5000))
-            .setResponseTimeout(Timeout.ofMilliseconds(10000))
-            .build();
-
-        CloseableHttpClient httpClient = HttpClients.custom()
-            .setDefaultRequestConfig(config)
-            .build();
-
-        org.springframework.http.client.HttpComponentsClientHttpRequestFactory requestFactory =
-            new org.springframework.http.client.HttpComponentsClientHttpRequestFactory(httpClient);
-
-        restTemplate.getRestTemplate().setRequestFactory(requestFactory);
+        userRepository.deleteAll();
     }
 
     private String registerAndLogin(String username, String password, String playerId) {
-        playerRepository.save(new Player(playerId, username));
+        // Register the user - since we're using unique data, this should succeed
         RegisterRequest registerRequest = new RegisterRequest(username, password, playerId);
-        restTemplate.postForEntity("/api/auth/register", registerRequest, Map.class);
-
+        ResponseEntity<Map> regResponse = restTemplate.postForEntity("/api/auth/register", registerRequest, Map.class);
+        
+        // Confirm registration was successful
+        assertThat(regResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        
         LoginRequest loginRequest = new LoginRequest(username, password);
-        ResponseEntity<Map> loginResponse;
-        try {
-            loginResponse = restTemplate.postForEntity("/api/auth/login", loginRequest, Map.class);
-        } catch (org.springframework.web.client.ResourceAccessException e) {
-            // Handle specific authentication retry exceptions that can occur in test environments
-            if (e.getMessage() != null && e.getMessage().contains("cannot retry due to server authentication")) {
-                // This is a known intermittent issue with the HTTP client when dealing with authentication in test environments
-                // Sleep and retry once, which often resolves the issue
-                try {
-                    Thread.sleep(50); // Short delay before retry
-                    loginResponse = restTemplate.postForEntity("/api/auth/login", loginRequest, Map.class);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("Interrupted while waiting to retry authentication", ie);
-                } catch (org.springframework.web.client.ResourceAccessException e2) {
-                    if (e2.getMessage() != null && e2.getMessage().contains("cannot retry due to server authentication")) {
-                        // Still getting the same error after retry, treat as authentication failure
-                        throw new RuntimeException("Authentication failed due to HTTP client retry issue", e2);
-                    } else {
-                        throw e2; // Different error, re-throw
-                    }
-                }
-            } else {
-                throw e; // Different error, re-throw
-            }
+        ResponseEntity<Map> loginResponse = restTemplate.postForEntity("/api/auth/login", loginRequest, Map.class);
+
+        // Handle potential login failures more gracefully in the helper
+        if (loginResponse.getStatusCode() != HttpStatus.OK || loginResponse.getBody() == null || !loginResponse.getBody().containsKey("token")) {
+            throw new RuntimeException("Failed to login user '" + username + "' in test setup. Status: " + loginResponse.getStatusCode() + 
+                ", Response Body: " + (loginResponse.getBody() != null ? loginResponse.getBody() : "null"));
         }
         return (String) loginResponse.getBody().get("token");
     }
 
     @Test
     void testSendFriendRequest_Success() {
-        String user1Token = registerAndLogin("user1_fr", "password", "player1_fr");
-        registerAndLogin("user2_fr", "password", "player2_fr");
+        // Arrange
+        String user1Username = TestDataUtil.generateUniqueUsername("user1");
+        String user1Password = TestDataUtil.generateUniquePassword();
+        String user1PlayerId = TestDataUtil.generateUniquePlayerId("player1");
+        String user2Username = TestDataUtil.generateUniqueUsername("user2");
+        String user2Password = TestDataUtil.generateUniquePassword();
+        String user2PlayerId = TestDataUtil.generateUniquePlayerId("player2");
+        
+        String user1Token = registerAndLogin(user1Username, user1Password, user1PlayerId);
+        
+        // Register the target user (no need to log them in for this part)
+        RegisterRequest registerRequest = new RegisterRequest(user2Username, user2Password, user2PlayerId);
+        ResponseEntity<Map> regResponse = restTemplate.postForEntity("/api/auth/register", registerRequest, Map.class);
+        assertThat(regResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
+        // Create Headers with JWT Token
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(user1Token);
-        HttpEntity<Map> request = new HttpEntity<>(Map.of("targetUsername", "user2_fr"), headers);
+        headers.setBearerAuth(user1Token); // <-- Use the token here
 
-        ResponseEntity<String> response = restTemplate.postForEntity("/api/friends/request", request, String.class);
+        // Create request body
+        Map<String, String> requestBody = Map.of("targetUsername", user2Username);
 
+        // Create HttpEntity with body and headers
+        HttpEntity<Map<String, String>> request = new HttpEntity<>(requestBody, headers); // <-- Pass headers
+
+        // Act
+        ResponseEntity<Map> response = restTemplate.postForEntity("/api/friends/request", request, Map.class); // Expect Map response based on controller
+
+        // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).contains("Friend request sent");
+        assertThat(response.getBody()).containsEntry("message", "Friend request sent successfully");
     }
 
     @Test
     void testAcceptFriendRequest_Success() {
-        String user1Token = registerAndLogin("user3", "password", "player3");
-        String user2Token = registerAndLogin("user4", "password", "player4");
+         // Arrange
+         String user3Username = TestDataUtil.generateUniqueUsername("user3");
+         String user3Password = TestDataUtil.generateUniquePassword();
+         String user3PlayerId = TestDataUtil.generateUniquePlayerId("player3");
+         String user4Username = TestDataUtil.generateUniqueUsername("user4");
+         String user4Password = TestDataUtil.generateUniquePassword();
+         String user4PlayerId = TestDataUtil.generateUniquePlayerId("player4");
 
-        HttpHeaders user1Headers = new HttpHeaders();
-        user1Headers.setBearerAuth(user1Token);
-        HttpEntity<Map> request = new HttpEntity<>(Map.of("targetUsername", "user4"), user1Headers);
-        restTemplate.postForEntity("/api/friends/request", request, String.class);
+         // Register both users
+         String user3Token = registerAndLogin(user3Username, user3Password, user3PlayerId);
+         String user4Token = registerAndLogin(user4Username, user4Password, user4PlayerId);
 
-        HttpHeaders user2Headers = new HttpHeaders();
-        user2Headers.setBearerAuth(user2Token);
-        HttpEntity<Map> acceptRequest = new HttpEntity<>(Map.of("senderUsername", "user3"), user2Headers);
+         // User3 sends request to User4
+         HttpHeaders user3Headers = new HttpHeaders();
+         user3Headers.setBearerAuth(user3Token);
+         HttpEntity<Map<String, String>> sendRequest = new HttpEntity<>(Map.of("targetUsername", user4Username), user3Headers);
+         ResponseEntity<Map> sendResponse = restTemplate.postForEntity("/api/friends/request", sendRequest, Map.class);
+         assertThat(sendResponse.getStatusCode()).isEqualTo(HttpStatus.OK); // Verify request was sent
 
-        ResponseEntity<String> response = restTemplate.postForEntity("/api/friends/accept", acceptRequest, String.class);
+         // User4 accepts request from User3
+         HttpHeaders user4Headers = new HttpHeaders();
+         user4Headers.setBearerAuth(user4Token); // <-- User4 uses their token
+         HttpEntity<Map<String, String>> acceptRequest = new HttpEntity<>(Map.of("senderUsername", user3Username), user4Headers); // <-- Pass headers
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).contains("Friend request accepted");
+         // Act
+         ResponseEntity<Map> response = restTemplate.postForEntity("/api/friends/accept", acceptRequest, Map.class); // Expect Map
+
+         // Assert
+         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+         assertThat(response.getBody()).containsEntry("message", "Friend request accepted successfully");
     }
 }

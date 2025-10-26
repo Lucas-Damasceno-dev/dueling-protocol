@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import service.election.LeaderElectionService;
+import repository.MatchRepository;
 
 /**
  * Thread-safe implementation of the MatchmakingService interface.
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ConcurrentMatchmakingService implements MatchmakingService {
 
+    private static final Logger logger = LoggerFactory.getLogger(ConcurrentMatchmakingService.class);
     private final Queue<PlayerWithDeck> matchmakingQueue = new ConcurrentLinkedQueue<>();
     private final Object lock = new Object();
     private final LeaderElectionService leaderElectionService;
@@ -27,7 +30,10 @@ public class ConcurrentMatchmakingService implements MatchmakingService {
     /**
      * Public constructor for Spring's dependency injection.
      */
-    public ConcurrentMatchmakingService() {}
+    public ConcurrentMatchmakingService(LeaderElectionService leaderElectionService, MatchRepository matchRepository) {
+        this.leaderElectionService = leaderElectionService;
+        this.matchRepository = matchRepository;
+    }
 
     /**
      * {@inheritDoc}
