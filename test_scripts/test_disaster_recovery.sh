@@ -26,7 +26,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -42,14 +42,14 @@ cd "$PROJECT_ROOT"
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
 rm -f .env
 echo ">>> Build completed successfully."
 
 # Step 2: Start services
 run_test "Start Services" "Starting full system for disaster recovery tests"
 echo ">>> Starting services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 echo ">>> Waiting for services to initialize..."
 sleep 30
 
@@ -60,17 +60,17 @@ echo ">>> Creating baseline data for recovery testing..."
 # Start a client briefly to generate some data that should persist
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
 sleep 15
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 rm -f .env
 
 # Record initial state
-INITIAL_REDIS_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
+INITIAL_REDIS_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
 echo ">>> Initial Redis keys: $INITIAL_REDIS_KEYS"
 
 # Check if PostgreSQL has tables and sample data
-INITIAL_DB_TABLES=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
+INITIAL_DB_TABLES=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
 echo ">>> Initial DB tables: $INITIAL_DB_TABLES"
 
 # Step 4: Test PostgreSQL failure and recovery
@@ -78,19 +78,19 @@ run_test "PostgreSQL Failure Recovery" "Testing system behavior when PostgreSQL 
 echo ">>> Testing PostgreSQL failure and recovery..."
 
 # Get initial state before failure
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs postgres > postgres_before_failure.log 2>&1
-INITIAL_PG_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps postgres | grep -o "Up\|Down")
+docker compose -f "$DOCKER_COMPOSE_FILE" logs postgres > postgres_before_failure.log 2>&1
+INITIAL_PG_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps postgres | grep -o "Up\|Down")
 
 echo ">>> Initial PostgreSQL state: $INITIAL_PG_STATUS"
 
 # Stop PostgreSQL to simulate failure
 echo ">>> Stopping PostgreSQL to simulate database failure..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" stop postgres
+docker compose -f "$DOCKER_COMPOSE_FILE" stop postgres
 sleep 8
 
 # Check how applications react to database failure
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_during_pg_failure.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_during_pg_failure.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_during_pg_failure.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_during_pg_failure.log 2>&1
 
 if grep -i -E "connection.*fail|database.*down|sql.*error|hibernate.*error" server1_during_pg_failure.log; then
   echo ">>> INFO: Found database failure related messages in server-1 logs"
@@ -102,15 +102,15 @@ fi
 
 # Start PostgreSQL again to simulate recovery
 echo ">>> Restarting PostgreSQL to simulate recovery..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" start postgres
+docker compose -f "$DOCKER_COMPOSE_FILE" start postgres
 sleep 20
 
 # Check if PostgreSQL is accessible after restart
-if docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_isready -h localhost -U dueling_user -d dueling_db; then
+if docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_isready -h localhost -U dueling_user -d dueling_db; then
   echo ">>> SUCCESS: PostgreSQL successfully recovered and is accessible"
   
   # Check that the database tables still exist after restart
-  POST_RECOVERY_DB_TABLES=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
+  POST_RECOVERY_DB_TABLES=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
   
   if [ "$POST_RECOVERY_DB_TABLES" -eq "$INITIAL_DB_TABLES" ]; then
     echo ">>> SUCCESS: Database structure preserved after failure/recovery"
@@ -119,7 +119,7 @@ if docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_isr
   fi
 else
   echo ">>> FAILURE: PostgreSQL did not recover properly"
-  docker-compose -f "$DOCKER_COMPOSE_FILE" logs postgres
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs postgres
   exit 1
 fi
 
@@ -131,27 +131,27 @@ run_test "Redis Failure Recovery" "Testing system behavior when Redis fails and 
 echo ">>> Testing Redis failure and recovery..."
 
 # Get initial state before failure
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs redis > redis_before_failure.log 2>&1
-INITIAL_REDIS_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps redis | grep -o "Up\|Down")
+docker compose -f "$DOCKER_COMPOSE_FILE" logs redis > redis_before_failure.log 2>&1
+INITIAL_REDIS_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps redis | grep -o "Up\|Down")
 
 echo ">>> Initial Redis state: $INITIAL_REDIS_STATUS"
 
 # Stop Redis to simulate failure
 echo ">>> Stopping Redis to simulate cache failure..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" stop redis
+docker compose -f "$DOCKER_COMPOSE_FILE" stop redis
 sleep 8
 
 # Start a client to see how the system behaves without Redis
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=1 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=1 --remove-orphans -d
 sleep 15
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 rm -f .env
 
 # Check how applications reacted to Redis failure
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_during_redis_failure.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_during_redis_failure.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_during_redis_failure.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_during_redis_failure.log 2>&1
 
 if grep -i -E "redis.*fail|connection.*timeout|cache.*error|session.*error" server1_during_redis_failure.log; then
   echo ">>> INFO: Found Redis failure related messages in server-1 logs"
@@ -163,15 +163,15 @@ fi
 
 # Start Redis again to simulate recovery
 echo ">>> Restarting Redis to simulate recovery..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" start redis
+docker compose -f "$DOCKER_COMPOSE_FILE" start redis
 sleep 15
 
 # Check if Redis is accessible after restart
-if docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli ping | grep -q "PONG"; then
+if docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli ping | grep -q "PONG"; then
   echo ">>> SUCCESS: Redis successfully recovered and is responding to PING"
   
   # Check if Redis data was preserved (this depends on persistence settings)
-  POST_RECOVERY_REDIS_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
+  POST_RECOVERY_REDIS_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
   echo ">>> Redis keys after recovery: $POST_RECOVERY_REDIS_KEYS (before failure: $INITIAL_REDIS_KEYS)"
   
   if [ $POST_RECOVERY_REDIS_KEYS -gt 0 ]; then
@@ -181,7 +181,7 @@ if docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli
   fi
 else
   echo ">>> FAILURE: Redis did not recover properly"
-  docker-compose -f "$DOCKER_COMPOSE_FILE" logs redis
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs redis
   exit 1
 fi
 
@@ -193,12 +193,12 @@ run_test "Server Failure Recovery" "Testing single server failure and recovery"
 echo ">>> Testing server failure and recovery..."
 
 # Get initial state
-INITIAL_SERVER1_LOG_SIZE=$(docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 2>&1 | wc -c)
-INITIAL_SERVER2_LOG_SIZE=$(docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 2>&1 | wc -c)
+INITIAL_SERVER1_LOG_SIZE=$(docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 2>&1 | wc -c)
+INITIAL_SERVER2_LOG_SIZE=$(docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 2>&1 | wc -c)
 
 # Stop server-1 to simulate failure
 echo ">>> Stopping server-1 to simulate server failure..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" stop server-1
+docker compose -f "$DOCKER_COMPOSE_FILE" stop server-1
 sleep 10
 
 # Check if server-2 can handle all traffic
@@ -213,14 +213,14 @@ fi
 # Start a client to verify the system still works with only server-2
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=1 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=1 --remove-orphans -d
 sleep 15
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 rm -f .env
 
 # Restart server-1 to simulate recovery
 echo ">>> Restarting server-1 to simulate recovery..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" start server-1
+docker compose -f "$DOCKER_COMPOSE_FILE" start server-1
 sleep 25
 
 # Verify both servers are healthy after recovery
@@ -238,8 +238,8 @@ run_test "Network Partitioning" "Testing system behavior under network partition
 echo ">>> Testing network partitioning resilience..."
 
 # Get initial state
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_before_partition.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_before_partition.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_before_partition.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_before_partition.log 2>&1
 
 # This is a simulation - in a real environment, we'd have more sophisticated network testing
 # For Docker Compose, we can't easily simulate partial network failures,
@@ -247,7 +247,7 @@ docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_before_partitio
 
 # Restart the network to simulate temporary disruption
 echo ">>> Simulating network disruption by restarting containers..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" restart server-1 server-2
+docker compose -f "$DOCKER_COMPOSE_FILE" restart server-1 server-2
 sleep 20
 
 # Verify services are still operational
@@ -270,17 +270,17 @@ echo ">>> Testing data consistency after failure scenarios..."
 # Start a client to generate more data post-recovery
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
 sleep 20
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 rm -f .env
 
 # Check Redis consistency
-FINAL_REDIS_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
+FINAL_REDIS_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "*" | wc -l)
 echo ">>> Final Redis keys after all tests: $FINAL_REDIS_KEYS"
 
 # Check PostgreSQL consistency
-FINAL_DB_TABLES=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
+FINAL_DB_TABLES=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
 echo ">>> Final DB tables after all tests: $FINAL_DB_TABLES"
 
 if [ $FINAL_REDIS_KEYS -gt 0 ] && [ $FINAL_DB_TABLES -gt 0 ]; then
@@ -294,11 +294,11 @@ run_test "Graceful Shutdown and Startup" "Testing graceful shutdown and startup 
 echo ">>> Testing graceful shutdown procedures..."
 
 # Get current state
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_before_shutdown.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_before_shutdown.log 2>&1
 
 # Perform graceful shutdown
 echo ">>> Performing graceful shutdown of all services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" down
+docker compose -f "$DOCKER_COMPOSE_FILE" down
 sleep 5
 
 # Check if shutdown was clean
@@ -310,11 +310,11 @@ fi
 
 # Restart services
 echo ">>> Restarting services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 sleep 25
 
 # Verify all services are running
-FINAL_SERVICES_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps)
+FINAL_SERVICES_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps)
 echo ">>> Final service status:"
 echo "$FINAL_SERVICES_STATUS"
 

@@ -25,7 +25,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -41,14 +41,14 @@ cd "$PROJECT_ROOT"
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
 rm -f .env
 echo ">>> Build completed successfully."
 
 # Step 2: Start services
 run_test "Start Services" "Starting gateway, servers, Redis, and PostgreSQL"
 echo ">>> Starting services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 echo ">>> Waiting for services to initialize..."
 sleep 20
 
@@ -61,7 +61,7 @@ if curl -f -s -o /dev/null http://localhost:8081/actuator/health; then
   echo ">>> SUCCESS: Gateway is accessible at http://localhost:8081"
 else
   echo ">>> FAILURE: Gateway is not accessible"
-  docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1
   exit 1
 fi
 
@@ -72,7 +72,7 @@ if [ "$GATEWAY_RESPONSE" -eq 404 ] || [ "$GATEWAY_RESPONSE" -eq 200 ]; then
 else
   echo ">>> FAILURE: Gateway is not properly forwarding requests (received HTTP $GATEWAY_RESPONSE)"
   cat response.txt
-  docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1
   exit 1
 fi
 rm -f response.txt
@@ -93,8 +93,8 @@ run_test "Load Balancing" "Testing load balancing between multiple servers"
 echo ">>> Testing load balancing between server-1 and server-2..."
 
 # Get initial server logs
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_initial.log
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_initial.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_initial.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_initial.log
 
 # Make several requests to see if load balancing works
 for i in {1..5}; do
@@ -103,8 +103,8 @@ for i in {1..5}; do
 done
 
 # Get updated logs to see which servers handled requests
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_after.log
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_after.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_after.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_after.log
 
 # Compare log sizes to see if both servers were active
 SIZE1_BEFORE=$(stat -c%s server1_initial.log)

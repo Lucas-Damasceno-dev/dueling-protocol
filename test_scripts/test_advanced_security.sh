@@ -26,7 +26,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -42,14 +42,14 @@ cd "$PROJECT_ROOT"
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
 rm -f .env
 echo ">>> Build completed successfully."
 
 # Step 2: Start services
 run_test "Start Services" "Starting gateway, servers, Redis, and PostgreSQL"
 echo ">>> Starting services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 echo ">>> Waiting for services to initialize..."
 sleep 25
 

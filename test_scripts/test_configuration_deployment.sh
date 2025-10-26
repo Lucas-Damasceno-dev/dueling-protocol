@@ -26,7 +26,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -83,7 +83,7 @@ echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
 
 # Build Docker images
-DOCKER_BUILD_RESULT=$(docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build 2>&1 | tee docker_build_output.log)
+DOCKER_BUILD_RESULT=$(docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build 2>&1 | tee docker_build_output.log)
 DOCKER_BUILD_EXIT_CODE=${PIPESTATUS[0]}
 
 if [ $DOCKER_BUILD_EXIT_CODE -eq 0 ]; then
@@ -133,9 +133,9 @@ echo ">>> Testing Spring profiles configuration..."
 
 # Check the docker-compose.yml for profile activation
 if grep -q "distributed.*distributed-db" "$DOCKER_COMPOSE_FILE"; then
-  echo ">>> SUCCESS: Distributed profiles configured in docker-compose"
+  echo ">>> SUCCESS: Distributed profiles configured in docker compose"
 else
-  echo ">>> INFO: Distributed profiles not explicitly found in docker-compose"
+  echo ">>> INFO: Distributed profiles not explicitly found in docker compose"
 fi
 
 # Step 5: Test service startup configuration
@@ -143,21 +143,21 @@ run_test "Service Startup Configuration" "Testing service startup and health che
 echo ">>> Testing service startup configuration..."
 
 # Start services with specific configuration
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 
 # Wait for services with longer timeout than normal
 echo ">>> Waiting for services to become healthy..."
 sleep 40
 
 # Check the health status for each service
-SERVICES_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps --format "json")
+SERVICES_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps --format "json")
 echo ">>> Service status: $SERVICES_STATUS"
 
 # Check individual service health
-SERVER1_HEALTH_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps server-1 | awk '{print $NF}')
-SERVER2_HEALTH_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps server-2 | awk '{print $NF}')
-REDIS_HEALTH_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps redis | awk '{print $NF}')
-POSTGRES_HEALTH_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps postgres | awk '{print $NF}')
+SERVER1_HEALTH_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps server-1 | awk '{print $NF}')
+SERVER2_HEALTH_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps server-2 | awk '{print $NF}')
+REDIS_HEALTH_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps redis | awk '{print $NF}')
+POSTGRES_HEALTH_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps postgres | awk '{print $NF}')
 
 echo ">>> Server-1 status: $SERVER1_HEALTH_STATUS"
 echo ">>> Server-2 status: $SERVER2_HEALTH_STATUS"
@@ -188,7 +188,7 @@ fi
 
 if [ "$ALL_SERVICES_UP" = false ]; then
   echo ">>> FAILURE: Not all services are running properly"
-  docker-compose -f "$DOCKER_COMPOSE_FILE" logs
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs
   exit 1
 fi
 
@@ -199,8 +199,8 @@ run_test "Configuration Validation Through Logs" "Testing configuration through 
 echo ">>> Testing configuration validation through startup logs..."
 
 # Check server logs for configuration messages
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_config.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_config.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_config.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_config.log 2>&1
 
 # Look for configuration-related messages in logs
 CONFIG_SUCCESS=0
@@ -276,7 +276,7 @@ echo ">>> Testing configuration stability under load..."
 # Start clients to create some load while checking configuration
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
 sleep 20
 
 # Check that services are still properly configured under load
@@ -289,7 +289,7 @@ else
   echo ">>> WARNING: Services may have configuration issues under load (Server1: $LOAD_SERVER1_HEALTH, Server2: $LOAD_SERVER2_HEALTH)"
 fi
 
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env down
 rm -f .env
 
 # Step 9: Test configuration file integrity
@@ -348,21 +348,21 @@ else
   exit 1
 fi
 
-# Check for docker-compose file
+# Check for docker compose file
 if [ -f "$DOCKER_COMPOSE_FILE" ]; then
   echo ">>> SUCCESS: Docker Compose file found"
   
-  # Check for essential services in docker-compose file
+  # Check for essential services in docker compose file
   if grep -q "server.*:" "$DOCKER_COMPOSE_FILE"; then
-    echo ">>> SUCCESS: Server service defined in docker-compose"
+    echo ">>> SUCCESS: Server service defined in docker compose"
   fi
   
   if grep -q "redis:" "$DOCKER_COMPOSE_FILE"; then
-    echo ">>> SUCCESS: Redis service defined in docker-compose"
+    echo ">>> SUCCESS: Redis service defined in docker compose"
   fi
   
   if grep -q "postgres:" "$DOCKER_COMPOSE_FILE"; then
-    echo ">>> SUCCESS: PostgreSQL service defined in docker-compose"
+    echo ">>> SUCCESS: PostgreSQL service defined in docker compose"
   fi
 else
   echo ">>> FAILURE: Docker Compose file not found"

@@ -18,25 +18,25 @@ echo ">>> [STEP 2/3] Building Docker images..."
 # Set environment variables to avoid warnings
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f docker/docker-compose.yml --env-file .env build
+docker compose -f docker/docker-compose.yml --env-file .env build
 
 echo ""
 echo ">>> [STEP 3/3] Starting stress test with 1 server and $CLIENT_COUNT clients..."
 echo ">>> The test will run for $TEST_DURATION seconds."
-docker-compose -f docker/docker-compose.yml --env-file .env up --scale client=$CLIENT_COUNT --remove-orphans &
+docker compose -f docker/docker-compose.yml --env-file .env up --scale client=$CLIENT_COUNT --remove-orphans &
 
-# Saves the docker-compose process PID
+# Saves the docker compose process PID
 COMPOSE_PID=$!
 
 # Waits for the test duration
 sleep $TEST_DURATION
 
-# Terminates docker-compose
+# Terminates docker compose
 kill $COMPOSE_PID
 
 echo ""
 echo ">>> Test finished. Cleaning up containers..."
-docker-compose -f docker/docker-compose.yml --env-file .env down
+docker compose -f docker/docker-compose.yml --env-file .env down
 # Clean up the temporary .env file
 rm -f .env
 

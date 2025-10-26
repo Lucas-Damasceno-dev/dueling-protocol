@@ -26,7 +26,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -42,26 +42,26 @@ cd "$PROJECT_ROOT"
 echo ">>> Building Docker images for complete stack..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
 rm -f .env
 echo ">>> Build completed successfully."
 
 # Step 2: Start the complete distributed system
 run_test "Start Complete System" "Starting gateway, both servers, Redis, PostgreSQL, Prometheus, and Grafana"
 echo ">>> Starting complete distributed system..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 echo ">>> Waiting for complete system to initialize..."
 sleep 30
 
 # Verify all services are running
-SERVICES_STATUS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" ps --format "json")
+SERVICES_STATUS=$(docker compose -f "$DOCKER_COMPOSE_FILE" ps --format "json")
 echo ">>> Service status: $SERVICES_STATUS"
 
 # Check if all essential services are up
 ESSENTIAL_SERVICES=("server-1" "server-2" "redis" "postgres")
 ALL_UP=true
 for service in "${ESSENTIAL_SERVICES[@]}"; do
-  if ! docker-compose -f "$DOCKER_COMPOSE_FILE" ps | grep -q "$service.*Up"; then
+  if ! docker compose -f "$DOCKER_COMPOSE_FILE" ps | grep -q "$service.*Up"; then
     echo ">>> WARNING: Service $service is not running properly"
     ALL_UP=false
   fi
@@ -71,7 +71,7 @@ if [ "$ALL_UP" = true ]; then
   echo ">>> SUCCESS: All essential services are running"
 else
   echo ">>> WARNING: Some services may have issues"
-  docker-compose -f "$DOCKER_COMPOSE_FILE" ps
+  docker compose -f "$DOCKER_COMPOSE_FILE" ps
 fi
 
 # Step 3: Test the complete request flow through gateway to backend services
@@ -81,15 +81,15 @@ echo ">>> Testing complete request flow..."
 # Start a client that will connect through the gateway
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
 sleep 25
 
 # Verify the flow by checking logs for activity across all layers
 echo ">>> Checking logs for activity across all system layers..."
 
 # Check gateway activity (server-1 acts as gateway in this setup)
-SERVER1_LOGS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 2>&1)
-SERVER2_LOGS=$(docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 2>&1)
+SERVER1_LOGS=$(docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 2>&1)
+SERVER2_LOGS=$(docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 2>&1)
 
 ACTIVITY_FOUND=false
 if echo "$SERVER1_LOGS" | grep -i -E "client.*connect|session.*create|game.*start|request.*handle|api.*call|ws.*connect"; then
@@ -111,14 +111,14 @@ run_test "Multi-Layer Data Persistence" "Verifying data is stored in both Redis 
 echo ">>> Verifying data persistence across storage layers..."
 
 # Check Redis for session and game state
-REDIS_GAME_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "game:*" | wc -l)
-REDIS_SESSION_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "spring:session:*" | wc -l)
-REDIS_MATCH_KEYS=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "match:*" | wc -l)
+REDIS_GAME_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "game:*" | wc -l)
+REDIS_SESSION_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "spring:session:*" | wc -l)
+REDIS_MATCH_KEYS=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q redis) redis-cli --raw keys "match:*" | wc -l)
 
 echo ">>> Redis - Game keys: $REDIS_GAME_KEYS, Session keys: $REDIS_SESSION_KEYS, Match keys: $REDIS_MATCH_KEYS"
 
 # Check PostgreSQL for persistent data (if tables exist)
-DB_TABLES=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
+DB_TABLES=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' \n' || echo "0")
 
 echo ">>> PostgreSQL - Tables: $DB_TABLES"
 
@@ -179,13 +179,13 @@ run_test "System Resilience Under Load" "Testing system stability under increase
 echo ">>> Testing system resilience with increased client load..."
 
 # Increase client count to test under more load
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=4 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=4 --remove-orphans -d
 sleep 30
 
 # Check if all services are still healthy under load
 HEALTHY_SERVICES=0
 for service in "${ESSENTIAL_SERVICES[@]}"; do
-  if docker-compose -f "$DOCKER_COMPOSE_FILE" ps | grep -q "$service.*Up.*healthy\|Up (healthy)"; then
+  if docker compose -f "$DOCKER_COMPOSE_FILE" ps | grep -q "$service.*Up.*healthy\|Up (healthy)"; then
     ((HEALTHY_SERVICES++))
   fi
 done
@@ -193,8 +193,8 @@ done
 echo ">>> $HEALTHY_SERVICES out of ${#ESSENTIAL_SERVICES[@]} essential services are healthy under load"
 
 # Check for errors under load
-ERROR_COUNT=$(docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 2>&1 | grep -i -E "error|exception|fail|timeout" | wc -l)
-ERROR_COUNT=$((ERROR_COUNT + $(docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 2>&1 | grep -i -E "error|exception|fail|timeout" | wc -l)))
+ERROR_COUNT=$(docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 2>&1 | grep -i -E "error|exception|fail|timeout" | wc -l)
+ERROR_COUNT=$((ERROR_COUNT + $(docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 2>&1 | grep -i -E "error|exception|fail|timeout" | wc -l)))
 
 if [ $ERROR_COUNT -eq 0 ]; then
   echo ">>> SUCCESS: No errors found under increased load"

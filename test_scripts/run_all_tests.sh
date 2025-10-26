@@ -23,7 +23,7 @@ echo ">>> [STEP 1/4] Building Docker images..."
 # Create a temporary .env file with default values for docker-compose build
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f docker/docker-compose.yml --env-file .env build
+docker compose -f docker/docker-compose.yml --env-file .env build
 rm -f .env
 echo ">>> Images built successfully."
 echo ""
@@ -49,15 +49,15 @@ run_test() {
   echo "BOT_SCENARIO=$bot_scenario" >> .env
 
   # Start containers and wait for the test to complete
-  docker-compose -f docker/docker-compose.yml --env-file .env up --scale client=$client_count --remove-orphans -d
+  docker compose -f docker/docker-compose.yml --env-file .env up --scale client=$client_count --remove-orphans -d
   sleep 15 # Time for the test to run
 
   # Display server logs for analysis
   echo ">>> Server Logs for test '$test_name':"
-  docker-compose -f docker/docker-compose.yml --env-file .env logs server
+  docker compose -f docker/docker-compose.yml --env-file .env logs server
 
   # Clean up environment
-  docker-compose -f docker/docker-compose.yml down
+  docker compose -f docker/docker-compose.yml down
   rm -f .env
   echo ">>> Test '$test_name' completed."
   echo ""

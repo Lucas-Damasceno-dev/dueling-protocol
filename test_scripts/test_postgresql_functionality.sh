@@ -25,7 +25,7 @@ run_test() {
 # Helper function to clean up the environment
 cleanup() {
   echo ">>> Cleaning up Docker environment..."
-  docker-compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
+  docker compose -f "$DOCKER_COMPOSE_FILE" down --remove-orphans
   if [ -f "$PROJECT_ROOT/.env" ]; then
     rm -f "$PROJECT_ROOT/.env"
   fi
@@ -41,14 +41,14 @@ cd "$PROJECT_ROOT"
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker-compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env build
 rm -f .env
 echo ">>> Build completed successfully."
 
 # Step 2: Start services (without clients initially)
 run_test "Start Services" "Starting servers, Redis, and PostgreSQL for database tests"
 echo ">>> Starting services..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
 echo ">>> Waiting for services and database to initialize..."
 sleep 25
 
@@ -57,11 +57,11 @@ run_test "PostgreSQL Connectivity" "Testing direct connectivity to PostgreSQL in
 echo ">>> Testing PostgreSQL connectivity..."
 
 # Check if PostgreSQL is accessible and responding
-if docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_isready -h localhost -U dueling_user -d dueling_db; then
+if docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_isready -h localhost -U dueling_user -d dueling_db; then
   echo ">>> SUCCESS: PostgreSQL is accessible and accepting connections"
 else
   echo ">>> FAILURE: PostgreSQL is not accessible or not accepting connections"
-  docker-compose -f "$DOCKER_COMPOSE_FILE" logs postgres
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs postgres
   exit 1
 fi
 
@@ -70,14 +70,14 @@ run_test "Schema Initialization" "Testing if database schema is properly initial
 echo ">>> Testing database schema initialization..."
 
 # Check if tables exist by querying the information schema
-TABLES_COUNT=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "0")
+TABLES_COUNT=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "0")
 
 if [ "$TABLES_COUNT" -gt 0 ]; then
   echo ">>> SUCCESS: Found $TABLES_COUNT tables in the database"
   
   # List available tables
   echo ">>> Available tables:"
-  docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "\dt" 2>/dev/null | head -20
+  docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -c "\dt" 2>/dev/null | head -20
 else
   echo ">>> WARNING: No tables found in the database - schema may not be initialized"
 fi
@@ -87,8 +87,8 @@ run_test "JPA/Hibernate Integration" "Testing JPA/Hibernate integration with Pos
 echo ">>> Testing JPA/Hibernate integration..."
 
 # Check server logs for PostgreSQL/JPA initialization messages
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_jpa.log
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_jpa.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_jpa.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_jpa.log
 
 JPA_SUCCESS=0
 if grep -i -E "postgresql|hibernate|jpa|datasource|connection.*pool" server1_jpa.log; then
@@ -112,12 +112,12 @@ run_test "Data Persistence" "Testing data persistence to PostgreSQL during game 
 echo ">>> Testing data persistence by starting clients..."
 
 # Start some clients to generate data
-docker-compose -f "$DOCKER_COMPOSE_FILE" up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=2 --remove-orphans -d
 sleep 20
 
 # Check if there are any records in relevant tables (if they exist)
 # First check if specific tables exist (like players, matches, etc.)
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_activity.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_activity.log 2>&1
 
 # Check for any game-related activity in the logs
 if grep -i -E "save|insert|persist|update|player|match|game" server1_activity.log; then
@@ -131,7 +131,7 @@ fi
 declare -a possible_tables=("players" "matches" "games" "users" "game_sessions" "match_history")
 
 for table in "${possible_tables[@]}"; do
-  record_count=$(docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM $table;" 2>/dev/null | tr -d ' \n' || echo "0")
+  record_count=$(docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) psql -U dueling_user -d dueling_db -t -c "SELECT COUNT(*) FROM $table;" 2>/dev/null | tr -d ' \n' || echo "0")
   if [ "$record_count" -gt 0 ]; then
     echo ">>> SUCCESS: Found $record_count records in table '$table'"
   fi
@@ -144,8 +144,8 @@ run_test "Connection Pooling" "Testing database connection pooling functionality
 echo ">>> Testing database connection pooling..."
 
 # Check logs for connection pool messages
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_pool.log
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_pool.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > server1_pool.log
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_pool.log
 
 if grep -i -E "hikari|connection.*pool|max.*connections|pool.*size|min.*idle" server1_pool.log || grep -i -E "hikari|connection.*pool|max.*connections|pool.*size|min.*idle" server2_pool.log; then
   echo ">>> SUCCESS: Found connection pooling configuration in server logs"
@@ -160,22 +160,22 @@ run_test "Database Failover Readiness" "Testing application resilience to Postgr
 echo ">>> Testing application behavior when PostgreSQL is temporarily unavailable..."
 
 # Get initial server logs
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > initial_server1.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > initial_server2.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > initial_server1.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > initial_server2.log 2>&1
 
 # Stop PostgreSQL temporarily
 echo ">>> Stopping PostgreSQL temporarily to test resilience..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" stop postgres
+docker compose -f "$DOCKER_COMPOSE_FILE" stop postgres
 sleep 8
 
 # Start PostgreSQL again
 echo ">>> Restarting PostgreSQL..."
-docker-compose -f "$DOCKER_COMPOSE_FILE" start postgres
+docker compose -f "$DOCKER_COMPOSE_FILE" start postgres
 sleep 15
 
 # Check server logs for any database-related errors during the PostgreSQL unavailability
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > after_db_restart_server1.log 2>&1
-docker-compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > after_db_restart_server2.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1 > after_db_restart_server1.log 2>&1
+docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > after_db_restart_server2.log 2>&1
 
 if diff -u initial_server1.log after_db_restart_server1.log | grep -i -E "error|exception|fail|database|sql|connection|timeout|hibernate"; then
   echo ">>> INFO: Found database-related issues in server-1 logs during temporary unavailability"
@@ -193,7 +193,7 @@ fi
 rm -f initial_server1.log initial_server2.log after_db_restart_server1.log after_db_restart_server2.log
 
 # Final check: Ensure PostgreSQL is still accessible after the failover test
-if docker exec $(docker-compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_isready -h localhost -U dueling_user -d dueling_db; then
+if docker exec $(docker compose -f "$DOCKER_COMPOSE_FILE" ps -q postgres) pg_isready -h localhost -U dueling_user -d dueling_db; then
   echo ">>> SUCCESS: PostgreSQL remains accessible after failover test"
 else
   echo ">>> WARNING: PostgreSQL may have issues after failover test"
