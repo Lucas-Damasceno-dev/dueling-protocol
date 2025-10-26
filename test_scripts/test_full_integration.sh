@@ -49,7 +49,7 @@ echo ">>> Build completed successfully."
 # Step 2: Start the complete distributed system
 run_test "Start Complete System" "Starting gateway, both servers, Redis, PostgreSQL, Prometheus, and Grafana"
 echo ">>> Starting complete distributed system..."
-docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client-1=0 --scale client-2=0 --scale client-3=0 --scale client-4=0 --remove-orphans -d
 echo ">>> Waiting for complete system to initialize..."
 sleep 30
 
@@ -81,7 +81,7 @@ echo ">>> Testing complete request flow..."
 # Start a client that will connect through the gateway
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
-docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client-1=1 --scale client-2=1 --remove-orphans -d
 sleep 25
 
 # Verify the flow by checking logs for activity across all layers
@@ -179,7 +179,7 @@ run_test "System Resilience Under Load" "Testing system stability under increase
 echo ">>> Testing system resilience with increased client load..."
 
 # Increase client count to test under more load
-docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client=4 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" --env-file .env up --scale client-1=1 --scale client-2=1 --scale client-3=1 --scale client-4=1 --remove-orphans -d
 sleep 30
 
 # Check if all services are still healthy under load

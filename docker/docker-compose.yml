@@ -18,13 +18,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
-      server-1:
+      postgres:
         condition: service_healthy
-      server-2:
-        condition: service_healthy
-      server-3:
-        condition: service_healthy
-      server-4:
+      redis:
         condition: service_healthy
     networks:
       - dueling-network
@@ -327,10 +323,6 @@ services:
       - dueling-network
     depends_on:
       server-1:
-        condition: service_healthy
-      server-2:
-        condition: service_healthy
-      server-3:
         condition: service_healthy
       server-4:
         condition: service_healthy

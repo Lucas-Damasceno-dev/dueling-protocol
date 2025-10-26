@@ -48,7 +48,7 @@ echo ">>> Build completed successfully."
 # Step 2: Start services
 run_test "Start Services" "Starting gateway, servers, Redis, and PostgreSQL"
 echo ">>> Starting services..."
-docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client-1=0 --scale client-2=0 --scale client-3=0 --scale client-4=0 --remove-orphans -d
 echo ">>> Waiting for services to initialize..."
 sleep 20
 
@@ -57,22 +57,22 @@ run_test "Gateway Route Forwarding" "Testing that API routes are properly forwar
 echo ">>> Testing gateway route forwarding..."
 
 # Test that the gateway is accessible
-if curl -f -s -o /dev/null http://localhost:8081/actuator/health; then
-  echo ">>> SUCCESS: Gateway is accessible at http://localhost:8081"
+if curl -f -s -o /dev/null http://localhost:8080/actuator/health; then
+  echo ">>> SUCCESS: Gateway is accessible at http://localhost:8080"
 else
   echo ">>> FAILURE: Gateway is not accessible"
-  docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs server-gateway
   exit 1
 fi
 
 # Test basic route forwarding (even if backend returns error, gateway should forward the request)
-GATEWAY_RESPONSE=$(curl -s -o response.txt -w "%{http_code}" http://localhost:8081/api/test 2>/dev/null || true)
+GATEWAY_RESPONSE=$(curl -s -o response.txt -w "%{http_code}" http://localhost:8080/api/test 2>/dev/null || true)
 if [ "$GATEWAY_RESPONSE" -eq 404 ] || [ "$GATEWAY_RESPONSE" -eq 200 ]; then
   echo ">>> SUCCESS: Gateway is forwarding requests (received HTTP $GATEWAY_RESPONSE)"
 else
   echo ">>> FAILURE: Gateway is not properly forwarding requests (received HTTP $GATEWAY_RESPONSE)"
   cat response.txt
-  docker compose -f "$DOCKER_COMPOSE_FILE" logs server-1
+  docker compose -f "$DOCKER_COMPOSE_FILE" logs server-gateway
   exit 1
 fi
 rm -f response.txt
@@ -82,7 +82,7 @@ run_test "WebSocket Route" "Testing WebSocket route through the gateway"
 echo ">>> Testing WebSocket route functionality..."
 # Check if WebSocket endpoint is accessible through gateway
 # This is a basic connectivity test
-if curl -f -s -o /dev/null http://localhost:8081/ws/test 2>/dev/null || true; then
+if curl -f -s -o /dev/null http://localhost:8080/ws/test 2>/dev/null || true; then
   echo ">>> WebSocket route is accessible through gateway"
 else
   echo ">>> WebSocket route may not be properly configured"
@@ -98,7 +98,7 @@ docker compose -f "$DOCKER_COMPOSE_FILE" logs server-2 > server2_initial.log
 
 # Make several requests to see if load balancing works
 for i in {1..5}; do
-  curl -s -o /dev/null http://localhost:8081/api/test 2>/dev/null || true
+  curl -s -o /dev/null http://localhost:8080/api/test 2>/dev/null || true
   sleep 1
 done
 
@@ -138,7 +138,7 @@ CORS_HEADERS=$(curl -s -D - -o /dev/null -X OPTIONS \
   -H "Origin: http://localhost:3000" \
   -H "Access-Control-Request-Method: GET" \
   -H "Access-Control-Request-Headers: X-Requested-With" \
-  http://localhost:8081/api/test 2>/dev/null || true)
+  http://localhost:8080/api/test 2>/dev/null || true)
 
 if echo "$CORS_HEADERS" | grep -q "Access-Control-Allow-Origin"; then
   echo ">>> SUCCESS: CORS headers are properly configured"
