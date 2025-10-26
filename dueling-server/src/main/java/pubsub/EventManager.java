@@ -27,7 +27,10 @@ public class EventManager implements IEventManager {
      * @param subscriber The PrintWriter to notify of new messages.
      */
     public void subscribe(String topic, PrintWriter subscriber) {
-        subscribers.computeIfAbsent(topic, k -> new CopyOnWriteArrayList<>()).add(subscriber);
+        CopyOnWriteArrayList<PrintWriter> topicSubscribers = subscribers.computeIfAbsent(topic, k -> new CopyOnWriteArrayList<>());
+        // Remove existing subscriber if present to avoid duplicates
+        topicSubscribers.remove(subscriber);
+        topicSubscribers.add(subscriber);
         logger.info("New subscriber for topic {}", topic);
     }
 
