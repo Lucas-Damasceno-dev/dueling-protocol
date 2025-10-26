@@ -1,5 +1,40 @@
 # Caminho: docker/docker-compose.yml
 services:
+  server-gateway:
+    build:
+      context: ..
+      dockerfile: dueling-gateway/Dockerfile
+    container_name: server-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: 8080
+      SERVER_NAME: server-gateway
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      server-1:
+        condition: service_healthy
+      server-2:
+        condition: service_healthy
+      server-3:
+        condition: service_healthy
+      server-4:
+        condition: service_healthy
+    networks:
+      - dueling-network
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 30s
+
   server-1:
     build:
       context: ..
@@ -146,13 +181,7 @@ services:
       context: ..
       dockerfile: dueling-client/Dockerfile
     depends_on:
-      server-1:
-        condition: service_healthy
-      server-2:
-        condition: service_healthy
-      server-3:
-        condition: service_healthy
-      server-4:
+      server-gateway:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
@@ -164,8 +193,8 @@ services:
       echo 'Gateway is ready, starting client...'
       java -jar app.jar
     environment:
-      - GATEWAY_HOST=${GATEWAY_HOST:-server-1}
-      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - GATEWAY_HOST=server-gateway
+      - GATEWAY_PORT=8080
       - DOCKER_ENV=true
       - CLIENT_USERNAME=client1
       - CLIENT_PASSWORD=password1
@@ -177,13 +206,7 @@ services:
       context: ..
       dockerfile: dueling-client/Dockerfile
     depends_on:
-      server-1:
-        condition: service_healthy
-      server-2:
-        condition: service_healthy
-      server-3:
-        condition: service_healthy
-      server-4:
+      server-gateway:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
@@ -195,8 +218,8 @@ services:
       echo 'Gateway is ready, starting client...'
       java -jar app.jar
     environment:
-      - GATEWAY_HOST=${GATEWAY_HOST:-server-2}
-      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - GATEWAY_HOST=server-gateway
+      - GATEWAY_PORT=8080
       - DOCKER_ENV=true
       - CLIENT_USERNAME=client2
       - CLIENT_PASSWORD=password2
@@ -208,13 +231,7 @@ services:
       context: ..
       dockerfile: dueling-client/Dockerfile
     depends_on:
-      server-1:
-        condition: service_healthy
-      server-2:
-        condition: service_healthy
-      server-3:
-        condition: service_healthy
-      server-4:
+      server-gateway:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
@@ -226,8 +243,8 @@ services:
       echo 'Gateway is ready, starting client...'
       java -jar app.jar
     environment:
-      - GATEWAY_HOST=${GATEWAY_HOST:-server-3}
-      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - GATEWAY_HOST=server-gateway
+      - GATEWAY_PORT=8080
       - DOCKER_ENV=true
       - CLIENT_USERNAME=client3
       - CLIENT_PASSWORD=password3
@@ -239,13 +256,7 @@ services:
       context: ..
       dockerfile: dueling-client/Dockerfile
     depends_on:
-      server-1:
-        condition: service_healthy
-      server-2:
-        condition: service_healthy
-      server-3:
-        condition: service_healthy
-      server-4:
+      server-gateway:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
@@ -257,8 +268,8 @@ services:
       echo 'Gateway is ready, starting client...'
       java -jar app.jar
     environment:
-      - GATEWAY_HOST=${GATEWAY_HOST:-server-4}
-      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - GATEWAY_HOST=server-gateway
+      - GATEWAY_PORT=8080
       - DOCKER_ENV=true
       - CLIENT_USERNAME=client4
       - CLIENT_PASSWORD=password4
