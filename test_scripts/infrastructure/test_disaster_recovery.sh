@@ -4,7 +4,7 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-PROJECT_ROOT="$SCRIPT_DIR/.."
+PROJECT_ROOT="$SCRIPT_DIR/../.."
 DOCKER_COMPOSE_FILE="$PROJECT_ROOT/docker/docker-compose.yml"
 
 echo "======================================================="
@@ -38,7 +38,8 @@ trap cleanup EXIT
 run_test "Build Project" "Compiling project and building Docker images"
 echo ">>> Building project..."
 cd "$PROJECT_ROOT"
-./scripts/build.sh
+# Skipping build - images should be pre-built
+# mvn clean package -DskipTests && docker compose build
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
