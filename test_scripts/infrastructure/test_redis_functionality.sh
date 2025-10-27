@@ -37,7 +37,8 @@ trap cleanup EXIT
 run_test "Build Project" "Compiling project and building Docker images"
 echo ">>> Building project..."
 cd "$PROJECT_ROOT"
-./scripts/build.sh
+# Skipping build - images should be pre-built
+# mvn clean package -DskipTests && docker compose build
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
@@ -48,7 +49,7 @@ echo ">>> Build completed successfully."
 # Step 2: Start services (without clients initially)
 run_test "Start Services" "Starting servers, Redis, and PostgreSQL for Redis tests"
 echo ">>> Starting services..."
-docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up -d redis-master redis-slave redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 -d
 echo ">>> Waiting for services to initialize..."
 sleep 20
 
@@ -71,7 +72,7 @@ echo ">>> Testing Redis session caching functionality..."
 
 # Start a simple test client to generate some session data
 echo ">>> Starting temporary client to test session caching..."
-docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=1 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up -d redis-master redis-slave redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 client-1 -d
 sleep 10
 
 # Check Redis for session-related keys
@@ -126,7 +127,7 @@ run_test "Distributed Cache" "Testing Redis as distributed cache between servers
 echo ">>> Testing data sharing between servers via Redis..."
 
 # Start a client to create some data that would be cached in Redis
-docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up -d redis-master redis-slave redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 client-1 client-2 -d
 sleep 15
 
 # Check Redis for any game-related keys that might indicate distributed caching

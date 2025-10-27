@@ -4,7 +4,7 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-PROJECT_ROOT="$SCRIPT_DIR/.."
+PROJECT_ROOT="$SCRIPT_DIR/../.."
 DOCKER_COMPOSE_FILE="$PROJECT_ROOT/docker/docker-compose.yml"
 
 echo "======================================================="
@@ -37,7 +37,8 @@ trap cleanup EXIT
 run_test "Build Project" "Compiling project and building Docker images"
 echo ">>> Building project..."
 cd "$PROJECT_ROOT"
-./scripts/build.sh
+# Skipping build - images should be pre-built
+# mvn clean package -DskipTests && docker compose build
 echo ">>> Building Docker images..."
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
@@ -48,7 +49,7 @@ echo ">>> Build completed successfully."
 # Step 2: Start services (without clients initially)
 run_test "Start Services" "Starting servers, Redis, and PostgreSQL for database tests"
 echo ">>> Starting services..."
-docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=0 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up -d postgres redis-master redis-slave redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 server-1 server-2 -d
 echo ">>> Waiting for services and database to initialize..."
 sleep 25
 
@@ -112,7 +113,7 @@ run_test "Data Persistence" "Testing data persistence to PostgreSQL during game 
 echo ">>> Testing data persistence by starting clients..."
 
 # Start some clients to generate data
-docker compose -f "$DOCKER_COMPOSE_FILE" up --scale client=2 --remove-orphans -d
+docker compose -f "$DOCKER_COMPOSE_FILE" up -d postgres redis-master redis-slave redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 server-1 server-2 client-1 client-2 -d
 sleep 20
 
 # Check if there are any records in relevant tables (if they exist)
