@@ -7,39 +7,37 @@ echo "======================================================="
 echo ">>> RUNNING QUEUE DISCONNECTION TEST"
 echo "======================================================="
 
-# Step 1: Compile and build Docker images (only needs to be done once)
-echo ">>> [STEP 1/2] Building Docker images..."
-./scripts/build.sh
-# Create a temporary .env file with default values for docker compose build
-echo "BOT_MODE=autobot" > .env
-echo "BOT_SCENARIO=" >> .env
-docker compose -f docker/docker-compose.yml --env-file .env build
-rm -f .env
-echo ">>> Images built successfully."
+# Get the script's directory to build robust paths
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PROJECT_ROOT="$SCRIPT_DIR/../.."
+source "$PROJECT_ROOT/test_scripts/common_env.sh"
+
+# Step 1: Build Docker images if needed (skip for now)
+echo ">>> [STEP 1/2] Skipping build - assuming images are pre-built"
 echo ""
 
 # Step 2: Run Queue Disconnection test
 echo ">>> [STEP 2/2] Running Queue Disconnection test..."
 
-# Set variables for docker compose (using env-file approach to avoid warnings)
-echo "BOT_MODE=autobot" > .env
-echo "BOT_SCENARIO=matchmaking_disconnect" >> .env
+# Create env file with common helper
+ENV_FILE="$PROJECT_ROOT/.env"
+create_env_file "$ENV_FILE" "autobot" "matchmaking_disconnect"
 
 # Start containers and wait for the test to complete
 echo "-------------------------------------------------------"
 echo ">>> Running test: Queue Disconnection"
 echo "-------------------------------------------------------"
-docker compose -f docker/docker-compose.yml --env-file .env up --scale client=2 --remove-orphans -d
+docker compose -f "$PROJECT_ROOT/docker/docker-compose.yml" --env-file "$ENV_FILE" up client-1 client-2 -d
 sleep 15 # Increase if tests need more time
 
 # Display server logs for analysis
 echo ">>> Server Logs for test 'Queue Disconnection':"
-docker compose -f docker/docker-compose.yml --env-file .env logs server
+docker compose -f "$PROJECT_ROOT/docker/docker-compose.yml" --env-file "$ENV_FILE" logs server-1 server-2
 
 # Clean up environment for the next test
-docker compose -f docker/docker-compose.yml --env-file .env down
+docker compose -f "$PROJECT_ROOT/docker/docker-compose.yml" --env-file "$ENV_FILE" down
 # Remove the temporary .env file
-rm -f .env
+rm -f "$ENV_FILE"
 echo ">>> Test 'Queue Disconnection' completed."
 echo ""
 

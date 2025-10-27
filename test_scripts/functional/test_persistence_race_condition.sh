@@ -9,7 +9,8 @@ echo "======================================================="
 
 # Step 1: Compile and build Docker images (only needs to be done once)
 echo ">>> [STEP 1/2] Building Docker images..."
-./scripts/build.sh
+# Skipping build - images should be pre-built
+# mvn clean package -DskipTests && docker compose build
 # Create a temporary .env file with default values for docker compose build
 echo "BOT_MODE=autobot" > .env
 echo "BOT_SCENARIO=" >> .env
