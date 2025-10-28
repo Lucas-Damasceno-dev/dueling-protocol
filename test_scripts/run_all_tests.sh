@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common environment helper
+source "$SCRIPT_DIR/common_env.sh"
+
 # Define the log file name with current date and time to keep them organized
 if [ "$SAVE_LOGS" = "true" ]; then
     LOG_FILE="test_results_$(date +'%Y-%m-%d_%H-%M-%S').log"
@@ -23,8 +29,7 @@ echo ">>> Building project with Maven..."
 mvn clean package -DskipTests -q
 echo ">>> Building Docker images..."
 # Create a temporary .env file with default values for docker-compose build
-echo "BOT_MODE=autobot" > .env
-echo "BOT_SCENARIO=" >> .env
+create_env_file .env autobot ""
 docker compose -f docker/docker-compose.yml --env-file .env build
 rm -f .env
 echo ">>> Images built successfully."
@@ -46,17 +51,23 @@ run_test() {
   echo ">>> Running test: $test_name"
   echo "-------------------------------------------------------"
 
-  # Set variables for docker-compose
-  echo "BOT_MODE=$bot_mode" > .env
-  echo "BOT_SCENARIO=$bot_scenario" >> .env
+  # Set variables for docker-compose using common helper
+  create_env_file .env "$bot_mode" "$bot_scenario"
+
+  # Determine which services to start based on client count
+  if [ "$client_count" -eq 1 ]; then
+    SERVICES="postgres redis-master redis-slave redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 server-1 server-2 nginx-gateway client-1"
+  else
+    SERVICES="postgres redis-master redis-slave redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 server-1 server-2 nginx-gateway client-1 client-2"
+  fi
 
   # Start containers and wait for the test to complete
-  docker compose -f docker/docker-compose.yml --env-file .env up --scale client=$client_count --remove-orphans -d
+  docker compose -f docker/docker-compose.yml --env-file .env up $SERVICES -d
   sleep 15 # Time for the test to run
 
   # Display server logs for analysis
   echo ">>> Server Logs for test '$test_name':"
-  docker compose -f docker/docker-compose.yml --env-file .env logs server
+  docker compose -f docker/docker-compose.yml --env-file .env logs server-1 server-2
 
   # Clean up environment
   docker compose -f docker/docker-compose.yml down
