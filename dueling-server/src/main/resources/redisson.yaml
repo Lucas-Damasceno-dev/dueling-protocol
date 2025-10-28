@@ -1,2 +1,7 @@
-singleServerConfig:
-  address: "redis://${REDIS_HOST:localhost}:${REDIS_PORT:6379}" 
+sentinelServersConfig:
+  masterName: "mymaster"
+  sentinelAddresses:
+    - "redis://redis-sentinel-1:26379"
+    - "redis://redis-sentinel-2:26379" 
+    - "redis://redis-sentinel-3:26379"
+  database: 0 
