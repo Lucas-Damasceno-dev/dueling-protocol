@@ -1,6 +1,7 @@
 package service.auth;
 
 
+import model.Player;
 import model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -45,9 +46,9 @@ public class AuthenticationService {
      *
      * @param username The desired username for the new user.
      * @param password The plain-text password for the new user.
-     * @param playerId The unique identifier of the player associated with this user account.
+     * @param playerId The unique identifier of the player associated with this user account (can be null).
      * @return {@code true} if the user was successfully registered, {@code false} otherwise
-     *         (e.g., username or player ID already exists, or player does not exist).
+     *         (e.g., username already exists, or player does not exist when playerId is provided).
      */
     public boolean registerUser(String username, String password, String playerId) {
         // Check if user already exists
@@ -55,18 +56,26 @@ public class AuthenticationService {
             return false;
         }
 
-        // Check if playerId already has a user account
-        if (userRepository.existsByPlayerId(playerId)) {
+        // Handle playerId - if not provided, create one using the username
+        String finalPlayerId = playerId;
+        if (finalPlayerId == null || finalPlayerId.trim().isEmpty()) {
+            finalPlayerId = username; // Use username as playerId when not provided
+        }
+
+        // Check if this playerId already has a user account
+        if (userRepository.existsByPlayerId(finalPlayerId)) {
             return false;
         }
 
-        // Verify that the player exists
-        if (playerRepository.findById(playerId).isEmpty()) {
-            return false;
+        // Verify that the player exists, create one if it doesn't
+        if (playerRepository.findById(finalPlayerId).isEmpty()) {
+            // Auto-create player if it doesn't exist
+            Player newPlayer = new Player(finalPlayerId, username); // Use username as nickname
+            playerRepository.save(newPlayer);
         }
 
         // Create and save the user
-        User user = new User(username, passwordEncoder.encode(password), playerId);
+        User user = new User(username, passwordEncoder.encode(password), finalPlayerId);
         userRepository.save(user);
         return true;
     }

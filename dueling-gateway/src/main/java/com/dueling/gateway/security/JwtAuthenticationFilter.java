@@ -17,6 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
@@ -32,48 +33,66 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
+            
+            String path = request.getURI().getPath();
+            if (isPublicPath(path)) {
+                return chain.filter(exchange);
+            }
 
-            // Check if the request contains an Authorization header
-            if (!request.getHeaders().containsKey(HttpHeaders.AUTHORIZATION)) {
+            String token = null;
+            
+            // Try to get the token from the Authorization header
+            String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+            } else {
+                // If not in the header, try to get it from the query parameter (for WebSocket)
+                List<String> tokenParams = request.getQueryParams().get("token");
+                if (tokenParams != null && !tokenParams.isEmpty()) {
+                    token = tokenParams.get(0);
+                }
+            }
+ 
+            if (token == null) {
                 ServerHttpResponse response = exchange.getResponse();
                 response.setStatusCode(HttpStatus.UNAUTHORIZED);
-                String error = "{\"error\":\"Missing Authorization header\"}";
+                String error = "{\"error\":\"Missing or invalid authentication token\"}";
                 DataBuffer buffer = response.bufferFactory().wrap(error.getBytes(StandardCharsets.UTF_8));
                 return response.writeWith(Mono.just(buffer));
             }
 
-            String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7); // Remove "Bearer " prefix
+            try {
+                Claims claims = parseJwtClaims(token);
                 
-                try {
-                    // Validate and parse the JWT token
-                    Claims claims = parseJwtClaims(token);
-                    
-                    // Add user info to request headers for downstream services
-                    ServerHttpRequest mutatedRequest = request.mutate()
-                            .header("X-User-Id", claims.getSubject())
-                            .header("X-User-Roles", claims.get("roles", String.class))
-                            .build();
-                    
-                    return chain.filter(exchange.mutate().request(mutatedRequest).build());
-                } catch (Exception e) {
-                    ServerHttpResponse response = exchange.getResponse();
-                    response.setStatusCode(HttpStatus.FORBIDDEN);
-                    String error = "{\"error\":\"Invalid or expired JWT token\"}";
-                    DataBuffer buffer = response.bufferFactory().wrap(error.getBytes(StandardCharsets.UTF_8));
-                    return response.writeWith(Mono.just(buffer));
-                }
-            } else {
+                ServerHttpRequest mutatedRequest = request.mutate()
+                        .header("X-User-Id", claims.getSubject())
+                        .header("X-User-Roles", claims.get("roles", String.class))
+                        .build();
+                
+                return chain.filter(exchange.mutate().request(mutatedRequest).build());
+            } catch (Exception e) {
                 ServerHttpResponse response = exchange.getResponse();
-                response.setStatusCode(HttpStatus.UNAUTHORIZED);
-                String error = "{\"error\":\"Authorization header must start with Bearer\"}";
+                response.setStatusCode(HttpStatus.FORBIDDEN);
+                String error = "{\"error\":\"Invalid or expired JWT token\"}";
                 DataBuffer buffer = response.bufferFactory().wrap(error.getBytes(StandardCharsets.UTF_8));
                 return response.writeWith(Mono.just(buffer));
             }
         };
     }
+    
+    private boolean isPublicPath(String path) {
+        // List of paths that should bypass authentication
+        List<String> publicPaths = List.of(
+            "/api/auth/register",
+            "/api/auth/login",
+            "/api/auth/verify",
+            "/actuator/health"
+        );
+        
+        // Check if the path starts with any of the public paths
+        return publicPaths.stream().anyMatch(path::startsWith);
+    }
+
 
     private Claims parseJwtClaims(String token) {
         Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
