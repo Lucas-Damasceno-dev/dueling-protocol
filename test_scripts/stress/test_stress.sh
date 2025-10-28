@@ -11,7 +11,8 @@ CLIENT_COUNT=10
 TEST_DURATION=30 # in seconds
 
 echo ">>> [STEP 1/3] Ensuring the project is compiled..."
-./scripts/build.sh
+# Skipping build - images should be pre-built
+# mvn clean package -DskipTests && docker compose build
 
 echo ""
 echo ">>> [STEP 2/3] Building Docker images..."
