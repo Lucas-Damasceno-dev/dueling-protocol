@@ -1,37 +1,25 @@
-# Caminho: docker/docker-compose.yml
+# Caminho: docker/docker-compose.yml (atualizado com NGINX como gateway)
 services:
-  server-gateway:
+  nginx-gateway:
     build:
       context: ..
-      dockerfile: dueling-gateway/Dockerfile
-    container_name: server-gateway
+      dockerfile: Dockerfile.nginx
+    container_name: nginx-gateway
     ports:
       - "8080:8080"
-    environment:
-      SERVER_PORT: 8080
-      SERVER_NAME: server-gateway
-      REDIS_SENTINEL_MASTER: ${REDIS_SENTINEL_MASTER:-mymaster}
-      REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
       redis-master:
         condition: service_healthy
-      redis-sentinel-1:
-        condition: service_healthy
     networks:
       - dueling-network
     healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+        test: ["CMD", "curl", "-f", "http://localhost:8080/nginx-health"]
         interval: 10s
         timeout: 5s
         retries: 5
-        start_period: 30s
+        start_period: 120s  # Increased to allow time for server discovery
 
   server-1:
     build:
@@ -179,7 +167,7 @@ services:
       context: ..
       dockerfile: dueling-client/Dockerfile
     depends_on:
-      server-gateway:
+      nginx-gateway:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
@@ -191,7 +179,7 @@ services:
       echo 'Gateway is ready, starting client...'
       java -jar app.jar
     environment:
-      - GATEWAY_HOST=server-gateway
+      - GATEWAY_HOST=nginx-gateway
       - GATEWAY_PORT=8080
       - DOCKER_ENV=true
       - CLIENT_USERNAME=client1
@@ -204,7 +192,7 @@ services:
       context: ..
       dockerfile: dueling-client/Dockerfile
     depends_on:
-      server-gateway:
+      nginx-gateway:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
@@ -216,7 +204,7 @@ services:
       echo 'Gateway is ready, starting client...'
       java -jar app.jar
     environment:
-      - GATEWAY_HOST=server-gateway
+      - GATEWAY_HOST=nginx-gateway
       - GATEWAY_PORT=8080
       - DOCKER_ENV=true
       - CLIENT_USERNAME=client2
@@ -229,7 +217,7 @@ services:
       context: ..
       dockerfile: dueling-client/Dockerfile
     depends_on:
-      server-gateway:
+      nginx-gateway:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
@@ -241,7 +229,7 @@ services:
       echo 'Gateway is ready, starting client...'
       java -jar app.jar
     environment:
-      - GATEWAY_HOST=server-gateway
+      - GATEWAY_HOST=nginx-gateway
       - GATEWAY_PORT=8080
       - DOCKER_ENV=true
       - CLIENT_USERNAME=client3
@@ -254,7 +242,7 @@ services:
       context: ..
       dockerfile: dueling-client/Dockerfile
     depends_on:
-      server-gateway:
+      nginx-gateway:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
@@ -266,7 +254,7 @@ services:
       echo 'Gateway is ready, starting client...'
       java -jar app.jar
     environment:
-      - GATEWAY_HOST=server-gateway
+      - GATEWAY_HOST=nginx-gateway
       - GATEWAY_PORT=8080
       - DOCKER_ENV=true
       - CLIENT_USERNAME=client4
@@ -382,7 +370,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./init-test-data.sql:/docker-entrypoint-initdb.d/99-init-test-data.sql
+      # - ./init-test-data.sql:/docker-entrypoint-initdb.d/99-init-test-data.sql
     networks:
       - dueling-network
     healthcheck:
