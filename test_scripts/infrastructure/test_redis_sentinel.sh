@@ -9,7 +9,7 @@ docker compose -f docker/docker-compose.yml up -d redis-master redis-slave redis
 
 # Wait for services to be ready
 echo "Waiting for services to be ready..."
-sleep 30
+sleep 45
 
 # Test Redis master
 echo "Testing Redis Master..."
@@ -70,7 +70,9 @@ echo "Checking Sentinel monitoring configuration..."
 for sid in 1 2 3; do
     SENTINEL_NAME="redis-sentinel-$sid"
     MASTER_INFO=$(docker exec $SENTINEL_NAME redis-cli -p 26379 sentinel master mymaster)
-    if echo "$MASTER_INFO" | grep -q "num-other-sentinels.*2"; then
+    # Extract the num-other-sentinels value from the output
+    NUM_OTHER_SENTINELS=$(echo "$MASTER_INFO" | grep -A 1 "num-other-sentinels" | tail -1)
+    if [ "$NUM_OTHER_SENTINELS" = "2" ]; then
         echo "✓ $SENTINEL_NAME correctly sees 2 other sentinels"
     else
         echo "✗ $SENTINEL_NAME sentinel count issue"

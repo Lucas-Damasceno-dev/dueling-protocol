@@ -81,7 +81,7 @@ echo ""
 
 # Step 3: Running new integration tests for Pub/Sub and REST API
 echo ">>> [STEP 3/4] Running integration tests for new features..."
-./test_scripts/test_integration_pubsub_rest.sh
+./test_scripts/integration/test_integration_pubsub_rest.sh
 echo ">>> Integration tests completed."
 echo ""
 
@@ -91,22 +91,22 @@ echo ""
 echo ">>> [STEP 4/7] Running tests for new architecture components..."
 
 echo ">>> Running Gateway functionality tests..."
-./test_scripts/test_gateway_functionality.sh
+./test_scripts/integration/test_gateway_functionality.sh
 
 echo ">>> Running JWT security tests..."
-./test_scripts/test_jwt_security.sh
+./test_scripts/security/test_jwt_security.sh
 
 echo ">>> Running Redis functionality tests..."
-./test_scripts/test_redis_functionality.sh
+./test_scripts/infrastructure/test_redis_functionality.sh
 
 echo ">>> Running PostgreSQL functionality tests..."
-./test_scripts/test_postgresql_functionality.sh
+./test_scripts/infrastructure/test_postgresql_functionality.sh
 
 echo ">>> Running distributed system tests..."
-./test_scripts/test_distributed_system.sh
+./test_scripts/distributed/test_distributed_system.sh
 
 echo ">>> Running full integration tests..."
-./test_scripts/test_full_integration.sh
+./test_scripts/integration/test_full_integration.sh
 
 echo ">>> Architecture component tests completed."
 echo ""
@@ -115,43 +115,43 @@ echo ""
 
 # Step 5: Running the stress test
 echo ">>> [STEP 5/7] Running stress test with 10 clients..."
-./test_scripts/test_stress.sh
+./test_scripts/stress/test_stress.sh
 
 # -----------------------------------------------------------------------------
 
 # Step 6: Running final validation test
 echo ">>> [STEP 6/7] Running final validation test..."
-./test_scripts/test_distributed_matchmaking.sh
+./test_scripts/distributed/test_distributed_matchmaking.sh
 
 # -----------------------------------------------------------------------------
 
 # Step 7: Running additional comprehensive tests
 echo ">>> [STEP 7/11] Running contract compliance tests..."
-./test_scripts/test_contract_compliance.sh
+./test_scripts/infrastructure/test_contract_compliance.sh
 
 echo ">>> [STEP 8/11] Running performance and scalability tests..."
-./test_scripts/test_performance_scalability.sh
+./test_scripts/performance/test_performance_scalability.sh
 
 echo ">>> [STEP 9/11] Running advanced security tests..."
-./test_scripts/test_advanced_security.sh
+./test_scripts/security/test_advanced_security.sh
 
 echo ">>> [STEP 10/11] Running disaster recovery tests..."
-./test_scripts/test_disaster_recovery.sh
+./test_scripts/infrastructure/test_disaster_recovery.sh
 
 # -----------------------------------------------------------------------------
 
 # Step 11: Running leader failure test
 echo ">>> [STEP 11/12] Running leader failure test..."
-../test_leader_failure.sh
+./test_scripts/distributed/test_leader_failure.sh
 
 # -----------------------------------------------------------------------------
 
 # Step 12: Running final validation tests
 echo ">>> [STEP 12/12] Running additional validation tests..."
-./test_scripts/test_configuration_deployment.sh
-./test_scripts/test_observability.sh
-./test_scripts/test_data_consistency.sh
-./test_scripts/test_data_migration.sh
+./test_scripts/infrastructure/test_configuration_deployment.sh
+./test_scripts/infrastructure/test_observability.sh
+./test_scripts/infrastructure/test_data_consistency.sh
+./test_scripts/infrastructure/test_data_migration.sh
 
 echo "======================================================="
 echo ">>> COMPLETE TEST SUITE FINISHED"
