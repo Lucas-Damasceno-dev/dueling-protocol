@@ -46,3 +46,6 @@ dependency-reduced-pom.xml
 # Temporary files
 *.tmp
 *.temp
+componentes-arquitetura.md
+requisitos-avaliacao.md
+scripts-testes.md
