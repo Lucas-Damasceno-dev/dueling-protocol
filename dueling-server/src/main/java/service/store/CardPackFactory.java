@@ -11,6 +11,7 @@ import repository.CardRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class CardPackFactory {
@@ -34,11 +35,15 @@ public class CardPackFactory {
         logger.warn("Unknown pack type: {}, using basic pack as default", type);
         return new BasicCardPack(cardRepository);
     }
+
 }
 
 class BasicCardPack implements CardPack {
     private final CardRepository cardRepository;
-    public BasicCardPack(CardRepository cardRepository) { this.cardRepository = cardRepository; }
+    
+    public BasicCardPack(CardRepository cardRepository) { 
+        this.cardRepository = cardRepository;
+    }
 
     @Override
     public String getName() { return "Basic Pack"; }
@@ -49,7 +54,14 @@ class BasicCardPack implements CardPack {
     public List<Card> open() {
         List<Card> cards = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            cardRepository.getRandomCardByRarity("Common").ifPresent(cards::add);
+            // Try to get a Common card, fallback to any available card if out of stock
+            Optional<Card> card = cardRepository.getRandomCardByRarity("Common");
+            if (card.isPresent()) {
+                cards.add(card.get());
+            } else {
+                // If Common cards are out of stock, get any card
+                cardRepository.getRandomCard().ifPresent(cards::add);
+            }
         }
         Collections.shuffle(cards);
         return cards;
@@ -58,7 +70,10 @@ class BasicCardPack implements CardPack {
 
 class PremiumCardPack implements CardPack {
     private final CardRepository cardRepository;
-    public PremiumCardPack(CardRepository cardRepository) { this.cardRepository = cardRepository; }
+    
+    public PremiumCardPack(CardRepository cardRepository) { 
+        this.cardRepository = cardRepository;
+    }
 
     @Override
     public String getName() { return "Premium Pack"; }
@@ -68,12 +83,29 @@ class PremiumCardPack implements CardPack {
     @Override
     public List<Card> open() {
         List<Card> cards = new ArrayList<>();
+        
+        // Try to get 3 Rare cards with fallback to any available card if out of stock
         for (int i = 0; i < 3; i++) {
-            cardRepository.getRandomCardByRarity("Rare").ifPresent(cards::add);
+            Optional<Card> card = cardRepository.getRandomCardByRarity("Rare");
+            if (card.isPresent()) {
+                cards.add(card.get());
+            } else {
+                // Fallback to any card if Rare is out of stock
+                cardRepository.getRandomCard().ifPresent(cards::add);
+            }
         }
+        
+        // Try to get 2 Common cards with fallback to any available card if out of stock
         for (int i = 0; i < 2; i++) {
-            cardRepository.getRandomCardByRarity("Common").ifPresent(cards::add);
+            Optional<Card> card = cardRepository.getRandomCardByRarity("Common");
+            if (card.isPresent()) {
+                cards.add(card.get());
+            } else {
+                // Fallback to any card if Common is out of stock
+                cardRepository.getRandomCard().ifPresent(cards::add);
+            }
         }
+        
         Collections.shuffle(cards);
         return cards;
     }
@@ -81,7 +113,10 @@ class PremiumCardPack implements CardPack {
 
 class LegendaryCardPack implements CardPack {
     private final CardRepository cardRepository;
-    public LegendaryCardPack(CardRepository cardRepository) { this.cardRepository = cardRepository; }
+    
+    public LegendaryCardPack(CardRepository cardRepository) { 
+        this.cardRepository = cardRepository;
+    }
 
     @Override
     public String getName() { return "Legendary Pack"; }
@@ -91,13 +126,38 @@ class LegendaryCardPack implements CardPack {
     @Override
     public List<Card> open() {
         List<Card> cards = new ArrayList<>();
-        cardRepository.getRandomCardByRarity("Legendary").ifPresent(cards::add);
-        for (int i = 0; i < 2; i++) {
-            cardRepository.getRandomCardByRarity("Rare").ifPresent(cards::add);
+        
+        // Try to get 1 Legendary card with fallback to any available card if out of stock
+        Optional<Card> card = cardRepository.getRandomCardByRarity("Legendary");
+        if (card.isPresent()) {
+            cards.add(card.get());
+        } else {
+            // Fallback to any card if Legendary is out of stock
+            cardRepository.getRandomCard().ifPresent(cards::add);
         }
+        
+        // Try to get 2 Rare cards with fallback to any available card if out of stock
         for (int i = 0; i < 2; i++) {
-            cardRepository.getRandomCardByRarity("Common").ifPresent(cards::add);
+            Optional<Card> rareCard = cardRepository.getRandomCardByRarity("Rare");
+            if (rareCard.isPresent()) {
+                cards.add(rareCard.get());
+            } else {
+                // Fallback to any card if Rare is out of stock
+                cardRepository.getRandomCard().ifPresent(cards::add);
+            }
         }
+        
+        // Try to get 2 Common cards with fallback to any available card if out of stock
+        for (int i = 0; i < 2; i++) {
+            Optional<Card> commonCard = cardRepository.getRandomCardByRarity("Common");
+            if (commonCard.isPresent()) {
+                cards.add(commonCard.get());
+            } else {
+                // Fallback to any card if Common is out of stock
+                cardRepository.getRandomCard().ifPresent(cards::add);
+            }
+        }
+        
         Collections.shuffle(cards);
         return cards;
     }

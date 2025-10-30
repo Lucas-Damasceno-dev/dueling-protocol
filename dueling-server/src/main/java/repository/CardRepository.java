@@ -22,9 +22,11 @@ public class CardRepository {
     private final RMap<String, Integer> cardStock;
     private final SecureRandom random = new SecureRandom();
 
+    private final RedissonClient redissonClient;
     private static final Logger logger = LoggerFactory.getLogger(CardRepository.class);
 
     public CardRepository(RedissonClient redissonClient) {
+        this.redissonClient = redissonClient;
         this.cardStock = redissonClient.getMap(CARD_STOCK_KEY);
 
         try {
@@ -84,18 +86,52 @@ public class CardRepository {
     }
 
     public Optional<Card> claimCard(String id) {
-        // Operação atômica para decrementar o estoque
-        Integer newStock = cardStock.addAndGet(id, -1);
+        // Usando uma abordagem com script Lua para garantir atomicidade
+        // Isso evita o problema com HINCRBYFLOAT e garante que a operação seja realmente atômica
+        String luaScript = 
+            "local key = KEYS[1] " +
+            "local field = ARGV[1] " +
+            "local amount = tonumber(ARGV[2]) " +
+            "" +
+            "local current = redis.call('HGET', key, field) " +
+            "if not current then " +
+            "    current = 0 " +
+            "else " +
+            "    current = tonumber(current) " +
+            "end " +
+            "" +
+            "if current and current > 0 then " +
+            "    local new_val = current + amount " +
+            "    if new_val >= 0 then " +
+            "        redis.call('HSET', key, field, new_val) " +
+            "        return new_val " +
+            "    else " +
+            "        return -1 " +
+            "    end " +
+            "else " +
+            "    return -1 " +
+            "end";
 
-        if (newStock != null && newStock >= 0) {
-            logger.info("Card {} claimed. Remaining stock: {}", id, newStock);
-            return findById(id);
-        } else {
-            // Se o estoque ficou negativo, reverta a operação
-            if (newStock != null) {
-                cardStock.addAndGet(id, 1);
+        try {
+            Object result = redissonClient.getScript().eval(
+                org.redisson.api.RScript.Mode.READ_WRITE,
+                luaScript,
+                org.redisson.api.RScript.ReturnType.INTEGER,
+                java.util.Arrays.asList(CARD_STOCK_KEY),
+                id, "-1"
+            );
+
+            Integer newStock = result != null ? ((Long) result).intValue() : -1;
+
+            if (newStock >= 0) {
+                logger.info("Card {} claimed. Remaining stock: {}", id, newStock);
+                return findById(id);
+            } else {
+                logger.warn("Attempt to claim card {}, but it is out of stock.", id);
+                return Optional.empty();
             }
-            logger.warn("Attempt to claim card {}, but it is out of stock.", id);
+        } catch (Exception e) {
+            logger.error("Error claiming card {}: {}", id, e.getMessage(), e);
             return Optional.empty();
         }
     }
@@ -108,6 +144,22 @@ public class CardRepository {
 
         if (availableCards.isEmpty()) {
             logger.warn("No cards of rarity {} available in stock.", rarity);
+            return Optional.empty();
+        }
+
+        String randomCardId = availableCards.get(random.nextInt(availableCards.size()));
+        // claimCard já é atômico e seguro para concorrência
+        return claimCard(randomCardId);
+    }
+    
+    public Optional<Card> getRandomCard() {
+        List<String> availableCards = allCards.values().stream()
+            .filter(c -> cardStock.getOrDefault(c.getId(), 0) > 0)
+            .map(Card::getId)
+            .collect(Collectors.toList());
+
+        if (availableCards.isEmpty()) {
+            logger.warn("No cards available in stock.");
             return Optional.empty();
         }
 
