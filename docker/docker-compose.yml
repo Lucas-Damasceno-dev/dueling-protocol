@@ -12,6 +12,14 @@ services:
         condition: service_healthy
       redis-master:
         condition: service_healthy
+      server-1:
+        condition: service_healthy
+      server-2:
+        condition: service_healthy
+      server-3:
+        condition: service_healthy
+      server-4:
+        condition: service_healthy
     networks:
       - dueling-network
     healthcheck:
