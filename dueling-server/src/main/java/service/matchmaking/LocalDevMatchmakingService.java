@@ -141,4 +141,19 @@ public class LocalDevMatchmakingService implements MatchmakingService {
             return Optional.empty();
         }
     }
+    
+    @Override
+    public boolean isPlayerInQueue(Player player) {
+        if (player == null) {
+            return false;
+        }
+        PlayerWithDeck target = new PlayerWithDeck(player, null);
+        // Check for the player with null deck
+        boolean isInQueue = matchmakingQueue.contains(target);
+        if (isInQueue) {
+            return true;
+        }
+        // Check for the player with any deck
+        return matchmakingQueue.stream().anyMatch(p -> p.getPlayer() != null && p.getPlayer().getId().equals(player.getId()));
+    }
 }

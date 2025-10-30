@@ -37,4 +37,12 @@ public interface MatchmakingService {
      * @return an Optional containing a Player if one is available, or empty otherwise.
      */
     Optional<Player> findAndLockPartner();
+    
+    /**
+     * Checks if a player is already in the matchmaking queue.
+     *
+     * @param player the player to check
+     * @return true if the player is already in the queue, false otherwise
+     */
+    boolean isPlayerInQueue(Player player);
 }
