@@ -22,6 +22,7 @@ public class WebSocketSessionManager {
     private final ConcurrentHashMap<String, String> sessionToPlayerId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, PrintWriter> playerWriters = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> sessionActivity = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Boolean> playerInMatch = new ConcurrentHashMap<>();
 
     public WebSocketSessionManager(RedissonClient redissonClient) {
         this.redissonClient = redissonClient;
@@ -32,6 +33,7 @@ public class WebSocketSessionManager {
         activeSessions.put(sessionId, session);
         sessionToPlayerId.put(sessionId, playerId);
         sessionActivity.put(sessionId, System.currentTimeMillis());
+        playerInMatch.put(playerId, false); // Initially not in a match
 
         // Armazena o mapeamento em Redis para ser visível globalmente
         RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
@@ -41,18 +43,23 @@ public class WebSocketSessionManager {
     }
 
     public String unregisterSession(String sessionId) {
+        String playerId = sessionToPlayerId.get(sessionId);
+        
         activeSessions.remove(sessionId);
         sessionActivity.remove(sessionId);
-        String playerId = sessionToPlayerId.remove(sessionId);
-
         if (playerId != null) {
-            playerWriters.remove(playerId);
+            playerInMatch.remove(playerId);
+        }
+        String removedPlayerId = sessionToPlayerId.remove(sessionId);
+
+        if (removedPlayerId != null) {
+            playerWriters.remove(removedPlayerId);
             // Remove o mapeamento do Redis
             RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
             redisSessionMap.remove(sessionId);
-            logger.debug("Unregistered session {} for player {}", sessionId, playerId);
+            logger.debug("Unregistered session {} for player {}", sessionId, removedPlayerId);
         }
-        return playerId;
+        return removedPlayerId;
     }
 
     public void updateSessionActivity(String sessionId) {
@@ -76,7 +83,7 @@ public class WebSocketSessionManager {
     public Map<String, Long> getSessionActivity() {
         return Map.copyOf(sessionActivity);
     }
-
+    
     public void storePlayerWriter(String playerId, PrintWriter writer) {
         playerWriters.put(playerId, writer);
     }
@@ -87,5 +94,16 @@ public class WebSocketSessionManager {
 
     public PrintWriter removePlayerWriter(String playerId) {
         return playerWriters.remove(playerId);
+    }
+    
+    public boolean isPlayerInMatch(String playerId) {
+        Boolean inMatch = playerInMatch.get(playerId);
+        return inMatch != null && inMatch;
+    }
+    
+    public void setPlayerInMatch(String playerId, boolean inMatch) {
+        if (sessionToPlayerId.containsValue(playerId)) {
+            playerInMatch.put(playerId, inMatch);
+        }
     }
 }
