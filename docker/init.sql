@@ -1,19 +1,19 @@
 -- Script de inicialização do PostgreSQL
--- Criação do usuário dueling_user se não existir
+-- Criação do usuário user se não existir
 DO
 $do$
 BEGIN
    IF NOT EXISTS (
       SELECT FROM pg_catalog.pg_roles
-      WHERE rolname = 'dueling_user') THEN
+      WHERE rolname = 'user') THEN
 
-      CREATE ROLE dueling_user LOGIN PASSWORD 'dueling_password';
+      CREATE ROLE "user" LOGIN PASSWORD 'password';
    END IF;
 END
 $do$;
 
 -- Criação do banco de dados dueling_db se não existir
-SELECT 'CREATE DATABASE dueling_db OWNER dueling_user'
+SELECT 'CREATE DATABASE dueling_db OWNER user'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'dueling_db');
 
 -- Precisamos executar o comando acima separadamente
@@ -22,7 +22,7 @@ DO
 $do$
 BEGIN
    IF NOT EXISTS (SELECT FROM pg_database WHERE datname = 'dueling_db') THEN
-      CREATE DATABASE dueling_db OWNER dueling_user;
+      CREATE DATABASE dueling_db OWNER "user";
    END IF;
 END
 $do$;

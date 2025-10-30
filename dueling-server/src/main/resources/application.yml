@@ -13,8 +13,8 @@ spring:
       nodes: ${REDIS_SENTINEL_NODES:redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379}
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:dueling_db}
-    username: ${POSTGRES_USER:dueling_user}
-    password: ${POSTGRES_PASSWORD:dueling_password}
+    username: ${POSTGRES_USER:-user}
+    password: ${POSTGRES_PASSWORD:-password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:

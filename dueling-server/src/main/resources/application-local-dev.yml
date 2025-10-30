@@ -16,8 +16,8 @@ spring:
     port: ${REDIS_PORT:6379}
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:dueling_db}
-    username: ${POSTGRES_USER:dueling_user}
-    password: ${POSTGRES_PASSWORD:dueling_password}
+    username: ${POSTGRES_USER:-user}
+    password: ${POSTGRES_PASSWORD:-password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:

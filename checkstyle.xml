@@ -29,9 +29,7 @@
         <!-- Javadoc Checks - Main focus of this configuration -->
         <module name="JavadocMethod">
             <property name="accessModifiers" value="public"/>
-            <property name="allowMissingParamTags" value="true"/>[ERROR] Target player not found.
-
-[ERROR] Target player not found.
+            <property name="allowMissingParamTags" value="true"/>
             <property name="allowMissingReturnTag" value="true"/>
         </module>
         <module name="JavadocType"/>

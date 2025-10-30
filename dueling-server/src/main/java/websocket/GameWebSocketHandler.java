@@ -106,7 +106,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        String playerId = String.valueOf(user.getId());
+        String playerId = user.getPlayerId();
         sessionManager.registerSession(session, playerId);
 
         PrintWriter writer = new PrintWriter(new WebSocketWriter(session));

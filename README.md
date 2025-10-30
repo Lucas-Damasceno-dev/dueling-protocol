@@ -1,6 +1,6 @@
 # Dueling Protocol
 
-A distributed multiplayer card game system built with microservices architecture, featuring cross-server matchmaking, atomic card trading using Two-Phase Commit protocol, and real-time WebSocket communication.
+A distributed multiplayer card game system built with microservices architecture, featuring cross-server matchmaking, atomic card trading using distributed locks, and real-time WebSocket communication.
 
 ## 📑 Table of Contents
 
@@ -31,7 +31,7 @@ A distributed multiplayer card game system built with microservices architecture
 ### Core Capabilities
 
 - 🎮 **Cross-Server Matchmaking**: Players on different server instances can be matched together
-- 🔄 **Atomic Card Trading**: Two-Phase Commit (2PC) protocol ensures consistency across servers
+- 🔄 **Atomic Card Trading**: Distributed locks with Redis ensure consistency across servers
 - 💳 **Card Shop System**: Buy cards with atomic stock management and transaction safety
 - ⚡ **Real-time Communication**: WebSocket-based bidirectional communication with Redis Pub/Sub
 - 🔐 **Distributed Locking**: Redisson-based distributed locks prevent race conditions
@@ -100,7 +100,7 @@ The following diagram illustrates the complete flow of key operations:
 
 1. **Phase 1-2**: Player connection and character setup
 2. **Phase 3**: Card purchase with atomic transaction
-3. **Phase 4**: Cross-server card trade using Two-Phase Commit (2PC)
+3. **Phase 4**: Cross-server card trade using distributed locks
 4. **Phase 5-6**: Cross-server matchmaking with HTTP coordination
 5. **Phase 7-8**: Match creation and game initialization with Redis Pub/Sub
 
@@ -114,10 +114,11 @@ The following diagram illustrates the complete flow of key operations:
   - Cooldown mechanism prevents race conditions
   - Scheduled tasks ensure matches are created
 
-- **Atomic Card Trading (2PC Protocol)**:
-  - **Phase 1 (PREPARE)**: Both servers validate and lock resources
-  - **Phase 2 (COMMIT)**: Atomic commit on both servers
-  - Rollback on failure ensures consistency
+- **Atomic Card Trading**:
+  - Distributed locks via Redisson ensure exclusive access
+  - Trade proposals stored in Redis for cross-server visibility
+  - Synchronized card collection updates prevent race conditions
+  - Transaction rollback on failure ensures consistency
   - No partial trades possible
 
 - **Card Shop with Stock Management**:
@@ -406,42 +407,38 @@ Response:
 }
 ```
 
-#### Trade Preparation (2PC Phase 1)
+#### Trade Proposal
 
 ```http
-POST /api/trade/prepare
+POST /api/trades/propose
 Content-Type: application/json
 
 {
-  "proposalId": "trade-123",
-  "target": "player456",
-  "requestedCard": "Ice Shard"
+  "proposingPlayerId": "player123",
+  "targetPlayerId": "player456",
+  "offeredCardIds": ["card-001", "card-002"],
+  "requestedCardIds": ["card-101"]
 }
 ```
 
 Response:
 ```json
 {
-  "status": "PREPARED"
+  "tradeId": "trade-123",
+  "status": "PENDING"
 }
 ```
 
-#### Trade Commit (2PC Phase 2)
+#### Trade Acceptance
 
 ```http
-POST /api/trade/commit
-Content-Type: application/json
-
-{
-  "proposalId": "trade-123",
-  "decision": "COMMIT"
-}
+POST /api/trades/{tradeId}/accept
 ```
 
 Response:
 ```json
 {
-  "status": "COMMITTED"
+  "status": "Trade accepted and executed."
 }
 ```
 

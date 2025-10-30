@@ -160,14 +160,14 @@ public final class GameClient {
             System.out.print("Username: > ");
             String username = scanner.nextLine().trim();
             if (username.isEmpty()) {
-                logger.error("[ERROR] ✗ Username cannot be empty");
+                System.out.println("✗ Username cannot be empty");
                 return;
             }
             
             System.out.print("Password: > ");
             String password = scanner.nextLine().trim();
             if (password.isEmpty()) {
-                logger.error("[ERROR] ✗ Password cannot be empty");
+                System.out.println("✗ Password cannot be empty");
                 return;
             }
 
@@ -181,10 +181,10 @@ public final class GameClient {
                 JsonObject responseJson = new Gson().fromJson(response.body, JsonObject.class);
                 jwtToken = responseJson.get("token").getAsString();
                 currentUsername = username;
-                logger.info("[SUCCESS] ✓ Login successful!");
+                System.out.println("✓ Login successful!");
             } else {
                 String errorMessage = response.body != null && !response.body.isEmpty() ? response.body : "Invalid credentials";
-                logger.error("[ERROR] ✗ Login failed: {} (Code: {})", errorMessage, response.statusCode);
+                System.out.println("✗ Login failed: " + errorMessage);
             }
         } catch (IOException e) {
             logger.error("[ERROR] ✗ IOException during login: {}", e.getMessage());
@@ -205,9 +205,9 @@ public final class GameClient {
                 JsonObject responseJson = new Gson().fromJson(response.body, JsonObject.class);
                 jwtToken = responseJson.get("token").getAsString();
                 currentUsername = AUTO_USERNAME;
-                System.out.println("[SUCCESS] ✓ Auto-login successful!");
+                System.out.println("✓ Auto-login successful!");
             } else {
-                System.out.println("[ERROR] ✗ Auto-login failed: " + response.body + " (Code: " + response.statusCode + ")");
+                System.out.println("✗ Auto-login failed: " + response.body);
                 autoRegister();
             }
         } catch (IOException e) {
@@ -226,10 +226,10 @@ public final class GameClient {
             HttpResponse response = makeHttpRequest("/api/auth/register", "POST", credentials.toString(), null);
 
             if (response.statusCode == 200 || response.statusCode == 201) {
-                System.out.println("[SUCCESS] ✓ Auto-registration successful. Attempting to login now.");
+                System.out.println("✓ Auto-registration successful. Attempting to login now.");
                 autoLogin();
             } else {
-                System.out.println("[ERROR] ✗ Auto-registration failed: " + response.body + " (Code: " + response.statusCode + ")");
+                System.out.println("✗ Auto-registration failed: " + response.body);
                 isExiting = true;
             }
         } catch (IOException e) {
@@ -242,14 +242,14 @@ public final class GameClient {
             System.out.print("Username: > ");
             String username = scanner.nextLine().trim();
             if (username.isEmpty()) {
-                System.out.println("[ERROR] ✗ Username cannot be empty");
+                System.out.println("✗ Username cannot be empty");
                 return;
             }
             
             System.out.print("Password: > ");
             String password = scanner.nextLine().trim();
             if (password.isEmpty()) {
-                System.out.println("[ERROR] ✗ Password cannot be empty");
+                System.out.println("✗ Password cannot be empty");
                 return;
             }
 
@@ -260,10 +260,10 @@ public final class GameClient {
             HttpResponse response = makeHttpRequest("/api/auth/register", "POST", credentials.toString(), null);
 
             if (response.statusCode == 200 || response.statusCode == 201) {
-                System.out.println("[SUCCESS] ✓ Registration successful. Please log in.");
+                System.out.println("✓ Registration successful. Please log in.");
             } else {
                 String errorMessage = response.body != null && !response.body.isEmpty() ? response.body : "Registration failed";
-                System.out.println("[ERROR] ✗ Registration failed: " + errorMessage + " (Code: " + response.statusCode + ")");
+                System.out.println("✗ Registration failed: " + errorMessage);
             }
         } catch (IOException e) {
             System.out.println("[ERROR] ✗ IOException during registration: " + e.getMessage());
@@ -613,13 +613,11 @@ public final class GameClient {
         }
         
         String command = "STORE:BUY:" + packType;
-        System.out.println("[CLIENT] Sending purchase command: " + command);
         try {
             webSocketClient.send(command);
-            System.out.println("[CLIENT] Purchase command sent. Waiting for server response...");
+            System.out.println("Purchase command sent. Waiting for server response...");
         } catch (Exception e) {
-            System.out.println("[ERROR] ✗ Failed to send command: " + e.getMessage());
-            logger.error("Failed to send purchase command", e);
+            System.out.println("✗ Failed to send command: " + e.getMessage());
         }
     }
 
@@ -720,9 +718,8 @@ public final class GameClient {
 
         // Send trade proposal - WebSocketHandler will add GAME:playerId prefix automatically
         String tradeCommand = "TRADE:PROPOSE:" + targetUsername + ":" + offeredCards + ":" + requestedCards;
-        System.out.println("[DEBUG] Sending trade command: " + tradeCommand);
         webSocketClient.send(tradeCommand);
-        System.out.println("[TRADE] Trade proposal sent! Wait for response from " + targetUsername);
+        System.out.println("Trade proposal sent! Waiting for a response from " + targetUsername);
     }
     
     private static void acceptTrade(Scanner scanner) {
@@ -734,9 +731,8 @@ public final class GameClient {
         }
         
         String command = "TRADE:ACCEPT:" + tradeId;
-        System.out.println("[DEBUG] Sending: " + command);
         webSocketClient.send(command);
-        System.out.println("[TRADE] Trade acceptance sent! Wait for confirmation...");
+        System.out.println("Trade acceptance sent! Waiting for confirmation...");
     }
     
     private static void rejectTrade(Scanner scanner) {
@@ -748,9 +744,8 @@ public final class GameClient {
         }
         
         String command = "TRADE:REJECT:" + tradeId;
-        System.out.println("[DEBUG] Sending: " + command);
         webSocketClient.send(command);
-        System.out.println("[TRADE] Trade rejection sent!");
+        System.out.println("Trade rejection sent!");
     }
 
     private static void checkPing(Scanner scanner) {
@@ -810,24 +805,53 @@ public final class GameClient {
             return;
         }
 
+        // Do not print connection success message, it's implicit
+        if ("SUCCESS".equals(type) && parts.length > 1 && "CONNECTED".equals(parts[1])) {
+            return;
+        }
+
+        // Generic error message
         if ("ERROR".equals(type)) {
             String errorMsg = message.substring(message.indexOf(":") + 1).trim();
-            System.out.println("\n[ERROR] " + errorMsg);
-        } else if ("SUCCESS".equals(parts[0]) && parts.length > 1 && parts[1].startsWith("CONNECTED")) {
+            System.out.println("\n✗ " + errorMsg);
             return;
-        } else if ("INFO".equals(type)) {
-            // Handle info messages including card collection
+        }
+        
+        // Handle specific success messages
+        if ("SUCCESS".equals(type) && parts.length > 1) {
+            if ("CHARACTER_CREATED".equals(parts[1])) {
+                System.out.println("\n✓ Character created successfully!");
+            } else if (message.contains("Pack purchased")) {
+                System.out.println("\n✓ Pack purchased successfully!");
+                hasCards = true;
+            } else if (message.contains("Entered matchmaking")) {
+                System.out.println("\n✓ " + message.substring(message.indexOf(":") + 1));
+            } else {
+                // Display other success messages
+                System.out.println("\n✓ " + message.substring(message.indexOf(":") + 1));
+            }
+            return;
+        }
+
+        // Handle info messages, including card collection
+        if ("INFO".equals(type)) {
             if (message.startsWith("INFO:YOUR_CARDS:")) {
                 String cardsInfo = message.substring("INFO:YOUR_CARDS:".length());
-                System.out.println("\n[CARDS] Your card collection:");
-                System.out.println("[CARDS] " + cardsInfo.replace(";", "\n[CARDS] "));
-                System.out.println("[CARDS] Use these card IDs for trading.");
+                System.out.println("\n--- Your Card Collection ---");
+                String[] cardEntries = cardsInfo.split(";");
+                for (String card : cardEntries) {
+                    System.out.println("- " + card.trim());
+                }
+                System.out.println("--------------------------");
+                System.out.println("Use these card IDs for trading.");
             } else {
-                System.out.println("\n[INFO] " + message.substring(5)); // Remove "INFO:" prefix
+                System.out.println("\n" + message.substring(5)); // Remove "INFO:" prefix
             }
-        } else {
-            System.out.println("\n[SERVER] " + message);
+            return;
         }
+        
+        // Fallback for other server messages
+        System.out.println("\n" + message);
 
         if ("UPDATE".equals(type)) {
             if (parts.length > 2 && "GAME_START".equals(parts[1])) {

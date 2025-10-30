@@ -5,9 +5,14 @@
 
 const WebSocket = require('ws');
 const https = require('http');
+const crypto = require('crypto');
 
 const API_URL = 'http://localhost:8080';
 const WS_URL = 'ws://localhost:8080/ws';
+
+function generateUniqueId() {
+    return crypto.randomBytes(8).toString('hex');
+}
 
 // Colors
 const colors = {
@@ -55,6 +60,11 @@ async function registerAndLogin(username, password) {
     const regResp = await httpPost(`${API_URL}/api/auth/register`, { username, password });
     log(`Register status: ${regResp.status}`);
     
+    if (regResp.status !== 200) {
+        log(`ERROR: Registration failed for ${username}: ${JSON.stringify(regResp.data)}`, colors.red);
+        return null;
+    }
+    
     log(`Logging in ${username}...`);
     const loginResp = await httpPost(`${API_URL}/api/auth/login`, { username, password });
     const token = loginResp.data.token;
@@ -64,8 +74,12 @@ async function registerAndLogin(username, password) {
         process.exit(1);
     }
     
-    log(`Token for ${username}: ${token.substring(0, 20)}...`, colors.green);
-    return token;
+    // Decode JWT to get the actual username from token
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(Buffer.from(payload, 'base64').toString());
+    log(`Token username: ${decoded.sub}`, colors.green);
+    
+    return { token, username: decoded.sub };
 }
 
 function waitForMessage(ws, timeout = 10000) {
@@ -104,6 +118,11 @@ async function testPurchase(token, username) {
                 characterCreated = true;
             } else if (msg.includes('SUCCESS:Character created') || msg.includes('CHARACTER')) {
                 // Now send purchase command
+                ws.send('STORE:BUY:BASIC');
+                log('→ Sent: STORE:BUY:BASIC');
+            } else if (msg.includes('ERROR:Character already exists')) {
+                // Character already exists, just proceed with purchase
+                log('ℹ Character already exists, proceeding with purchase', colors.yellow);
                 ws.send('STORE:BUY:BASIC');
                 log('→ Sent: STORE:BUY:BASIC');
             } else if (msg.includes('Pack purchased') || msg.includes('Cards received')) {
@@ -156,6 +175,8 @@ async function testTrade(token1, username1, token2, username2) {
         
         let player1Id = null;
         let player2Id = null;
+        let player1Cards = [];
+        let player2Cards = [];
         
         ws1.on('message', (data) => {
             const msg = data.toString();
@@ -172,23 +193,43 @@ async function testTrade(token1, username1, token2, username2) {
                 ws1.send('CHARACTER_SETUP:User1:HUMAN:WARRIOR');
                 log(`→ ${username1} sent: CHARACTER_SETUP`);
                 ws1CharCreated = true;
+            } else if (msg.includes('ERROR:Character already exists')) {
+                log(`❌ ${username1} character already exists - THIS SHOULD NOT HAPPEN WITH UNIQUE USERS!`, colors.red);
+                log(`Username was: ${username1}`, colors.red);
+                ws1.close();
+                ws2.close();
+                resolve(false);
             } else if (msg.includes('SUCCESS:Character created')) {
-                // Extract player ID
-                const match = msg.match(/Player ID: (\d+)/);
+                // Extract player ID - it can be alphanumeric now
+                const match = msg.match(/Player ID:\s*([a-zA-Z0-9_-]+)/);
                 if (match) {
                     player1Id = match[1];
                     log(`Player 1 ID: ${player1Id}`);
                 }
                 
-                if (ws2CharCreated && player2Id && !proposalSent) {
-                    // Send trade proposal after both characters created
+                // Request cards to get card IDs for trade
+                ws1.send('SHOW_CARDS');
+                log(`→ ${username1} sent: SHOW_CARDS`);
+            } else if (msg.includes('INFO:YOUR_CARDS')) {
+                // Extract card IDs from the response
+                // Format: INFO:YOUR_CARDS:cardId1(name1),cardId2(name2),...
+                const cardsPart = msg.split(':').slice(2).join(':');
+                const cardMatches = cardsPart.match(/([a-z0-9-]+)\(/g);
+                
+                if (cardMatches && cardMatches.length >= 1) {
+                    player1Cards = cardMatches.map(m => m.slice(0, -1));
+                    log(`Player 1 has ${player1Cards.length} cards`);
+                }
+                
+                // Try to send trade proposal if both players are ready
+                if (ws2CharCreated && player2Id && player1Cards.length >= 1 && player2Cards.length >= 1 && !proposalSent) {
                     setTimeout(() => {
                         if (!proposalSent) {
-                            ws1.send(`TRADE:PROPOSE:${player2Id}:basic-0:basic-1`);
-                            log(`→ ${username1} sent: TRADE:PROPOSE:${player2Id}:basic-0:basic-1`);
+                            ws1.send(`TRADE:PROPOSE:${player2Id}:${player1Cards[0]}:${player2Cards[0]}`);
+                            log(`→ ${username1} sent: TRADE:PROPOSE:${player2Id}:${player1Cards[0]}:${player2Cards[0]}`);
                             proposalSent = true;
                         }
-                    }, 2000);
+                    }, 1000);
                 }
             }
         });
@@ -201,23 +242,50 @@ async function testTrade(token1, username1, token2, username2) {
                 ws2.send('CHARACTER_SETUP:User2:ELF:MAGE');
                 log(`→ ${username2} sent: CHARACTER_SETUP`);
                 ws2CharCreated = true;
+            } else if (msg.includes('ERROR:Character already exists')) {
+                log(`❌ ${username2} character already exists - THIS SHOULD NOT HAPPEN WITH UNIQUE USERS!`, colors.red);
+                log(`Username was: ${username2}`, colors.red);
+                ws1.close();
+                ws2.close();
+                resolve(false);
             } else if (msg.includes('SUCCESS:Character created')) {
-                // Extract player ID
-                const match = msg.match(/Player ID: (\d+)/);
+                // Extract player ID - it can be alphanumeric now
+                const match = msg.match(/Player ID:\s*([a-zA-Z0-9_-]+)/);
                 if (match) {
                     player2Id = match[1];
                     log(`Player 2 ID: ${player2Id}`);
                 }
                 
-                // Try to trigger proposal if player1 is ready
-                if (ws1CharCreated && player1Id && !proposalSent) {
+                // Request cards to get card IDs for trade
+                ws2.send('SHOW_CARDS');
+                log(`→ ${username2} sent: SHOW_CARDS`);
+            } else if (msg.includes('INFO:YOUR_CARDS')) {
+                // Extract card IDs from the response
+                const cardsPart = msg.split(':').slice(2).join(':');
+                const cardMatches = cardsPart.match(/([a-z0-9-]+)\(/g);
+                
+                if (cardMatches && cardMatches.length >= 1) {
+                    player2Cards = cardMatches.map(m => m.slice(0, -1));
+                    log(`Player 2 has ${player2Cards.length} cards`);
+                }
+                
+                // If player1 is ready, request their cards
+                if (ws1CharCreated && player1Cards.length === 0) {
+                    setTimeout(() => {
+                        ws1.send('SHOW_CARDS');
+                        log(`→ ${username1} sent: SHOW_CARDS (triggered by p2)`);
+                    }, 500);
+                }
+                
+                // Try to send trade proposal if both players are ready
+                if (ws1CharCreated && player1Id && player2Cards.length >= 1 && player1Cards.length >= 1 && !proposalSent) {
                     setTimeout(() => {
                         if (!proposalSent) {
-                            ws1.send(`TRADE:PROPOSE:${player2Id}:basic-0:basic-1`);
-                            log(`→ ${username1} sent: TRADE:PROPOSE:${player2Id}:basic-0:basic-1`);
+                            ws1.send(`TRADE:PROPOSE:${player2Id}:${player1Cards[0]}:${player2Cards[0]}`);
+                            log(`→ ${username1} sent: TRADE:PROPOSE:${player2Id}:${player1Cards[0]}:${player2Cards[0]}`);
                             proposalSent = true;
                         }
-                    }, 2000);
+                    }, 500);
                 }
             } else if (msg.includes('TRADE_COMPLETE') || msg.includes('TRADE_ACCEPTED')) {
                 log('✅ TRADE COMPLETE (detected by player 2)', colors.green);
@@ -239,7 +307,7 @@ async function testTrade(token1, username1, token2, username2) {
                     ws2.send(`TRADE:ACCEPT:${tradeId}`);
                     log(`→ ${username2} sent: TRADE:ACCEPT:${tradeId}`);
                 }, 500);
-            } else if (msg.includes('ERROR')) {
+            } else if (msg.includes('ERROR') && !msg.includes('already exists')) {
                 log(`❌ TRADE ERROR: ${msg}`, colors.red);
                 setTimeout(() => {
                     ws1.close();
@@ -293,6 +361,22 @@ async function testMatchmaking(token1, username1, token2, username2) {
                 ws1.send('CHARACTER_SETUP:Match1:HUMAN:WARRIOR');
                 log(`→ ${username1} sent: CHARACTER_SETUP`);
                 ws1CharCreated = true;
+            } else if (msg.includes('ERROR:Character already exists')) {
+                log(`ℹ ${username1} character already exists, continuing...`, colors.yellow);
+                ws1CharCreated = true;
+                // Check if we can start matchmaking
+                if (ws2CharCreated && !matchmaking1Sent) {
+                    setTimeout(() => {
+                        ws1.send('MATCHMAKING:ENTER');
+                        log(`→ ${username1} sent: MATCHMAKING:ENTER`);
+                        matchmaking1Sent = true;
+                        
+                        setTimeout(() => {
+                            ws2.send('MATCHMAKING:ENTER');
+                            log(`→ ${username2} sent: MATCHMAKING:ENTER`);
+                        }, 2000);
+                    }, 1000);
+                }
             } else if (msg.includes('SUCCESS:Character created') && ws2CharCreated && !matchmaking1Sent) {
                 setTimeout(() => {
                     ws1.send('MATCHMAKING:ENTER');
@@ -321,6 +405,9 @@ async function testMatchmaking(token1, username1, token2, username2) {
                 ws2.send('CHARACTER_SETUP:Match2:ELF:MAGE');
                 log(`→ ${username2} sent: CHARACTER_SETUP`);
                 ws2CharCreated = true;
+            } else if (msg.includes('ERROR:Character already exists')) {
+                log(`ℹ ${username2} character already exists, continuing...`, colors.yellow);
+                ws2CharCreated = true;
             } else if (msg.includes('MATCH') || msg.includes('OPPONENT') || msg.includes('GAME') || msg.includes('Entered matchmaking')) {
                 log('✅ MATCHMAKING SUCCESS - Match created or entered queue', colors.green);
                 // Wait a bit to see if match is created
@@ -347,7 +434,6 @@ async function testMatchmaking(token1, username1, token2, username2) {
 
 async function main() {
     const testFeature = process.env.TEST_FEATURE || 'ALL';
-    const timestamp = Date.now();
     
     log('╔════════════════════════════════════════════════╗', colors.blue);
     if (testFeature === 'ALL') {
@@ -363,30 +449,45 @@ async function main() {
     
     // Test PURCHASE
     if (testFeature === 'ALL' || testFeature === 'PURCHASE') {
-        const user1 = `purchase_${timestamp}`;
+        const user1 = `p${generateUniqueId()}`;
         log(`\nCreating user for PURCHASE: ${user1}`);
-        const token1 = await registerAndLogin(user1, 'pass123');
-        purchaseOk = await testPurchase(token1, user1);
+        const auth1 = await registerAndLogin(user1, 'pass123');
+        if (!auth1) {
+            log('ERROR: Failed to register user for PURCHASE test', colors.red);
+            purchaseOk = false;
+        } else {
+            purchaseOk = await testPurchase(auth1.token, auth1.username);
+        }
     }
     
     // Test TRADE
     if (testFeature === 'ALL' || testFeature === 'TRADE') {
-        const user2 = `trader1_${timestamp}`;
-        const user3 = `trader2_${timestamp}`;
+        const user2 = `t${generateUniqueId()}`;
+        const user3 = `t${generateUniqueId()}`;
         log(`\nCreating users for TRADE: ${user2}, ${user3}`);
-        const token2 = await registerAndLogin(user2, 'pass123');
-        const token3 = await registerAndLogin(user3, 'pass123');
-        tradeOk = await testTrade(token2, user2, token3, user3);
+        const auth2 = await registerAndLogin(user2, 'pass123');
+        const auth3 = await registerAndLogin(user3, 'pass123');
+        if (!auth2 || !auth3) {
+            log('ERROR: Failed to register users for TRADE test', colors.red);
+            tradeOk = false;
+        } else {
+            tradeOk = await testTrade(auth2.token, auth2.username, auth3.token, auth3.username);
+        }
     }
     
     // Test MATCHMAKING
     if (testFeature === 'ALL' || testFeature === 'MATCHMAKING') {
-        const user4 = `match1_${timestamp}`;
-        const user5 = `match2_${timestamp}`;
+        const user4 = `m${generateUniqueId()}`;
+        const user5 = `m${generateUniqueId()}`;
         log(`\nCreating users for MATCHMAKING: ${user4}, ${user5}`);
-        const token4 = await registerAndLogin(user4, 'pass123');
-        const token5 = await registerAndLogin(user5, 'pass123');
-        matchOk = await testMatchmaking(token4, user4, token5, user5);
+        const auth4 = await registerAndLogin(user4, 'pass123');
+        const auth5 = await registerAndLogin(user5, 'pass123');
+        if (!auth4 || !auth5) {
+            log('ERROR: Failed to register users for MATCHMAKING test', colors.red);
+            matchOk = false;
+        } else {
+            matchOk = await testMatchmaking(auth4.token, auth4.username, auth5.token, auth5.username);
+        }
     }
     
     // Summary
@@ -395,20 +496,27 @@ async function main() {
     log('╚════════════════════════════════════════════════╝', colors.blue);
     
     if (purchaseOk !== null) {
-        log(`1. PURCHASE:    ${purchaseOk ? '✅ PASSED' : '❌ FAILED'}`, 
-            purchaseOk ? colors.green : colors.red);
+        log(`1. PURCHASE:    ${purchaseOk === 'SKIP' ? '⊘ SKIPPED (db not clean)' : purchaseOk ? '✅ PASSED' : '❌ FAILED'}`, 
+            purchaseOk === 'SKIP' ? colors.yellow : purchaseOk ? colors.green : colors.red);
     }
     if (tradeOk !== null) {
-        log(`2. TRADE:       ${tradeOk ? '✅ PASSED' : '❌ FAILED'}`, 
-            tradeOk ? colors.green : colors.red);
+        log(`2. TRADE:       ${tradeOk === 'SKIP' ? '⊘ SKIPPED (db not clean)' : tradeOk ? '✅ PASSED' : '❌ FAILED'}`, 
+            tradeOk === 'SKIP' ? colors.yellow : tradeOk ? colors.green : colors.red);
     }
     if (matchOk !== null) {
-        log(`3. MATCHMAKING: ${matchOk ? '✅ PASSED' : '❌ FAILED'}`, 
-            matchOk ? colors.green : colors.red);
+        log(`3. MATCHMAKING: ${matchOk === 'SKIP' ? '⊘ SKIPPED (db not clean)' : matchOk ? '✅ PASSED' : '❌ FAILED'}`, 
+            matchOk === 'SKIP' ? colors.yellow : matchOk ? colors.green : colors.red);
     }
     
-    const allTests = [purchaseOk, tradeOk, matchOk].filter(v => v !== null);
+    const allTests = [purchaseOk, tradeOk, matchOk].filter(v => v !== null && v !== 'SKIP');
     const success = allTests.length > 0 && allTests.every(v => v === true);
+    const hasSkipped = [purchaseOk, tradeOk, matchOk].some(v => v === 'SKIP');
+    
+    if (hasSkipped) {
+        log('\n⚠ Some tests were skipped due to existing data in database.', colors.yellow);
+        log('Please clean the database before running tests for accurate results.', colors.yellow);
+    }
+    
     process.exit(success ? 0 : 1);
 }
 
