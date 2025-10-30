@@ -63,6 +63,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/health", "/health").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/api/servers/**", "/servers/**").permitAll()
+                .requestMatchers("/api/matchmaking/**").permitAll() // Allow internal matchmaking communication
+                .requestMatchers("/api/lock/**").permitAll() // Allow internal lock communication
+                .requestMatchers("/api/trades/**").permitAll() // Allow internal trade communication
                 .anyRequest().authenticated() // Todas as outras requisições exigem autenticação
             )
             .sessionManagement(session -> session
