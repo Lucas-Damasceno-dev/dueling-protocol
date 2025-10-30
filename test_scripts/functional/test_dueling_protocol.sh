@@ -70,15 +70,14 @@ sleep 25
 
 echo "Servidores iniciados. Gateway PID: $GATEWAY_PID, Server PID: $SERVER_PID"
 
-echo "Pronto para testar! Execute o cliente com o seguinte comando em outro terminal:"
-echo "cd /home/lucas/Documentos/dev/projects/dueling-protocol/dueling-client && mvn compile exec:java -Dexec.mainClass=\"client.GameClient\""
+# Iniciar o cliente
+echo "Iniciando o cliente para o teste..."
+cd ../dueling-client
+mvn compile exec:java -Dexec.mainClass="client.GameClient"
 
-echo ""
-echo "Para acompanhar os logs dos servidores:"
-echo "Gateway: tail -f /home/lucas/Documentos/dev/projects/dueling-protocol/dueling-gateway/gateway.log"
-echo "Server: tail -f /home/lucas/Documentos/dev/projects/dueling-protocol/dueling-server/server.log"
-
-echo ""
-echo "Para parar tudo, execute:"
-echo "kill $GATEWAY_PID $SERVER_PID"
-echo "docker stop redis-master redis-replica 2>/dev/null"
+# Limpeza após o teste
+echo "Teste concluído. Realizando limpeza..."
+kill $GATEWAY_PID $SERVER_PID
+docker stop $REDIS_PID 2>/dev/null
+docker rm $REDIS_PID 2>/dev/null
+echo "Limpeza concluída."

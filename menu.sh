@@ -40,19 +40,20 @@ show_menu() {
     echo "15. Test Client WebSocket"
     echo "16. Test Dueling Protocol"
     echo "17. Test Redis Sentinel"
+    echo "18. Test S2S Communication"
     echo
     echo -e "${YELLOW}System Control:${NC}"
-    echo "18. Stop All Services"
-    echo "19. Build Project"
-    echo "20. View Running Containers"
+    echo "19. Stop All Services"
+    echo "20. Build Project"
+    echo "21. View Running Containers"
     echo
     echo -e "${YELLOW}Help & Info:${NC}"
-    echo "21. View Documentation"
-    echo "22. System Status Check"
+    echo "22. View Documentation"
+    echo "23. System Status Check"
     echo
     echo -e "${RED}0. Exit${NC}"
     echo
-    echo -n "Choose an option (0-22): "
+    echo -n "Choose an option (0-23): "
 }
 
 # Function to handle system status check
@@ -207,24 +208,29 @@ while true; do
             read -p "Press Enter to continue..."
             ;;
         18)
+            echo -e "${GREEN}Testing S2S Communication...${NC}"
+            bash ./test_scripts/functional/test_s2s_communication.sh
+            read -p "Press Enter to continue..."
+            ;;
+        19)
             echo -e "${GREEN}Stopping All Services...${NC}"
             bash ./scripts/deploy/stop_all_services.sh
             read -p "Press Enter to continue..."
             ;;
-        19)
+        20)
             echo -e "${GREEN}Building Project...${NC}"
             bash ./scripts/build/build.sh
             read -p "Press Enter to continue..."
             ;;
-        20)
+        21)
             view_containers
             read -p "Press Enter to continue..."
             ;;
-        21)
+        22)
             view_docs
             read -p "Press Enter to continue..."
             ;;
-        22)
+        23)
             system_status
             read -p "Press Enter to continue..."
             ;;
