@@ -20,7 +20,9 @@ echo "Redis iniciado com PID: $REDIS_PID"
 
 # Compilar todos os módulos
 echo "Compilando módulos..."
-cd /home/lucas/Documentos/dev/projects/dueling-protocol
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+cd "$PROJECT_DIR"
 
 echo "Compilando gateway..."
 cd dueling-gateway && mvn clean compile -q
