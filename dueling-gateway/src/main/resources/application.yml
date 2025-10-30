@@ -16,7 +16,7 @@ spring:
       routes:
         # Route for authentication requests (no JWT filter)
         - id: auth-route
-          uri: http://server-1:8080
+          uri: http://${SERVER_HOST:localhost}:${SERVER_PORT:8083}
           predicates:
             - Path=/api/auth/**
           filters:
@@ -24,46 +24,54 @@ spring:
         
         # Route for API requests to game microservices
         - id: game-create-match
-          uri: http://server-1:8080
+          uri: http://${SERVER_HOST:localhost}:${SERVER_PORT:8083}
           predicates:
             - Path=/api/match/**
           filters:
-            - JwtAuthenticationFilter  # Custom filter for JWT validation
+            - CustomJwtAuth  # Custom filter for JWT validation
             - RewritePath=/api/(?<segment>.*), /api/${segment}
         
         - id: game-move
-          uri: http://server-1:8080
+          uri: http://${SERVER_HOST:localhost}:${SERVER_PORT:8083}
           predicates:
             - Path=/api/move/**
           filters:
-            - JwtAuthenticationFilter
+            - CustomJwtAuth
             - RewritePath=/api/(?<segment>.*), /api/${segment}
         
         - id: game-state
-          uri: http://server-1:8080
+          uri: http://${SERVER_HOST:localhost}:${SERVER_PORT:8083}
           predicates:
             - Path=/api/state/**
           filters:
-            - JwtAuthenticationFilter
+            - CustomJwtAuth
             - RewritePath=/api/(?<segment>.*), /api/${segment}
         
         - id: game-user
-          uri: http://server-1:8080
+          uri: http://${SERVER_HOST:localhost}:${SERVER_PORT:8083}
           predicates:
             - Path=/api/user/**
           filters:
-            - JwtAuthenticationFilter
+            - CustomJwtAuth
+            - RewritePath=/api/(?<segment>.*), /api/${segment}
+        
+        # Route for friends API requests
+        - id: game-friends
+          uri: http://${SERVER_HOST:localhost}:${SERVER_PORT:8083}
+          predicates:
+            - Path=/api/friends/**
+          filters:
+            - CustomJwtAuth  # Custom filter for JWT validation
             - RewritePath=/api/(?<segment>.*), /api/${segment}
         
         # Route for WebSocket connections
         - id: websocket-route
-          uri: ws://server-1:8080
+          uri: ws://${SERVER_HOST:localhost}:${SERVER_PORT:8083}
           predicates:
             - Path=/ws/**
           filters:
-            - JwtAuthenticationFilter  # Custom filter for JWT validation
             - RewritePath=/ws/(?<segment>.*), /ws/${segment}
-       
+
       # Global filters configuration
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
