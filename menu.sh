@@ -22,38 +22,48 @@ show_menu() {
     echo -e "1.  Start Complete System (Docker + NGINX) ${GREEN}[Multi-PC Ready]${NC}"
     echo -e "2.  Start Game Local (Java processes) ${GREEN}[Single PC]${NC}"
     echo -e "3.  Start Game Local Simple (No Sentinel) ${GREEN}[Single PC]${NC}"
-    echo -e "4.  Start Game with Redis Disabled ${GREEN}[Single PC]${NC}"
-    echo -e "5.  Start Game Final (Original) ${GREEN}[Single PC]${NC}"
-    echo -e "6.  Start Game Local Debug ${GREEN}[Single PC]${NC}"
+    echo -e "4.  Start Game Local Debug ${GREEN}[Single PC]${NC}"
     echo
     echo -e "${YELLOW}Remote Deployment:${NC}"
-    echo -e "7.  Start Client Remote"
-    echo "8.  Start Gateway Remote"
-    echo "9.  Start Server Remote"
-    echo "10. Setup Distributed Environment"
+    echo -e "5.  Start Client Remote"
+    echo "6.  Start Gateway Remote"
+    echo "7.  Start Server Remote"
+    echo "8.  Setup Distributed Environment"
     echo
     echo -e "${YELLOW}Testing & Monitoring:${NC}"
-    echo "11. Run All Tests"
-    echo "12. Run Client"
-    echo "13. Run Server"
-    echo "14. Monitor All Logs"
-    echo "15. Test Client WebSocket"
-    echo "16. Test Dueling Protocol"
-    echo "17. Test Redis Sentinel"
-    echo "18. Test S2S Communication"
+    echo "9.  Run All Tests"
+    echo "10. Run Client"
+    echo "11. Run Server"
+    echo "12. Monitor All Logs"
+    echo "13. Test Client WebSocket"
+    echo "14. Test Dueling Protocol"
+    echo "15. Test Redis Sentinel"
+    echo "16. Test S2S Communication"
+    echo "17. Test Game State Consistency"
+    echo "18. Test Mid-Game Disconnection"
+    echo "19. Test Persistence Race Condition"
+    echo "20. Test Queue Disconnection"
+    echo "21. Test Simultaneous Play"
+    echo "22. Test Stock Concurrency"
+    echo "23. Test Cross Server Matchmaking"
+    echo "24. Test Global Coordination"
+    echo "25. Test Distributed Matchmaking"
+    echo "26. Test Purchase Global"
+    echo "27. Test Redis Failover"
+    echo "28. Test Advanced Security"
     echo
     echo -e "${YELLOW}System Control:${NC}"
-    echo "19. Stop All Services"
-    echo "20. Build Project"
-    echo "21. View Running Containers"
+    echo "29. Stop All Services"
+    echo "30. Build Project"
+    echo "31. View Running Containers"
     echo
     echo -e "${YELLOW}Help & Info:${NC}"
-    echo "22. View Documentation"
-    echo "23. System Status Check"
+    echo "32. View Documentation"
+    echo "33. System Status Check"
     echo
     echo -e "${RED}0. Exit${NC}"
     echo
-    echo -n "Choose an option (0-23): "
+    echo -n "Choose an option (0-33): "
 }
 
 # Function to handle system status check
@@ -135,102 +145,150 @@ while true; do
             read -p "Press Enter to continue..."
             ;;
         4)
-            echo -e "${GREEN}Starting Game with Redis Disabled...${NC}"
-            bash ./scripts/deploy/stop_all_services.sh
-            bash ./scripts/deploy/start_game_redis_disabled.sh
-            read -p "Press Enter to continue..."
-            ;;
-        5)
-            echo -e "${GREEN}Starting Game Final (Original)...${NC}"
-            bash ./scripts/deploy/stop_all_services.sh
-            bash ./scripts/deploy/start_game_final.sh
-            read -p "Press Enter to continue..."
-            ;;
-        6)
             echo -e "${GREEN}Starting Game Local Debug...${NC}"
             bash ./scripts/deploy/stop_all_services.sh
             bash ./scripts/deploy/start_game_local_debug.sh
             read -p "Press Enter to continue..."
             ;;
-        7)
+        5)
             echo -e "${GREEN}Starting Client Remote...${NC}"
             bash ./scripts/deploy/start_client_remote.sh
             read -p "Press Enter to continue..."
             ;;
-        8)
+        6)
             echo -e "${GREEN}Starting Gateway Remote...${NC}"
             bash ./scripts/deploy/start_gateway_remote.sh
             read -p "Press Enter to continue..."
             ;;
-        9)
+        7)
             echo -e "${GREEN}Starting Server Remote...${NC}"
             bash ./scripts/deploy/start_server_remote.sh
             read -p "Press Enter to continue..."
             ;;
-        10)
+        8)
             echo -e "${GREEN}Setting up Distributed Environment...${NC}"
             bash ./scripts/deploy/setup_distributed.sh
             read -p "Press Enter to continue..."
             ;;
-        11)
+        9)
             echo -e "${GREEN}Running All Tests...${NC}"
             bash ./scripts/build/run_all_tests.sh
             read -p "Press Enter to continue..."
             ;;
-        12)
+        10)
             echo -e "${GREEN}Running Client...${NC}"
             bash ./scripts/run/run_client.sh
             read -p "Press Enter to continue..."
             ;;
-        13)
+        11)
             echo -e "${GREEN}Running Server...${NC}"
             bash ./scripts/run/run_server.sh
             read -p "Press Enter to continue..."
             ;;
-        14)
+        12)
             echo -e "${GREEN}Monitoring All Logs...${NC}"
             bash ./scripts/monitor/monitor_logs.sh
             read -p "Press Enter to continue..."
             ;;
-        15)
+        13)
             echo -e "${GREEN}Testing Client WebSocket...${NC}"
             bash ./test_scripts/functional/test_client_websocket.sh
             read -p "Press Enter to continue..."
             ;;
-        16)
+        14)
             echo -e "${GREEN}Testing Dueling Protocol...${NC}"
             bash ./test_scripts/functional/test_dueling_protocol.sh
             read -p "Press Enter to continue..."
             ;;
-        17)
+        15)
             echo -e "${GREEN}Testing Redis Sentinel...${NC}"
             bash ./test_scripts/infrastructure/test_redis_sentinel.sh
             read -p "Press Enter to continue..."
             ;;
-        18)
+        16)
             echo -e "${GREEN}Testing S2S Communication...${NC}"
             bash ./test_scripts/functional/test_s2s_communication.sh
             read -p "Press Enter to continue..."
             ;;
+        17)
+            echo -e "${GREEN}Testing Game State Consistency...${NC}"
+            bash ./test_scripts/functional/test_game_state_consistency.sh
+            read -p "Press Enter to continue..."
+            ;;
+        18)
+            echo -e "${GREEN}Testing Mid-Game Disconnection...${NC}"
+            bash ./test_scripts/functional/test_mid_game_disconnection.sh
+            read -p "Press Enter to continue..."
+            ;;
         19)
+            echo -e "${GREEN}Testing Persistence Race Condition...${NC}"
+            bash ./test_scripts/functional/test_persistence_race_condition.sh
+            read -p "Press Enter to continue..."
+            ;;
+        20)
+            echo -e "${GREEN}Testing Queue Disconnection...${NC}"
+            bash ./test_scripts/functional/test_queue_disconnection.sh
+            read -p "Press Enter to continue..."
+            ;;
+        21)
+            echo -e "${GREEN}Testing Simultaneous Play...${NC}"
+            bash ./test_scripts/functional/test_simultaneous_play.sh
+            read -p "Press Enter to continue..."
+            ;;
+        22)
+            echo -e "${GREEN}Testing Stock Concurrency...${NC}"
+            bash ./test_scripts/concurrency/test_stock_concurrency.sh
+            read -p "Press Enter to continue..."
+            ;;
+        23)
+            echo -e "${GREEN}Testing Cross Server Matchmaking...${NC}"
+            bash ./test_scripts/distributed/test_cross_server_matchmaking.sh
+            read -p "Press Enter to continue..."
+            ;;
+        24)
+            echo -e "${GREEN}Testing Global Coordination...${NC}"
+            bash ./test_scripts/distributed/test_global_coordination.sh
+            read -p "Press Enter to continue..."
+            ;;
+        25)
+            echo -e "${GREEN}Testing Distributed Matchmaking...${NC}"
+            bash ./test_scripts/distributed/test_matchmaking_distributed.sh
+            read -p "Press Enter to continue..."
+            ;;
+        26)
+            echo -e "${GREEN}Testing Purchase Global...${NC}"
+            bash ./test_scripts/distributed/test_purchase_global.sh
+            read -p "Press Enter to continue..."
+            ;;
+        27)
+            echo -e "${GREEN}Testing Redis Failover...${NC}"
+            bash ./test_scripts/infrastructure/test_redis_failover.sh
+            read -p "Press Enter to continue..."
+            ;;
+        28)
+            echo -e "${GREEN}Testing Advanced Security...${NC}"
+            bash ./test_scripts/security/test_advanced_security.sh
+            read -p "Press Enter to continue..."
+            ;;
+        29)
             echo -e "${GREEN}Stopping All Services...${NC}"
             bash ./scripts/deploy/stop_all_services.sh
             read -p "Press Enter to continue..."
             ;;
-        20)
+        30)
             echo -e "${GREEN}Building Project...${NC}"
             bash ./scripts/build/build.sh
             read -p "Press Enter to continue..."
             ;;
-        21)
+        31)
             view_containers
             read -p "Press Enter to continue..."
             ;;
-        22)
+        32)
             view_docs
             read -p "Press Enter to continue..."
             ;;
-        23)
+        33)
             system_status
             read -p "Press Enter to continue..."
             ;;

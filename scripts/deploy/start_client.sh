@@ -5,14 +5,17 @@
 echo "Iniciando cliente do Protocolo de Duelo..."
 echo "Certifique-se de que o gateway e o servidor estão rodando antes de iniciar o cliente!"
 
-cd /home/lucas/Documentos/dev/projects/dueling-protocol/dueling-client
+# Diretório base do projeto (relative to script location)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR/dueling-client"
 
 # Compilar se necessário
 if [ ! -f "target/dueling-client-1.0-SNAPSHOT.jar" ]; then
     echo "Compilando cliente..."
-    cd ..
+    cd "$PROJECT_DIR"
     mvn clean package -DskipTests
-    cd dueling-client
+    cd "$PROJECT_DIR/dueling-client"
 fi
 
 echo "Executando cliente..."
