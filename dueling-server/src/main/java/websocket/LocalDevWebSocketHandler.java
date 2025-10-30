@@ -1,6 +1,5 @@
 package websocket;
 
-import controller.GameFacade;
 import model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,70 +19,63 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 @Component
-public class GameWebSocketHandler extends TextWebSocketHandler {
+@Profile("local-dev")
+public class LocalDevWebSocketHandler extends TextWebSocketHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(GameWebSocketHandler.class);
-    private final GameFacade gameFacade;
+    private static final Logger logger = LoggerFactory.getLogger(LocalDevWebSocketHandler.class);
     private final IEventManager eventManager;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final WebSocketSessionManager sessionManager;
 
     @Autowired
-    public GameWebSocketHandler(GameFacade gameFacade, UserRepository userRepository, JwtUtil jwtUtil, WebSocketSessionManager sessionManager) {
-        this.gameFacade = gameFacade;
-        this.eventManager = gameFacade.getEventManager();
+    public LocalDevWebSocketHandler(UserRepository userRepository, JwtUtil jwtUtil, 
+                                   WebSocketSessionManager sessionManager, IEventManager eventManager) {
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
         this.sessionManager = sessionManager;
+        this.eventManager = eventManager;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String username = null;
-
-        // 1. Get username from session attributes (populated by HttpHandshakeInterceptor)
-        Object userIdFromAttribute = session.getAttributes().get("userId");
-        if (userIdFromAttribute != null) {
-            username = userIdFromAttribute.toString();
-            logger.info("Authenticated user '{}' via session attribute from handshake interceptor.", username);
+        
+        // First, try to get username from X-User-Id header (from gateway authentication)
+        if (session.getHandshakeHeaders() != null) {
+            java.util.List<String> userIdHeaders = session.getHandshakeHeaders().get("X-User-Id");
+            if (userIdHeaders != null && !userIdHeaders.isEmpty()) {
+                username = userIdHeaders.get(0);
+                logger.info("Found username in X-User-Id header: {}", username);
+            } else {
+                logger.info("No X-User-Id header found in WebSocket handshake");
+            }
         }
-
-        // 2. Fallback for direct connections (no gateway) or if interceptor fails
+        
+        // If not found in headers, try to extract from token in query parameters (for direct server connections)
         if (username == null) {
-            logger.warn("Could not find user in session attribute. Falling back to token validation.");
             String token = getJwtTokenFromSession(session);
             if (token == null) {
-                logger.error("Authentication failed: No token found in query parameters for session: {}", session.getId());
-                session.close(CloseStatus.POLICY_VIOLATION.withReason("Authentication token is required"));
+                logger.error("No authentication token found in WebSocket handshake headers or query parameters for session: {}", session.getId());
+                session.close(CloseStatus.BAD_DATA.withReason("Authentication token is required"));
                 return;
             }
 
-            try {
-                if (!jwtUtil.validateToken(token)) {
-                    logger.error("Authentication failed: Invalid token for session: {}", session.getId());
-                    session.close(CloseStatus.POLICY_VIOLATION.withReason("Invalid authentication token"));
-                    return;
-                }
-                username = jwtUtil.getUsernameFromToken(token);
-                logger.info("Successfully authenticated user '{}' using JWT token from query parameter.", username);
-            } catch (Exception e) {
-                logger.error("Token validation failed for session: {}", session.getId(), e);
-                session.close(CloseStatus.POLICY_VIOLATION.withReason("Token validation error"));
+            if (!jwtUtil.validateToken(token)) {
+                logger.error("Invalid authentication token provided for session: {}", session.getId());
+                session.close(CloseStatus.BAD_DATA.withReason("Invalid authentication token"));
                 return;
             }
-        }
 
-        if (username == null) {
-            logger.error("Unable to determine user for session {}. Closing connection.", session.getId());
-            session.close(CloseStatus.POLICY_VIOLATION.withReason("User could not be authenticated"));
-            return;
+            username = jwtUtil.getUsernameFromToken(token);
+            logger.info("Successfully authenticated WebSocket connection using JWT token for user: {}", username);
+        } else {
+            logger.info("Authenticated WebSocket connection using gateway headers for user: {}", username);
         }
 
         User user = userRepository.findByUsername(username).orElse(null);
         if (user == null) {
-            logger.error("User '{}' not found in database. Closing session {}.", username, session.getId());
-            session.close(CloseStatus.POLICY_VIOLATION.withReason("User not found"));
+            session.close(CloseStatus.BAD_DATA.withReason("User not found"));
             return;
         }
 
@@ -93,10 +85,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         PrintWriter writer = new PrintWriter(new WebSocketWriter(session));
         sessionManager.storePlayerWriter(playerId, writer);
 
-        gameFacade.registerPlayer(playerId);
         eventManager.subscribe(playerId, writer);
 
-        logger.info("WebSocket connection established for player {} (user: {}): session {}", playerId, username, session.getId());
+        logger.info("WebSocket connection established for player {} (user: {}): session {}", playerId, username, session.getId().toString());
         writer.println("SUCCESS:CONNECTED");
         writer.flush();
     }
@@ -118,14 +109,32 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
 
         logger.debug("Received command from player {}: {}", playerId, payload);
-        String[] command = payload.split(":");
-
-        String[] facadeCommand = new String[command.length + 2];
-        facadeCommand[0] = "GAME";
-        facadeCommand[1] = playerId;
-        System.arraycopy(command, 0, facadeCommand, 2, command.length);
-
-        gameFacade.processGameCommand(facadeCommand);
+        
+        // Para desenvolvimento local, vamos apenas ecoar as mensagens recebidas
+        // Em um ambiente real, aqui seria a lógica do jogo
+        if (payload.startsWith("CHAT:")) {
+            // Echo de mensagens de chat
+            eventManager.publish(playerId, "ECHO:" + payload);
+        } else if (payload.startsWith("GAME:")) {
+            // Tratamento básico de comandos de jogo
+            String[] parts = payload.split(":");
+            if (parts.length > 1) {
+                String action = parts[1];
+                switch (action) {
+                    case "START":
+                        eventManager.publish(playerId, "GAME_STARTED:Welcome to local development mode!");
+                        break;
+                    case "END":
+                        eventManager.publish(playerId, "GAME_ENDED:Thanks for playing!");
+                        break;
+                    default:
+                        eventManager.publish(playerId, "UNKNOWN_COMMAND:" + action);
+                        break;
+                }
+            }
+        } else {
+            eventManager.publish(playerId, "UNKNOWN_COMMAND");
+        }
     }
 
     @Override
@@ -138,8 +147,6 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             if (writer != null) {
                 eventManager.unsubscribe(playerId, writer);
             }
-
-            gameFacade.unregisterPlayer(playerId);
         }
     }
 
