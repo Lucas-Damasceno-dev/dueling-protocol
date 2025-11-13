@@ -53,9 +53,6 @@ public class Player implements Serializable {
     @Column(name = "base_mana", nullable = false)
     private int baseMana;
 
-    @OneToOne(mappedBy = "player", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private PlayerRanking playerRanking;
-
     private static final Logger logger = LoggerFactory.getLogger(Player.class);
 
     public Player() {
@@ -69,7 +66,6 @@ public class Player implements Serializable {
         this.coins = 1000;
         this.healthPoints = 100;
         this.upgradePoints = 0;
-        this.playerRanking = new PlayerRanking(this);
         initializeStarterDeck();
         // Serialize cards immediately after creation
         serializeCardCollectionNow();
@@ -198,7 +194,7 @@ public class Player implements Serializable {
 
     private void applyAttributeBonuses() {
         this.baseAttack = 10;
-        this.baseDefense = 10;
+        this.baseDefense = 0;  // Defesa base reduzida para permitir dano
         this.baseMana = 5;
         
         if ("Elf".equals(this.playerRace)) {
@@ -208,25 +204,25 @@ public class Player implements Serializable {
                 this.baseMana += 5;
             } else if ("Archer".equals(this.playerClass)) {
                 this.baseAttack += 5;
-                this.baseDefense += 2;
+                this.baseDefense += 1;  // Reduzido de 2
             }
         } else if ("Dwarf".equals(this.playerRace)) {
-            this.baseDefense += 5;
+            this.baseDefense += 2;  // Reduzido de 5
             if ("Warrior".equals(this.playerClass)) {
                 this.baseAttack += 5;
-                this.baseDefense += 5;
+                this.baseDefense += 2;  // Reduzido de 5
             } else if ("Rogue".equals(this.playerClass)) {
                 this.baseAttack += 3;
-                this.baseDefense += 2;
+                this.baseDefense += 1;  // Reduzido de 2
                 this.baseMana += 2;
             }
         } else if ("Human".equals(this.playerRace)) {
             this.baseAttack += 2;
-            this.baseDefense += 2;
+            this.baseDefense += 1;  // Reduzido de 2
             this.baseMana += 2;
         } else if ("Orc".equals(this.playerRace)) {
             this.baseAttack += 5;
-            this.baseDefense += 3;
+            this.baseDefense += 1;  // Reduzido de 3
             this.baseMana -= 1;
         }
         
@@ -268,14 +264,6 @@ public class Player implements Serializable {
     
     public String getCardCollectionJson() { return cardCollectionJson; }
     public void setCardCollectionJson(String cardCollectionJson) { this.cardCollectionJson = cardCollectionJson; }
-
-    public PlayerRanking getPlayerRanking() {
-        return playerRanking;
-    }
-
-    public void setPlayerRanking(PlayerRanking playerRanking) {
-        this.playerRanking = playerRanking;
-    }
 
     public ResourceType getResourceType() {
         if (this.playerClass == null) {

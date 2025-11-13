@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import repository.MatchRepository;
+import repository.PlayerRankingRepository;
 
 /**
  * Thread-safe implementation of the MatchmakingService interface for local development.
@@ -24,6 +25,7 @@ public class LocalDevMatchmakingService implements MatchmakingService {
     private final Queue<PlayerWithDeck> matchmakingQueue = new ConcurrentLinkedQueue<>();
     private final Object lock = new Object();
     private final MatchRepository matchRepository;
+    private final PlayerRankingRepository playerRankingRepository;
     
     // Track recently returned players to avoid immediate re-lock
     private final java.util.Map<String, Long> recentlyReturnedPlayers = new java.util.concurrent.ConcurrentHashMap<>();
@@ -32,8 +34,9 @@ public class LocalDevMatchmakingService implements MatchmakingService {
     /**
      * Public constructor for Spring's dependency injection.
      */
-    public LocalDevMatchmakingService(MatchRepository matchRepository) {
+    public LocalDevMatchmakingService(MatchRepository matchRepository, PlayerRankingRepository playerRankingRepository) {
         this.matchRepository = matchRepository;
+        this.playerRankingRepository = playerRankingRepository;
     }
 
     /**
@@ -104,12 +107,12 @@ public class LocalDevMatchmakingService implements MatchmakingService {
             }
 
             Player player1 = playerWithDeck1.getPlayer();
-            int player1Elo = player1.getPlayerRanking().getEloRating();
+            int player1Elo = playerRankingRepository.findById(player1.getId()).map(ranking -> ranking.getEloRating()).orElse(1200);
 
             // Iterate through the queue to find a suitable opponent
             for (PlayerWithDeck playerWithDeck2 : matchmakingQueue) {
                 Player player2 = playerWithDeck2.getPlayer();
-                int player2Elo = player2.getPlayerRanking().getEloRating();
+                int player2Elo = playerRankingRepository.findById(player2.getId()).map(ranking -> ranking.getEloRating()).orElse(1200);
 
                 if (Math.abs(player1Elo - player2Elo) <= MAX_ELO_DIFFERENCE) {
                     // Found a suitable match, remove player2 from the queue

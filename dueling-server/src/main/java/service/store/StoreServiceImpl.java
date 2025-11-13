@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import service.lock.LockService;
+import service.blockchain.BlockchainService;
 
 @Service
 @Transactional
@@ -19,11 +20,13 @@ public class StoreServiceImpl implements StoreService {
     private static final Logger logger = LoggerFactory.getLogger(StoreServiceImpl.class);
     private final CardPackFactory cardPackFactory;
     private final LockService lockService;
+    private final BlockchainService blockchainService;
 
     @Autowired
-    public StoreServiceImpl(CardPackFactory cardPackFactory, LockService lockService) {
+    public StoreServiceImpl(CardPackFactory cardPackFactory, LockService lockService, BlockchainService blockchainService) {
         this.cardPackFactory = cardPackFactory;
         this.lockService = lockService;
+        this.blockchainService = blockchainService;
     }
 
     @Override
@@ -76,6 +79,10 @@ public class StoreServiceImpl implements StoreService {
             
             logger.info("{} bought a {} for {} coins and got {} cards. Cards before: {}, after: {}", 
                        player.getNickname(), pack.getName(), pack.getCost(), newCards.size(), cardsBefore, cardsAfter);
+            
+            // Record purchase on blockchain asynchronously
+            blockchainService.recordPurchase(player, newCards, packType);
+            
             return PurchaseResult.success(newCards);
 
         } catch (Exception e) {

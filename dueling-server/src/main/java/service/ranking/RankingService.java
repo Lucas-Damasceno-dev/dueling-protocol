@@ -16,8 +16,8 @@ public class RankingService {
     }
 
     public void updateEloRatings(Player winner, Player loser) {
-        PlayerRanking winnerRanking = winner.getPlayerRanking();
-        PlayerRanking loserRanking = loser.getPlayerRanking();
+        PlayerRanking winnerRanking = playerRankingRepository.findById(winner.getId()).orElse(null);
+        PlayerRanking loserRanking = playerRankingRepository.findById(loser.getId()).orElse(null);
 
         if (winnerRanking == null) {
             winnerRanking = new PlayerRanking(winner);
