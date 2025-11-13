@@ -1,0 +1,64 @@
+package config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.http.HttpService;
+import org.web3j.tx.gas.DefaultGasProvider;
+import org.web3j.tx.gas.ContractGasProvider;
+
+@Configuration
+public class BlockchainConfig {
+
+    @Value("${blockchain.enabled:true}")
+    private boolean blockchainEnabled;
+
+    @Value("${blockchain.node.url:http://dueling-blockchain:8545}")
+    private String nodeUrl;
+
+    @Value("${blockchain.contracts.asset:0x5FbDB2315678afecb367f032d93F642f64180aa3}")
+    private String assetContractAddress;
+
+    @Value("${blockchain.contracts.store:0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512}")
+    private String storeContractAddress;
+
+    @Value("${blockchain.contracts.trade:0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9}")
+    private String tradeContractAddress;
+
+    @Value("${blockchain.contracts.match:0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9}")
+    private String matchContractAddress;
+
+    @Bean
+    public Web3j web3j() {
+        if (!blockchainEnabled) {
+            return null;
+        }
+        return Web3j.build(new HttpService(nodeUrl));
+    }
+
+    @Bean
+    public ContractGasProvider gasProvider() {
+        return new DefaultGasProvider();
+    }
+
+    public boolean isBlockchainEnabled() {
+        return blockchainEnabled;
+    }
+
+    public String getAssetContractAddress() {
+        return assetContractAddress;
+    }
+
+    public String getStoreContractAddress() {
+        return storeContractAddress;
+    }
+
+    public String getTradeContractAddress() {
+        return tradeContractAddress;
+    }
+
+    public String getMatchContractAddress() {
+        return matchContractAddress;
+    }
+}
