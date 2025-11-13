@@ -5,6 +5,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,17 +21,45 @@ public class PlayerStateManager implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final Logger logger = LoggerFactory.getLogger(PlayerStateManager.class);
 
-    private final GameFacade gameFacade;
+    @JsonIgnore
+    private transient GameFacade gameFacade;
     private final Player player1;
     private final Player player2;
-    private final List<Card> deckP1;
-    private final List<Card> deckP2;
-    private final List<Card> handP1;
-    private final List<Card> handP2;
+    private List<Card> deckP1;
+    private List<Card> deckP2;
+    private List<Card> handP1;
+    private List<Card> handP2;
     private int resourceP1;
     private int resourceP2;
     private int nextAttackBonusP1 = 0;
     private int nextAttackBonusP2 = 0;
+
+    @JsonCreator
+    public PlayerStateManager(
+            @JsonProperty("player1") Player player1,
+            @JsonProperty("player2") Player player2,
+            @JsonProperty("deckP1") List<Card> deckP1,
+            @JsonProperty("deckP2") List<Card> deckP2,
+            @JsonProperty("handP1") List<Card> handP1,
+            @JsonProperty("handP2") List<Card> handP2,
+            @JsonProperty("resourceP1") int resourceP1,
+            @JsonProperty("resourceP2") int resourceP2,
+            @JsonProperty("nextAttackBonusP1") int nextAttackBonusP1,
+            @JsonProperty("nextAttackBonusP2") int nextAttackBonusP2) {
+        this.player1 = player1;
+        this.player2 = player2;
+        this.deckP1 = deckP1 != null ? new ArrayList<>(deckP1) : new ArrayList<>();
+        this.deckP2 = deckP2 != null ? new ArrayList<>(deckP2) : new ArrayList<>();
+        this.handP1 = handP1 != null ? new ArrayList<>(handP1) : new ArrayList<>();
+        this.handP2 = handP2 != null ? new ArrayList<>(handP2) : new ArrayList<>();
+        this.resourceP1 = resourceP1;
+        this.resourceP2 = resourceP2;
+        this.nextAttackBonusP1 = nextAttackBonusP1;
+        this.nextAttackBonusP2 = nextAttackBonusP2;
+        
+        logger.info("[DESERIALIZATION] PlayerStateManager created. handP1 size: {}, handP2 size: {}, deckP1 size: {}, deckP2 size: {}", 
+            this.handP1.size(), this.handP2.size(), this.deckP1.size(), this.deckP2.size());
+    }
 
     public PlayerStateManager(Player p1, Player p2, List<Card> deckP1, List<Card> deckP2, GameFacade facade) {
         this.player1 = p1;
@@ -58,9 +89,11 @@ public class PlayerStateManager implements Serializable {
             drawnCards.add(newCard);
         }
 
-        if (!drawnCards.isEmpty()) {
-            gameFacade.notifyPlayer(player.getId(), "UPDATE:DRAW_CARDS:" + getCardIds(hand));
-            logger.debug("Player {} drew {} cards. {} cards remaining in deck.", player.getId(), drawnCards.size(), deck.size());
+        if (!drawnCards.isEmpty() && gameFacade != null) {
+            String handIds = getCardIds(hand);
+            gameFacade.notifyPlayer(player.getId(), "UPDATE:DRAW_CARDS:" + handIds);
+            logger.info("Player {} drew {} cards. Hand now contains: [{}]. {} cards remaining in deck.", 
+                player.getId(), drawnCards.size(), handIds, deck.size());
         }
     }
 
@@ -69,7 +102,7 @@ public class PlayerStateManager implements Serializable {
         if (resourceP1 < 10) { resourceP1++; updated = true; }
         if (resourceP2 < 10) { resourceP2++; updated = true; }
 
-        if (updated) {
+        if (updated && gameFacade != null) {
             String message = String.format("UPDATE:RESOURCE:%d:%d", resourceP1, resourceP2);
             gameFacade.notifyPlayers(java.util.Arrays.asList(player1.getId(), player2.getId()), message);
         }
@@ -97,8 +130,22 @@ public class PlayerStateManager implements Serializable {
     
     public Player getPlayer1() { return player1; }
     public Player getPlayer2() { return player2; }
+    
+    // Getters explícitos para serialização JSON
+    public List<Card> getDeckP1() { return deckP1; }
+    public List<Card> getDeckP2() { return deckP2; }
+    public List<Card> getHandP1() { return handP1; }
+    public List<Card> getHandP2() { return handP2; }
+    public int getResourceP1() { return resourceP1; }
+    public int getResourceP2() { return resourceP2; }
+    public int getNextAttackBonusP1() { return nextAttackBonusP1; }
+    public int getNextAttackBonusP2() { return nextAttackBonusP2; }
+    
     public List<Card> getHand(String playerId) {
-        return player1.getId().equals(playerId) ? handP1 : handP2;
+        List<Card> hand = player1.getId().equals(playerId) ? handP1 : handP2;
+        logger.debug("[GET_HAND] Player {}: hand size = {}, cards = {}", playerId, hand.size(), 
+            hand.stream().map(Card::getId).collect(Collectors.joining(",")));
+        return hand;
     }
     public int getResource(String playerId) {
         return player1.getId().equals(playerId) ? resourceP1 : resourceP2;
@@ -111,7 +158,14 @@ public class PlayerStateManager implements Serializable {
         }
     }
     public void removeCardFromHand(String playerId, Card card) {
-        getHand(playerId).remove(card);
+        List<Card> hand = getHand(playerId);
+        // Remove first occurrence by ID to handle deserialized cards correctly
+        for (int i = 0; i < hand.size(); i++) {
+            if (hand.get(i).getId().equals(card.getId())) {
+                hand.remove(i);
+                break;
+            }
+        }
     }
 
     private String getCardIds(List<Card> cards) {

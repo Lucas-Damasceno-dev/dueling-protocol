@@ -1,5 +1,8 @@
 package model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import controller.GameFacade;
 import model.service.CardEffectService;
 import model.service.PlayerStateManager;
@@ -21,8 +24,10 @@ public class GameSession implements Serializable {
     private static final Logger logger = LoggerFactory.getLogger(GameSession.class);
 
     private final String matchId;
-    private final transient GameFacade gameFacade;
-    private final transient CardRepository cardRepository;
+    @JsonIgnore
+    private transient GameFacade gameFacade;
+    @JsonIgnore
+    private transient CardRepository cardRepository;
     private boolean gameEnded = false;
 
     private final PlayerStateManager playerStateManager;
@@ -34,6 +39,30 @@ public class GameSession implements Serializable {
     private long responseWindowEndTime;
     private Card cardToCounter;
     private Player originalCaster;
+
+    @JsonCreator
+    public GameSession(
+            @JsonProperty("matchId") String matchId,
+            @JsonProperty("gameEnded") boolean gameEnded,
+            @JsonProperty("playerStateManager") PlayerStateManager playerStateManager,
+            @JsonProperty("turnManager") TurnManager turnManager,
+            @JsonProperty("cardEffectService") CardEffectService cardEffectService,
+            @JsonProperty("scenarioManager") ScenarioManager scenarioManager,
+            @JsonProperty("isResponseWindowActive") boolean isResponseWindowActive,
+            @JsonProperty("responseWindowEndTime") long responseWindowEndTime,
+            @JsonProperty("cardToCounter") Card cardToCounter,
+            @JsonProperty("originalCaster") Player originalCaster) {
+        this.matchId = matchId;
+        this.gameEnded = gameEnded;
+        this.playerStateManager = playerStateManager;
+        this.turnManager = turnManager;
+        this.cardEffectService = cardEffectService;
+        this.scenarioManager = scenarioManager;
+        this.isResponseWindowActive = isResponseWindowActive;
+        this.responseWindowEndTime = responseWindowEndTime;
+        this.cardToCounter = cardToCounter;
+        this.originalCaster = originalCaster;
+    }
 
     public GameSession(String matchId, Player p1, Player p2, List<Card> deckP1, List<Card> deckP2, GameFacade facade, CardRepository cardRepository) {
         this.matchId = matchId;
@@ -56,10 +85,14 @@ public class GameSession implements Serializable {
         String gameStartMsgP1 = String.format("UPDATE:GAME_START:%s:%s:%s:%s:%s:%s",
                 matchId, getPlayer2().getNickname(), resourceTypeP1.name(), resourceTypeP2.name(), resourceTypeP1.colorHex, resourceTypeP2.colorHex);
         gameFacade.notifyPlayer(getPlayer1().getId(), gameStartMsgP1);
+        gameFacade.notifyPlayer(getPlayer1().getId(), String.format("INFO:🎮 Partida iniciada contra %s!", 
+                getPlayer2().getNickname()));
 
         String gameStartMsgP2 = String.format("UPDATE:GAME_START:%s:%s:%s:%s:%s:%s",
                 matchId, getPlayer1().getNickname(), resourceTypeP2.name(), resourceTypeP1.name(), resourceTypeP2.colorHex, resourceTypeP1.colorHex);
         gameFacade.notifyPlayer(getPlayer2().getId(), gameStartMsgP2);
+        gameFacade.notifyPlayer(getPlayer2().getId(), String.format("INFO:🎮 Partida iniciada contra %s!", 
+                getPlayer1().getNickname()));
 
         playerStateManager.drawCards(getPlayer1(), 5);
         playerStateManager.drawCards(getPlayer2(), 5);
@@ -80,6 +113,15 @@ public class GameSession implements Serializable {
 
         String message = String.format("UPDATE:NEW_TURN:%s:%d", turnManager.getCurrentPlayerId(), turnManager.getTurnEndTime());
         gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), message);
+        
+        // Notify current player about opponent's HP
+        String currentPlayerId = turnManager.getCurrentPlayerId();
+        Player currentPlayer = getPlayer(currentPlayerId);
+        Player opponent = getOpponent(currentPlayerId);
+        
+        gameFacade.notifyPlayer(currentPlayerId, String.format("INFO:💊 Sua vida: %d HP | Vida do oponente: %d HP", 
+                currentPlayer.getHealthPoints(), opponent.getHealthPoints()));
+        
         logger.info("Match {}: Starting turn {} for player {}. Turn ends at {}.", matchId, turnManager.getTurn(), turnManager.getCurrentPlayerId(), turnManager.getTurnEndTime());
     }
 
@@ -119,10 +161,20 @@ public class GameSession implements Serializable {
 
         Player caster = getPlayer(playerId);
         List<Card> hand = playerStateManager.getHand(playerId);
-        Optional<Card> cardToPlayOpt = hand.stream().filter(c -> c.getId().equals(cardId)).findFirst();
+        logger.debug("Player {} attempting to play card '{}'. Hand contains: {}", 
+            playerId, cardId, hand.stream().map(Card::getId).collect(java.util.stream.Collectors.joining(", ")));
+        
+        // Find card by ID - handles duplicate card IDs in hand by taking first match
+        Optional<Card> cardToPlayOpt = hand.stream()
+            .filter(c -> c.getId().equals(cardId))
+            .findFirst();
 
         if (cardToPlayOpt.isEmpty()) {
-            if (!isAutoPlay) gameFacade.notifyPlayer(playerId, "ERROR:Card not in hand");
+            if (!isAutoPlay) {
+                logger.warn("Card '{}' not found in hand for player {}. Hand IDs: {}", 
+                    cardId, playerId, hand.stream().map(Card::getId).collect(java.util.stream.Collectors.joining(", ")));
+                gameFacade.notifyPlayer(playerId, "ERROR:Card not in hand");
+            }
             return;
         }
         Card card = cardToPlayOpt.get();
@@ -175,7 +227,11 @@ public class GameSession implements Serializable {
         turnManager.recordPlayedCard(counterCard);
 
         logger.info("{} countered {} with {}", counterPlayer.getNickname(), cardToCounter.getName(), counterCard.getName());
-        gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), "UPDATE:SPELL_COUNTERED:" + cardToCounter.getName());
+        gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), 
+                "UPDATE:SPELL_COUNTERED:" + cardToCounter.getName());
+        gameFacade.notifyPlayers(Arrays.asList(getPlayer1().getId(), getPlayer2().getId()), 
+                String.format("INFO:🛡️ %s contrariou '%s' com '%s'!", 
+                        counterPlayer.getNickname(), cardToCounter.getName(), counterCard.getName()));
 
         this.isResponseWindowActive = false;
         this.cardToCounter = null;
@@ -221,6 +277,10 @@ public class GameSession implements Serializable {
             p1.setHealthPoints(p1.getHealthPoints() - damage);
             p2.setHealthPoints(p2.getHealthPoints() - damage);
             logger.info("Scenario '{}' deals {} damage to both players.", scenarioManager.getActiveScenario().getName(), damage);
+            
+            gameFacade.notifyPlayers(Arrays.asList(p1.getId(), p2.getId()), 
+                    String.format("INFO:🌋 Cenário '%s' causou %d de dano a ambos jogadores!", 
+                            scenarioManager.getActiveScenario().getName(), damage));
             notifyHealthUpdate(p1);
             notifyHealthUpdate(p2);
         }
@@ -241,10 +301,28 @@ public class GameSession implements Serializable {
         if (getPlayer1().getHealthPoints() <= 0) {
             gameEnded = true;
             logger.info("Match {} finished. Winner: {}", matchId, getPlayer2().getId());
+            
+            // Notify winner
+            gameFacade.notifyPlayer(getPlayer2().getId(), String.format("INFO:🏆 VOCÊ VENCEU! %s foi derrotado! (+10 pontos)", 
+                    getPlayer1().getNickname()));
+            
+            // Notify loser
+            gameFacade.notifyPlayer(getPlayer1().getId(), String.format("INFO:💀 VOCÊ PERDEU! %s venceu a partida!", 
+                    getPlayer2().getNickname()));
+            
             gameFacade.finishGame(matchId, getPlayer2().getId(), getPlayer1().getId());
         } else if (getPlayer2().getHealthPoints() <= 0) {
             gameEnded = true;
             logger.info("Match {} finished. Winner: {}", matchId, getPlayer1().getId());
+            
+            // Notify winner
+            gameFacade.notifyPlayer(getPlayer1().getId(), String.format("INFO:🏆 VOCÊ VENCEU! %s foi derrotado! (+10 pontos)", 
+                    getPlayer2().getNickname()));
+            
+            // Notify loser
+            gameFacade.notifyPlayer(getPlayer2().getId(), String.format("INFO:💀 VOCÊ PERDEU! %s venceu a partida!", 
+                    getPlayer1().getNickname()));
+            
             gameFacade.finishGame(matchId, getPlayer1().getId(), getPlayer2().getId());
         }
     }
@@ -269,6 +347,10 @@ public class GameSession implements Serializable {
         return getPlayer1().getId().equals(playerId) ? getPlayer2() : getPlayer1();
     }
     
+    public controller.GameFacade getGameFacade() {
+        return gameFacade;
+    }
+    
     public Player getPlayer1() {
         return playerStateManager.getPlayer1();
     }
@@ -279,6 +361,24 @@ public class GameSession implements Serializable {
 
     public String getMatchId() {
         return matchId;
+    }
+
+    public void reinitializeTransientDependencies(GameFacade facade, CardRepository cardRepo) {
+        try {
+            java.lang.reflect.Field gameFacadeField = GameSession.class.getDeclaredField("gameFacade");
+            gameFacadeField.setAccessible(true);
+            gameFacadeField.set(this, facade);
+            
+            java.lang.reflect.Field cardRepositoryField = GameSession.class.getDeclaredField("cardRepository");
+            cardRepositoryField.setAccessible(true);
+            cardRepositoryField.set(this, cardRepo);
+            
+            java.lang.reflect.Field playerStateManagerField = PlayerStateManager.class.getDeclaredField("gameFacade");
+            playerStateManagerField.setAccessible(true);
+            playerStateManagerField.set(this.playerStateManager, facade);
+        } catch (Exception e) {
+            logger.error("Failed to reinitialize transient dependencies", e);
+        }
     }
 
     public boolean isGameEnded() {

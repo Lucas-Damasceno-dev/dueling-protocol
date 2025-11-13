@@ -1,5 +1,7 @@
 package model.service;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import model.Card;
 
 import java.io.Serializable;
@@ -7,6 +9,19 @@ public class ScenarioManager implements Serializable {
     private static final long serialVersionUID = 1L;
     private Card activeScenario = null;
     private int scenarioDuration = 0;
+
+    @JsonCreator
+    public ScenarioManager(
+            @JsonProperty("activeScenario") Card activeScenario,
+            @JsonProperty("scenarioDuration") int scenarioDuration) {
+        this.activeScenario = activeScenario;
+        this.scenarioDuration = scenarioDuration;
+    }
+
+    public ScenarioManager() {
+        this.activeScenario = null;
+        this.scenarioDuration = 0;
+    }
 
     public void setActiveScenario(Card card, int duration) {
         this.activeScenario = card;
