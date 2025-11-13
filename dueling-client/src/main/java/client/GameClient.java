@@ -117,6 +117,7 @@ public final class GameClient {
         pingUpdateThread = new Thread(() -> {
             try (DatagramSocket datagramSocket = new DatagramSocket()) {
                 datagramSocket.setSoTimeout(1000);
+                long lastWebSocketPing = System.currentTimeMillis();
 
                 while (!Thread.currentThread().isInterrupted() && webSocketClient != null && webSocketClient.isOpen()) {
                     try {
@@ -135,6 +136,17 @@ public final class GameClient {
 
                     } catch (IOException e) {
                         lastPingTime = -1;
+                    }
+                    
+                    // Send WebSocket PING every 15 seconds to keep connection alive during match
+                    long now = System.currentTimeMillis();
+                    if (now - lastWebSocketPing > 15000 && webSocketClient != null && webSocketClient.isOpen()) {
+                        try {
+                            webSocketClient.send("PING");
+                            lastWebSocketPing = now;
+                        } catch (Exception e) {
+                            // Ignore ping send errors
+                        }
                     }
                     
                     long sleepTime = pingModeActive ? 200 : 5000;
@@ -361,7 +373,8 @@ public final class GameClient {
         System.out.println("6. Play card (during match)");
         System.out.println("7. Upgrade attributes");
         System.out.println("8. Trade cards with another player");
-        System.out.println("9. Exit");
+        System.out.println("9. 🔗 Blockchain Verification");
+        System.out.println("0. Exit");
         if (lastPingTime >= 0 && !pingModeActive) {
             // Only show ping in main menu if not in ping mode
             if (lastPingTime < 1000) {
@@ -444,12 +457,13 @@ public final class GameClient {
                         break;
                     case "7": upgradeAttributes(scanner); break;
                     case "8": tradeCards(scanner); break;
-                    case "9":
+                    case "9": blockchainMenu(scanner); break;
+                    case "0":
                         System.out.println("Exiting...");
                         isExiting = true;
                         break;
                     default:
-                        System.out.println("Invalid option! Please choose a number from 1-9.");
+                        System.out.println("Invalid option! Please choose a number from 0-9.");
                         break;
                 }
             }
@@ -585,12 +599,12 @@ public final class GameClient {
         
         System.out.println("Entering matchmaking queue...");
         String message = (selectedDeckId != null) ? "MATCHMAKING:ENTER:" + selectedDeckId : "MATCHMAKING:ENTER";
-        webSocketClient.send(message);
+        safeSend(message);
     }
 
     private static void buyCardPack(Scanner scanner) {
-        if (webSocketClient == null || !webSocketClient.isOpen()) {
-            System.out.println("[ERROR] ✗ WebSocket connection is not active. Please reconnect.");
+        if (!characterSet) {
+            System.out.println("You need to set up your character first!");
             return;
         }
         
@@ -613,11 +627,8 @@ public final class GameClient {
         }
         
         String command = "STORE:BUY:" + packType;
-        try {
-            webSocketClient.send(command);
+        if (safeSend(command)) {
             System.out.println("Purchase command sent. Waiting for server response...");
-        } catch (Exception e) {
-            System.out.println("✗ Failed to send command: " + e.getMessage());
         }
     }
 
@@ -634,7 +645,9 @@ public final class GameClient {
             return;
         }
         
-        webSocketClient.send("PLAY_CARD:" + currentMatchId + ":" + cardId);
+        if (!safeSend("PLAY_CARD:" + currentMatchId + ":" + cardId)) {
+            System.out.println("Please try reconnecting or restart the client.");
+        }
     }
 
     private static void upgradeAttributes(Scanner scanner) {
@@ -795,6 +808,106 @@ public final class GameClient {
         }
 
         System.out.print("\r" + " ".repeat(40) + "\r");
+    }
+
+    
+    private static void blockchainMenu(Scanner scanner) {
+        System.out.println();
+        System.out.println("--- 🔗 BLOCKCHAIN VERIFICATION MENU ---");
+        System.out.println("1. Verify Card Ownership");
+        System.out.println("2. View Purchase History");
+        System.out.println("3. View Match Results");
+        System.out.println("4. Complete Verification (All 3)");
+        System.out.println("5. Verify Specific Card by Token ID");
+        System.out.println("6. Open Etherscan (View on Browser)");
+        System.out.println("0. Back to Main Menu");
+        System.out.print("Choose an option: > ");
+        
+        String choice = scanner.nextLine().trim();
+        
+        System.out.println("\n⚠️  Blockchain verification requires the blockchain node to be running.");
+        System.out.println("Instructions:");
+        System.out.println("1. Open a new terminal");
+        System.out.println("2. Navigate to the project root");
+        System.out.println("3. Run: ./menu.sh");
+        System.out.println("4. Select option 39 to start the blockchain node");
+        System.out.println("5. Keep that terminal open");
+        System.out.println("6. Return here and try again\n");
+        
+        switch (choice) {
+            case "1":
+                System.out.println("\n📋 To verify your card ownership:");
+                System.out.println("Open a new terminal and run:");
+                System.out.println("  cd dueling-blockchain");
+                System.out.println("  PLAYER_ADDRESS=0xYourAddress npm run verify:ownership");
+                System.out.println("\nOr use menu.sh option 42");
+                break;
+            case "2":
+                System.out.println("\n📦 To view your purchase history:");
+                System.out.println("Open a new terminal and run:");
+                System.out.println("  cd dueling-blockchain");
+                System.out.println("  PLAYER_ADDRESS=0xYourAddress npm run verify:purchases");
+                System.out.println("\nOr use menu.sh option 44");
+                break;
+            case "3":
+                System.out.println("\n⚔️  To view your match results:");
+                System.out.println("Open a new terminal and run:");
+                System.out.println("  cd dueling-blockchain");
+                System.out.println("  PLAYER_ADDRESS=0xYourAddress npm run verify:matches");
+                System.out.println("\nOr use menu.sh option 45");
+                break;
+            case "4":
+                System.out.println("\n🔍 To run complete verification:");
+                System.out.println("Open a new terminal and run:");
+                System.out.println("  ./scripts/blockchain-verify.sh");
+                System.out.println("\nOr use menu.sh option 46");
+                break;
+            case "5":
+                System.out.print("\nEnter Token ID: > ");
+                String tokenId = scanner.nextLine().trim();
+                if (!tokenId.isEmpty()) {
+                    System.out.println("\n🔍 To verify card #" + tokenId + ":");
+                    System.out.println("Open a new terminal and run:");
+                    System.out.println("  cd dueling-blockchain");
+                    System.out.println("  TOKEN_ID=" + tokenId + " npm run verify:card");
+                    System.out.println("\nOr use menu.sh option 43");
+                } else {
+                    System.out.println("Token ID cannot be empty!");
+                }
+                break;
+            case "6":
+                System.out.println("\n🌐 View on Etherscan:");
+                System.out.println("Sepolia Testnet: https://sepolia.etherscan.io/");
+                System.out.println("Enter your Ethereum address in the search bar");
+                System.out.println("Click 'ERC-721 Token Txns' to see your NFT cards");
+                break;
+            case "0":
+                return;
+            default:
+                System.out.println("Invalid option!");
+                break;
+        }
+        
+        System.out.println("\nPress Enter to continue...");
+        scanner.nextLine();
+    }
+    
+    /**
+     * Safely sends a message through WebSocket with connection check
+     */
+    private static boolean safeSend(String message) {
+        if (webSocketClient == null || !webSocketClient.isOpen()) {
+            System.out.println("❌ Connection lost!");
+            return false;
+        }
+        
+        try {
+            webSocketClient.send(message);
+            return true;
+        } catch (org.java_websocket.exceptions.WebsocketNotConnectedException e) {
+            System.out.println("❌ Failed to send message - connection lost!");
+            return false;
+        }
     }
 
     private static void processServerMessage(String message) {

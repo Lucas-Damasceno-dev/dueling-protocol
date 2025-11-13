@@ -53,11 +53,11 @@ public class CardRepository {
     }
 
     private void initializeCardDefinitions() {
-        allCards.put("basic-0", new Card("basic-0", "Basic Card 0", 1, 1, "Common", CardType.ATTACK, "Basic attack", 1));
-        allCards.put("basic-1", new Card("basic-1", "Basic Card 1", 1, 1, "Common", CardType.ATTACK, "Basic attack", 1));
-        allCards.put("basic-2", new Card("basic-2", "Basic Card 2", 1, 1, "Common", CardType.ATTACK, "Basic attack", 1));
-        allCards.put("basic-3", new Card("basic-3", "Basic Card 3", 1, 1, "Common", CardType.ATTACK, "Basic attack", 1));
-        allCards.put("basic-4", new Card("basic-4", "Basic Card 4", 1, 1, "Common", CardType.ATTACK, "Basic attack", 1));
+        allCards.put("basic-0", new Card("basic-0", "Basic Card 0", 50, 1, "Common", CardType.ATTACK, "Basic attack", 1));
+        allCards.put("basic-1", new Card("basic-1", "Basic Card 1", 50, 1, "Common", CardType.ATTACK, "Basic attack", 1));
+        allCards.put("basic-2", new Card("basic-2", "Basic Card 2", 50, 1, "Common", CardType.ATTACK, "Basic attack", 1));
+        allCards.put("basic-3", new Card("basic-3", "Basic Card 3", 50, 1, "Common", CardType.ATTACK, "Basic attack", 1));
+        allCards.put("basic-4", new Card("basic-4", "Basic Card 4", 50, 1, "Common", CardType.ATTACK, "Basic attack", 1));
         allCards.put("rare-0", new Card("rare-0", "Rare Card 0", 3, 3, "Rare", CardType.MAGIC, "Powerful magic", 2));
         allCards.put("rare-1", new Card("rare-1", "Rare Card 1", 3, 3, "Rare", CardType.MAGIC, "Powerful magic", 2));
         allCards.put("rare-2", new Card("rare-2", "Rare Card 2", 3, 3, "Rare", CardType.MAGIC, "Powerful magic", 2));
