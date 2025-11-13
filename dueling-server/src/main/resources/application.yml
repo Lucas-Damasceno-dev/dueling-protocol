@@ -35,6 +35,16 @@ jwt:
   secret: ${JWT_SECRET:mySecretKeyForDuelingProtocolThatShouldBeLongerThan256Bits}
   expiration: ${JWT_EXPIRATION:86400000}
 
+blockchain:
+  enabled: ${BLOCKCHAIN_ENABLED:true}
+  node:
+    url: ${BLOCKCHAIN_NODE_URL:http://dueling-blockchain:8545}
+  contracts:
+    asset: ${ASSET_CONTRACT:0x5FC8d32690cc91D4c39d9d3abcBD16989F875707}
+    store: ${STORE_CONTRACT:0x0165878A594ca255338adfa4d48449f69242Eb8F}
+    trade: ${TRADE_CONTRACT:0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6}
+    match: ${MATCH_CONTRACT:0x8A791620dd6260079BF849Dc5567aDC3F2FdC318}
+
 management:
   endpoints:
     web:

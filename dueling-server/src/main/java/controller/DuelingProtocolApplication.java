@@ -9,6 +9,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.core.env.Environment;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.EnableAsync;
 import ping.PingServer;
 import security.JwtProperties;
 
@@ -18,6 +19,7 @@ import security.JwtProperties;
 @EntityScan(basePackages = {"model"})
 @EnableJpaRepositories(basePackages = {"repository"})
 @EnableScheduling
+@EnableAsync
 public class DuelingProtocolApplication {
 
     public static void main(String[] args) {

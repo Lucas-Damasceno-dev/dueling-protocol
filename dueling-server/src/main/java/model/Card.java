@@ -41,6 +41,9 @@ public class Card implements Serializable {
     @Column(name = "parameter_value")
     private Map<String, String> effectParameters;
 
+    @Column(name = "blockchain_token_id")
+    private Long blockchainTokenId;
+
     public enum CardType {
         ATTACK,
         DEFENSE,
@@ -92,6 +95,14 @@ public class Card implements Serializable {
 
     public void setEffectParameters(Map<String, String> effectParameters) {
         this.effectParameters = effectParameters;
+    }
+
+    public Long getBlockchainTokenId() {
+        return blockchainTokenId;
+    }
+
+    public void setBlockchainTokenId(Long blockchainTokenId) {
+        this.blockchainTokenId = blockchainTokenId;
     }
 
     @Override

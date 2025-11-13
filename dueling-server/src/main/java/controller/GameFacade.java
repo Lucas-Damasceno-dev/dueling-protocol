@@ -28,6 +28,7 @@ import service.matchmaking.MatchmakingService;
 import service.store.PurchaseResult;
 import service.store.StoreService;
 import service.trade.TradeService;
+import service.blockchain.BlockchainService;
 
 import service.ranking.RankingService;
 import service.achievement.AchievementService;
@@ -69,6 +70,7 @@ public class GameFacade {
 
     private final ChatGroupService chatGroupService;
     private final service.lock.LockService lockService;
+    private final BlockchainService blockchainService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -84,7 +86,8 @@ public class GameFacade {
                       RedissonClient redissonClient, RankingService rankingService, AchievementService achievementService,
                       ChatGroupService chatGroupService, InGameChatService inGameChatService, EmoteService emoteService,
                       service.lock.LockService lockService, WebSocketSessionManager sessionManager,
-                      TransactionTemplate transactionTemplate, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+                      TransactionTemplate transactionTemplate, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
+                      BlockchainService blockchainService) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
@@ -107,6 +110,7 @@ public class GameFacade {
         this.sessionManager = sessionManager;
         this.transactionTemplate = transactionTemplate;
         this.jdbcTemplate = jdbcTemplate;
+        this.blockchainService = blockchainService;
     }
 
     private String getSelfUrl() {
@@ -133,6 +137,7 @@ public class GameFacade {
             Optional<GameSession> sessionOpt = gameSessionRepository.findById(matchId);
             if (sessionOpt.isPresent()) {
                 GameSession session = sessionOpt.get();
+                session.reinitializeTransientDependencies(this, cardRepository);
                 if (session.getPlayer1().getId().equals(playerId) || session.getPlayer2().getId().equals(playerId)) {
                     String opponentId = session.getPlayer1().getId().equals(playerId) ?
                             session.getPlayer2().getId() : session.getPlayer1().getId();
@@ -289,17 +294,19 @@ public class GameFacade {
         Player p2 = match.getPlayer2();
 
         String matchId = UUID.randomUUID().toString();
-        List<Card> deckP1 = new ArrayList<>(p1.getCardCollection());
-        List<Card> deckP2 = new ArrayList<>(p2.getCardCollection());
+        List<Card> deckP1 = resolveCardsFromRepository(new ArrayList<>(p1.getCardCollection()));
+        List<Card> deckP2 = resolveCardsFromRepository(new ArrayList<>(p2.getCardCollection()));
 
         GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this, cardRepository);
-        gameSessionRepository.save(session);
 
         // Update player match status
         sessionManager.setPlayerInMatch(p1.getId(), true);
         sessionManager.setPlayerInMatch(p2.getId(), true);
 
         session.startGame();
+        
+        // Save session AFTER startGame so cards are distributed
+        gameSessionRepository.save(session);
 
         logger.info("New match created between {} and {} with ID {}", p1.getId(), p2.getId(), matchId);
     }
@@ -316,25 +323,27 @@ public class GameFacade {
         if (deckP1 == null) {
             deckP1 = getDefaultDeckCards(p1.getId());
             if (deckP1 == null) {
-                deckP1 = new ArrayList<>(p1.getCardCollection());
+                deckP1 = resolveCardsFromRepository(new ArrayList<>(p1.getCardCollection()));
             }
         }
 
         if (deckP2 == null) {
             deckP2 = getDefaultDeckCards(p2.getId());
             if (deckP2 == null) {
-                deckP2 = new ArrayList<>(p2.getCardCollection());
+                deckP2 = resolveCardsFromRepository(new ArrayList<>(p2.getCardCollection()));
             }
         }
 
         GameSession session = new GameSession(matchId, p1, p2, deckP1, deckP2, this, cardRepository);
-        gameSessionRepository.save(session);
 
         // Update player match status
         sessionManager.setPlayerInMatch(p1.getId(), true);
         sessionManager.setPlayerInMatch(p2.getId(), true);
 
         session.startGame();
+        
+        // Save session AFTER startGame so cards are distributed
+        gameSessionRepository.save(session);
 
         logger.info("New match created between {} and {} with ID {} using decks {} and {}",
                 p1.getId(), p2.getId(), matchId, deckId1, deckId2);
@@ -343,7 +352,7 @@ public class GameFacade {
     private List<Card> getDeckCards(String playerId, String deckId) {
         Optional<model.Deck> deckOpt = deckService.getDeckForPlayer(deckId, playerId);
         if (deckOpt.isPresent()) {
-            return deckOpt.get().getCards();
+            return resolveCardsFromRepository(deckOpt.get().getCards());
         }
         return null;
     }
@@ -351,9 +360,28 @@ public class GameFacade {
     private List<Card> getDefaultDeckCards(String playerId) {
         Optional<model.Deck> deckOpt = deckService.getDefaultDeck(playerId);
         if (deckOpt.isPresent()) {
-            return deckOpt.get().getCards();
+            return resolveCardsFromRepository(deckOpt.get().getCards());
         }
         return null;
+    }
+
+    /**
+     * Resolves cards from the deck by looking them up in the CardRepository.
+     * This ensures we use the in-memory Card instances instead of JPA entities/proxies,
+     * which prevents serialization issues with Redis.
+     */
+    private List<Card> resolveCardsFromRepository(List<Card> deckCards) {
+        List<Card> resolvedCards = new ArrayList<>();
+        for (Card deckCard : deckCards) {
+            Optional<Card> repoCard = cardRepository.findById(deckCard.getId());
+            if (repoCard.isPresent()) {
+                resolvedCards.add(repoCard.get());
+            } else {
+                logger.warn("Card with ID {} not found in repository, using deck card instance", deckCard.getId());
+                resolvedCards.add(deckCard);
+            }
+        }
+        return resolvedCards;
     }
 
     public void notifyPlayer(String playerId, String message) {
@@ -452,6 +480,7 @@ public class GameFacade {
                 Optional<GameSession> sessionOpt = gameSessionRepository.findById(matchId);
                 if (sessionOpt.isPresent()) {
                     GameSession session = sessionOpt.get();
+                    session.reinitializeTransientDependencies(this, cardRepository);
                     session.playCard(playerId, cardId);
                     gameSessionRepository.save(session);
                 } else {
@@ -638,13 +667,21 @@ public class GameFacade {
         }
         gameSessionRepository.deleteById(matchId);
 
+        Player winner = null;
+        Player loser = null;
+        
         Optional<Player> winnerOpt = playerRepository.findById(winnerId);
         if (winnerOpt.isPresent()) {
-            Player winner = winnerOpt.get();
+            winner = winnerOpt.get();
             int pointsEarned = 10;
             winner.setUpgradePoints(winner.getUpgradePoints() + pointsEarned);
             playerRepository.update(winner);
             logger.info("Match {} finished. {} won {} points!", matchId, winner.getNickname(), pointsEarned);
+        }
+        
+        Optional<Player> loserOpt = playerRepository.findById(loserId);
+        if (loserOpt.isPresent()) {
+            loser = loserOpt.get();
         }
 
         // Update player match status
@@ -653,6 +690,11 @@ public class GameFacade {
 
         notifyPlayer(winnerId, "UPDATE:GAME_OVER:VICTORY");
         notifyPlayer(loserId, "UPDATE:GAME_OVER:DEFEAT");
+        
+        // Record match on blockchain asynchronously
+        logger.info("🔗 Calling blockchainService.recordMatch() - matchId: {}, winner: {}, loser: {}", 
+            matchId, winner != null ? winner.getNickname() : "null", loser != null ? loser.getNickname() : "null");
+        blockchainService.recordMatch(matchId, winner, loser);
 
         logger.info("Match {} finished. Winner: {}, Loser: {}", matchId, winnerId, loserId);
     }
@@ -781,6 +823,15 @@ public class GameFacade {
             logger.info("[TRADE-EXEC] P1 notified");
             notifyPlayer(p2.getId(), "UPDATE:TRADE_COMPLETE:SUCCESS");
             logger.info("[TRADE-EXEC] P2 notified");
+
+            // Record trade on blockchain asynchronously
+            List<Card> p1OfferedCards = p1.getCardCollection().stream()
+                .filter(c -> proposal.getOfferedCardIds().contains(c.getId()))
+                .collect(Collectors.toList());
+            List<Card> p2RequestedCards = p2.getCardCollection().stream()
+                .filter(c -> proposal.getRequestedCardIds().contains(c.getId()))
+                .collect(Collectors.toList());
+            blockchainService.recordTrade(p1, p1OfferedCards, p2, p2RequestedCards, tradeId);
 
             logger.info("[TRADE-EXEC] === Trade execution completed successfully ===");
             return true;
@@ -965,6 +1016,7 @@ public class GameFacade {
             Optional<GameSession> sessionOpt = gameSessionRepository.findById(matchId);
             if (sessionOpt.isPresent()) {
                 GameSession session = sessionOpt.get();
+                session.reinitializeTransientDependencies(this, cardRepository);
                 session.forceEndTurn();
                 session.resolveResponseWindow();
                 gameSessionRepository.save(session);
