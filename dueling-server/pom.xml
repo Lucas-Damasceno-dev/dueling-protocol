@@ -137,6 +137,13 @@
             <artifactId>javalin</artifactId>
             <version>${javalin.version}</version>
         </dependency>
+
+        <!-- Web3j for Ethereum/Blockchain integration -->
+        <dependency>
+            <groupId>org.web3j</groupId>
+            <artifactId>core</artifactId>
+            <version>4.10.3</version>
+        </dependency>
         
         
         
@@ -160,6 +167,12 @@
             <artifactId>httpclient5</artifactId>
             <version>5.2.1</version>
             <scope>test</scope>
+        </dependency>
+
+        <!-- Jackson Hibernate6 module for proper JPA entity serialization -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-hibernate6</artifactId>
         </dependency>
 
         <!-- Testcontainers dependencies -->
