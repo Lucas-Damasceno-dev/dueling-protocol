@@ -34,11 +34,17 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     command: >
-      java 
-      -jar app.jar 
+      sh -c "
+      echo 'Waiting for blockchain deployment...';
+      while [ ! -f /shared/deployment-info.json ]; do sleep 2; done;
+      echo 'Blockchain ready, starting server...';
+      java -jar app.jar 
       --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
+      "
     container_name: server-1
+    volumes:
+      - shared-blockchain:/shared:ro
     ports:
       - "8081:8080"
       - "7778:7778/udp"
@@ -53,10 +59,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-dueling_db}
       POSTGRES_USER: ${POSTGRES_USER:-user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      BLOCKCHAIN_NODE_URL: "http://dueling-blockchain:8545"
+      BLOCKCHAIN_DEPLOYMENT_FILE: "/shared/deployment-info.json"
     depends_on:
       - postgres
       - redis-master
       - redis-sentinel-1
+      - dueling-blockchain
     networks:
       - dueling-network
     healthcheck:
@@ -64,18 +73,24 @@ services:
         interval: 10s
         timeout: 5s
         retries: 5
-        start_period: 30s
+        start_period: 40s
 
   server-2:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     command: >
-      java 
-      -jar app.jar 
+      sh -c "
+      echo 'Waiting for blockchain deployment...';
+      while [ ! -f /shared/deployment-info.json ]; do sleep 2; done;
+      echo 'Blockchain ready, starting server...';
+      java -jar app.jar 
       --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
+      "
     container_name: server-2
+    volumes:
+      - shared-blockchain:/shared:ro
     ports:
       - "8082:8080"
     environment:
@@ -89,10 +104,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-dueling_db}
       POSTGRES_USER: ${POSTGRES_USER:-user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      BLOCKCHAIN_NODE_URL: "http://dueling-blockchain:8545"
+      BLOCKCHAIN_DEPLOYMENT_FILE: "/shared/deployment-info.json"
     depends_on:
       - postgres
       - redis-master
       - redis-sentinel-1
+      - dueling-blockchain
     networks:
       - dueling-network
     healthcheck:
@@ -100,18 +118,24 @@ services:
         interval: 10s
         timeout: 5s
         retries: 5
-        start_period: 30s
+        start_period: 40s
 
   server-3:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     command: >
-      java 
-      -jar app.jar 
+      sh -c "
+      echo 'Waiting for blockchain deployment...';
+      while [ ! -f /shared/deployment-info.json ]; do sleep 2; done;
+      echo 'Blockchain ready, starting server...';
+      java -jar app.jar 
       --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
+      "
     container_name: server-3
+    volumes:
+      - shared-blockchain:/shared:ro
     ports:
       - "8083:8080"
     environment:
@@ -125,10 +149,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-dueling_db}
       POSTGRES_USER: ${POSTGRES_USER:-user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      BLOCKCHAIN_NODE_URL: "http://dueling-blockchain:8545"
+      BLOCKCHAIN_DEPLOYMENT_FILE: "/shared/deployment-info.json"
     depends_on:
       - postgres
       - redis-master
       - redis-sentinel-1
+      - dueling-blockchain
     networks:
       - dueling-network
     healthcheck:
@@ -136,18 +163,24 @@ services:
         interval: 10s
         timeout: 5s
         retries: 5
-        start_period: 30s
+        start_period: 40s
   
   server-4:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     command: >
-      java 
-      -jar app.jar 
+      sh -c "
+      echo 'Waiting for blockchain deployment...';
+      while [ ! -f /shared/deployment-info.json ]; do sleep 2; done;
+      echo 'Blockchain ready, starting server...';
+      java -jar app.jar 
       --spring.application.name=GAME-SERVER
       --spring.profiles.active=server,distributed,distributed-db
+      "
     container_name: server-4
+    volumes:
+      - shared-blockchain:/shared:ro
     ports:
       - "8084:8080"
     environment:
@@ -161,10 +194,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-dueling_db}
       POSTGRES_USER: ${POSTGRES_USER:-user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      BLOCKCHAIN_NODE_URL: "http://dueling-blockchain:8545"
+      BLOCKCHAIN_DEPLOYMENT_FILE: "/shared/deployment-info.json"
     depends_on:
       - postgres
       - redis-master
       - redis-sentinel-1
+      - dueling-blockchain
     networks:
       - dueling-network
     healthcheck:
@@ -172,7 +208,7 @@ services:
         interval: 10s
         timeout: 5s
         retries: 5
-        start_period: 30s
+        start_period: 40s
 
   client-1:
     build:
@@ -380,6 +416,27 @@ services:
     depends_on:
       - prometheus
 
+  dueling-blockchain:
+    build:
+      context: ../dueling-blockchain
+      dockerfile: Dockerfile
+    container_name: dueling-blockchain
+    ports:
+      - "8545:8545"
+    volumes:
+      - blockchain-data:/usr/src/app/cache
+      - blockchain-deployments:/usr/src/app/deployments
+      - shared-blockchain:/usr/src/app/shared
+    command: sh -c "if [ ! -f /usr/src/app/deployments/.deployed ]; then npx hardhat node --hostname 0.0.0.0 & sleep 10 && npx hardhat run scripts/deploy.js --network localhost && cp deployment-info.json shared/ && touch /usr/src/app/deployments/.deployed && wait; else npx hardhat node --hostname 0.0.0.0 & sleep 5 && cp /usr/src/app/deployments/deployment-info.json shared/ 2>/dev/null || true && wait; fi"
+    networks:
+      - dueling-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8545"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
 volumes:
   postgres_data:
   grafana_data:
@@ -388,6 +445,9 @@ volumes:
   redis-sentinel-1-data:
   redis-sentinel-2-data:
   redis-sentinel-3-data:
+  blockchain-data:
+  blockchain-deployments:
+  shared-blockchain:
   redis-sentinel-config:
 
 networks:
