@@ -198,10 +198,10 @@ public class BlockchainService {
                 return;
             }
             
-            logger.info("   Player1 trading {} cards (tokenIds: {})", tokenIds1.size(), tokenIds1);
-            logger.info("   Player2 trading {} cards (tokenIds: {})", tokenIds2.size(), tokenIds2);
+            logger.info("   Player1 ({}) trading {} cards (tokenIds: {})", player1.getNickname(), tokenIds1.size(), tokenIds1);
+            logger.info("   Player2 ({}) trading {} cards (tokenIds: {})", player2.getNickname(), tokenIds2.size(), tokenIds2);
             
-            // Transfer each card using the AssetContract's safeTransferFrom
+            // Transfer cards on blockchain to match application state
             // Transfer player1's cards to player2
             for (BigInteger tokenId : tokenIds1) {
                 transferCard(addr1, addr2, tokenId);
@@ -212,7 +212,7 @@ public class BlockchainService {
                 transferCard(addr2, addr1, tokenId);
             }
             
-            logger.info("✅ Trade {} recorded on blockchain", tradeId);
+            logger.info("✅ Trade {} recorded on blockchain - {} cards transferred", tradeId, tokenIds1.size() + tokenIds2.size());
         } catch (Exception e) {
             logger.error("❌ Failed to record trade on blockchain: {}", e.getMessage(), e);
         }

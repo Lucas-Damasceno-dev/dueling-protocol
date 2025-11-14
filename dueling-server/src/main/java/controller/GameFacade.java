@@ -808,6 +808,9 @@ public class GameFacade {
                     logger.info("[TRADE-EXEC] P1 saved");
                     playerRepository.save(p2);
                     logger.info("[TRADE-EXEC] P2 saved");
+                    
+                    // Record trade on blockchain asynchronously (before releasing synchronized blocks)
+                    blockchainService.recordTrade(p1, p1OfferedCards, p2, p2RequestedCards, tradeId);
                 }
             }
 
@@ -823,15 +826,6 @@ public class GameFacade {
             logger.info("[TRADE-EXEC] P1 notified");
             notifyPlayer(p2.getId(), "UPDATE:TRADE_COMPLETE:SUCCESS");
             logger.info("[TRADE-EXEC] P2 notified");
-
-            // Record trade on blockchain asynchronously
-            List<Card> p1OfferedCards = p1.getCardCollection().stream()
-                .filter(c -> proposal.getOfferedCardIds().contains(c.getId()))
-                .collect(Collectors.toList());
-            List<Card> p2RequestedCards = p2.getCardCollection().stream()
-                .filter(c -> proposal.getRequestedCardIds().contains(c.getId()))
-                .collect(Collectors.toList());
-            blockchainService.recordTrade(p1, p1OfferedCards, p2, p2RequestedCards, tradeId);
 
             logger.info("[TRADE-EXEC] === Trade execution completed successfully ===");
             return true;
