@@ -430,7 +430,8 @@ public class GameFacade {
                 playerRepository.save(newPlayer);
                 // Refresh the player object for use in subsequent operations
                 player = newPlayer;
-                logger.debug("Character created for player {}, sending response: SUCCESS:Character created. Player ID: {}", playerId, playerId);
+                
+                logger.debug("Character created for player {} (starting with no cards), sending response: SUCCESS:Character created. Player ID: {}", playerId, playerId);
                 notifyPlayer(playerId, "SUCCESS:Character created. Player ID: " + playerId);
                 logger.debug("Response sent to player {}", playerId);
                 break;
@@ -585,7 +586,7 @@ public class GameFacade {
                     StringBuilder cardList = new StringBuilder("INFO:YOUR_CARDS:");
                     for (int i = 0; i < playerCards.size(); i++) {
                         Card card = playerCards.get(i);
-                        cardList.append(card.getId()).append("(").append(card.getName()).append(")");
+                        cardList.append(card.getName()).append(" (").append(card.getId()).append(")");
                         if (i < playerCards.size() - 1) {
                             cardList.append(";");
                         }
@@ -810,7 +811,26 @@ public class GameFacade {
                     logger.info("[TRADE-EXEC] P2 saved");
                     
                     // Record trade on blockchain asynchronously (before releasing synchronized blocks)
-                    blockchainService.recordTrade(p1, p1OfferedCards, p2, p2RequestedCards, tradeId);
+                    java.util.concurrent.CompletableFuture<service.blockchain.BlockchainService.TradeBlockchainStatus> blockchainFuture = 
+                        blockchainService.recordTrade(p1, p1OfferedCards, p2, p2RequestedCards, tradeId);
+                    
+                    // Handle blockchain result asynchronously
+                    blockchainFuture.thenAccept(status -> {
+                        if (!status.success && !status.partialSuccess) {
+                            logger.warn("[TRADE-BLOCKCHAIN] Trade {} failed on blockchain: {}", tradeId, status.message);
+                            notifyPlayer(p1.getId(), "UPDATE:TRADE_BLOCKCHAIN_WARNING:" + status.message);
+                            notifyPlayer(p2.getId(), "UPDATE:TRADE_BLOCKCHAIN_WARNING:" + status.message);
+                        } else if (status.partialSuccess) {
+                            logger.warn("[TRADE-BLOCKCHAIN] Trade {} partially recorded on blockchain: {}", tradeId, status.message);
+                            notifyPlayer(p1.getId(), "UPDATE:TRADE_BLOCKCHAIN_PARTIAL:" + status.message);
+                            notifyPlayer(p2.getId(), "UPDATE:TRADE_BLOCKCHAIN_PARTIAL:" + status.message);
+                        } else {
+                            logger.info("[TRADE-BLOCKCHAIN] Trade {} fully recorded on blockchain", tradeId);
+                        }
+                    }).exceptionally(ex -> {
+                        logger.error("[TRADE-BLOCKCHAIN] Exception processing blockchain status for trade {}: {}", tradeId, ex.getMessage());
+                        return null;
+                    });
                 }
             }
 

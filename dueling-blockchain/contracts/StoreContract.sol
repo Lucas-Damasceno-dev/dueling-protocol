@@ -57,8 +57,12 @@ contract StoreContract is ReentrancyGuard, Ownable {
             (string memory cardType, uint8 rarity, uint16 attack, uint16 defense) = 
                 _generateCard(packType, i, purchaseId);
             
+            // Generate unique card name based on purchase and index
+            string memory cardName = string(abi.encodePacked("card-", _uint2str(purchaseId), "-", _uint2str(i)));
+            
             uint256 tokenId = assetContract.mintCard(
                 msg.sender,
+                cardName,
                 cardType,
                 rarity,
                 attack,
@@ -169,5 +173,30 @@ contract StoreContract is ReentrancyGuard, Ownable {
      */
     function withdraw() public onlyOwner {
         payable(msg.sender).transfer(address(this).balance);
+    }
+    
+    /**
+     * @dev Convert uint to string helper function
+     */
+    function _uint2str(uint256 _i) internal pure returns (string memory) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 len;
+        while (j != 0) {
+            len++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(len);
+        uint256 k = len;
+        while (_i != 0) {
+            k = k-1;
+            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        return string(bstr);
     }
 }

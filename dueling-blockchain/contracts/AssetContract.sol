@@ -16,6 +16,7 @@ contract AssetContract is ERC721Enumerable, Ownable {
     mapping(address => bool) public authorizedMinters;
     
     struct Card {
+        string cardName;     // Unique card identifier (e.g., "basic-0", "dragon-flame")
         string cardType;     // "Monster", "Spell", "Trap"
         uint8 rarity;        // 1-5 (stars)
         uint16 attack;       // 0-3000
@@ -28,6 +29,7 @@ contract AssetContract is ERC721Enumerable, Ownable {
     event CardMinted(
         uint256 indexed tokenId,
         address indexed owner,
+        string cardName,
         string cardType,
         uint8 rarity,
         uint16 attack,
@@ -72,6 +74,7 @@ contract AssetContract is ERC721Enumerable, Ownable {
      */
     function mintCard(
         address to,
+        string memory cardName,
         string memory cardType,
         uint8 rarity,
         uint16 attack,
@@ -87,6 +90,7 @@ contract AssetContract is ERC721Enumerable, Ownable {
         _safeMint(to, tokenId);
         
         cards[tokenId] = Card({
+            cardName: cardName,
             cardType: cardType,
             rarity: rarity,
             attack: attack,
@@ -94,7 +98,7 @@ contract AssetContract is ERC721Enumerable, Ownable {
             mintedAt: block.timestamp
         });
         
-        emit CardMinted(tokenId, to, cardType, rarity, attack, defense);
+        emit CardMinted(tokenId, to, cardName, cardType, rarity, attack, defense);
         
         return tokenId;
     }
@@ -138,5 +142,15 @@ contract AssetContract is ERC721Enumerable, Ownable {
      */
     function getTotalCards() public view returns (uint256) {
         return _tokenIdCounter;
+    }
+    
+    /**
+     * @dev Facilitate card transfers for trades (only authorized minters)
+     * This allows the server to execute atomic trades without requiring individual approvals
+     */
+    function facilitateTransfer(address from, address to, uint256 tokenId) public onlyMinter {
+        require(ownerOf(tokenId) == from, "From address does not own the token");
+        _transfer(from, to, tokenId);
+        emit CardTransferred(tokenId, from, to);
     }
 }
