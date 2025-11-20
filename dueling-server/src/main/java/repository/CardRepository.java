@@ -129,7 +129,31 @@ public class CardRepository {
             }
             
             logger.info("Card {} claimed atomically. New stock: {}", id, newStock);
-            return findById(id);
+            
+            // Create a unique copy of the card with a unique ID
+            Card template = allCards.get(id);
+            if (template == null) {
+                return Optional.empty();
+            }
+            
+            // Generate unique ID using template name + short UUID
+            // Format: basic-0-abc123, combo-1-def456, etc.
+            String uniqueSuffix = java.util.UUID.randomUUID().toString().substring(0, 6);
+            String uniqueId = id + "-" + uniqueSuffix;
+            Card uniqueCard = new Card(
+                uniqueId,
+                template.getName(),
+                template.getAttack(),
+                template.getDefense(),
+                template.getRarity(),
+                template.getCardType(),
+                template.getEffectDescription(),
+                template.getManaCost(),
+                template.getEffectParameters()
+            );
+            
+            logger.debug("Created unique card instance: {} (template: {})", uniqueId, id);
+            return Optional.of(uniqueCard);
             
         } catch (Exception e) {
             logger.error("Error claiming card {}: {}", id, e.getMessage(), e);

@@ -66,10 +66,9 @@ public class Player implements Serializable {
         this.coins = 1000;
         this.healthPoints = 100;
         this.upgradePoints = 0;
-        initializeStarterDeck();
-        // Serialize cards immediately after creation
+        // Serialize cards immediately after creation (empty collection)
         serializeCardCollectionNow();
-        logger.debug("New player created: {} ({})", nickname, id);
+        logger.debug("New player created: {} ({}) - Starting with no cards", nickname, id);
     }
 
     @Transient
@@ -151,45 +150,6 @@ public class Player implements Serializable {
             logger.warn("[CARD-LOAD] No cards JSON to deserialize for player {}", id);
             this.cardCollection = new ArrayList<>();
         }
-    }
-
-    private void initializeStarterDeck() {
-        List<Card> starterDeckCards = getCardCollection();
-        for (int i = 0; i < 5; i++) {
-            starterDeckCards.add(new Card(
-                "basic-" + i,
-                "Basic Card " + i,
-                1, 1, "Common",
-                Card.CardType.ATTACK,
-                "Standard attack", 1
-            ));
-        }
-
-        // Add a combo card
-        Map<String, String> comboParams = new HashMap<>();
-        comboParams.put("requiredCardName", "Basic Card 1");
-        comboParams.put("bonusDamage", "3");
-        starterDeckCards.add(new Card(
-            "combo-1",
-            "Combo Strike",
-            2, 1, "Rare",
-            Card.CardType.COMBO,
-            "Deals +3 damage if you played 'Basic Card 1' this turn.",
-            2,
-            comboParams
-        ));
-
-        // Add a counter-spell card
-        starterDeckCards.add(new Card(
-            "counter-1",
-            "Counter Spell",
-            0, 0, "Rare",
-            Card.CardType.COUNTER_SPELL,
-            "Counters a magic spell.",
-            3
-        ));
-
-        logger.info("[CARD-INIT] Starter deck created with {} cards for player {}", starterDeckCards.size(), id);
     }
 
     private void applyAttributeBonuses() {

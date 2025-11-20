@@ -42,6 +42,7 @@ public final class GameClient {
     private static boolean inGame;
     private static boolean characterSet = false;
     private static boolean hasCards = false;
+    private static java.util.List<String> currentHand = new java.util.ArrayList<>(); // Track current hand
     private static volatile boolean isExiting;
     private static volatile long lastPingTime = -1; // Now in nanoseconds
     private static volatile Thread pingUpdateThread;
@@ -638,16 +639,75 @@ public final class GameClient {
             return;
         }
         
-        System.out.print("Card ID to play: > ");
-        String cardId = scanner.nextLine().trim();
-        if (cardId.isEmpty()) {
-            System.out.println("Card ID cannot be empty!");
+        // Show current hand if available
+        if (!currentHand.isEmpty()) {
+            System.out.println("\n🎴 Your Hand:");
+            for (int i = 0; i < currentHand.size(); i++) {
+                String cardId = currentHand.get(i);
+                // Extract readable name from card ID (e.g., basic-1-abc123 -> Basic Card 1)
+                String displayName = getDisplayName(cardId);
+                System.out.println("  [" + (i+1) + "] " + displayName + " (" + cardId + ")");
+            }
+            System.out.println();
+            System.out.print("Card to play (1-" + currentHand.size() + " or card ID): > ");
+        } else {
+            System.out.print("Card ID to play: > ");
+        }
+        
+        String input = scanner.nextLine().trim();
+        if (input.isEmpty()) {
+            System.out.println("Card selection cannot be empty!");
             return;
+        }
+        
+        String cardId;
+        // Check if input is a number (card selection by index)
+        try {
+            int choice = Integer.parseInt(input);
+            if (choice >= 1 && choice <= currentHand.size()) {
+                cardId = currentHand.get(choice - 1);
+                System.out.println("→ Playing: " + getDisplayName(cardId));
+            } else {
+                System.out.println("Invalid choice! Please select 1-" + currentHand.size());
+                return;
+            }
+        } catch (NumberFormatException e) {
+            // Input is not a number, treat as card ID
+            cardId = input;
         }
         
         if (!safeSend("PLAY_CARD:" + currentMatchId + ":" + cardId)) {
             System.out.println("Please try reconnecting or restart the client.");
         }
+    }
+    
+    /**
+     * Extract display name from card ID
+     * E.g., basic-1-abc123 -> Basic Card 1
+     *       combo-1-def456 -> Combo Strike
+     */
+    private static String getDisplayName(String cardId) {
+        // Try to extract template from ID (e.g., basic-1 from basic-1-abc123)
+        if (cardId.contains("-")) {
+            String[] parts = cardId.split("-");
+            if (parts.length >= 2) {
+                String template = parts[0] + "-" + parts[1];
+                // Map common templates to display names
+                return switch (template) {
+                    case "basic-0" -> "Basic Card 0";
+                    case "basic-1" -> "Basic Card 1";
+                    case "basic-2" -> "Basic Card 2";
+                    case "basic-3" -> "Basic Card 3";
+                    case "basic-4" -> "Basic Card 4";
+                    case "combo-1" -> "Combo Strike";
+                    case "counter-1" -> "Counter Spell";
+                    case "defense-1" -> "Light Shield";
+                    case "equip-1" -> "Light Sword";
+                    default -> template; // Fallback to template name
+                };
+            }
+        }
+        return cardId; // Fallback to full ID
     }
 
     private static void upgradeAttributes(Scanner scanner) {
@@ -953,7 +1013,18 @@ public final class GameClient {
                 System.out.println("\n--- Your Card Collection ---");
                 String[] cardEntries = cardsInfo.split(";");
                 for (String card : cardEntries) {
-                    System.out.println("- " + card.trim());
+                    String trimmed = card.trim();
+                    // Extract just the card name (before parenthesis) for display
+                    // Format from server: "Basic Card 4 (card-12345678)"
+                    int parenIndex = trimmed.indexOf(" (");
+                    if (parenIndex > 0) {
+                        String cardName = trimmed.substring(0, parenIndex);
+                        String cardId = trimmed.substring(parenIndex + 2, trimmed.length() - 1);
+                        System.out.println("- " + cardName);
+                        System.out.println("  ID: " + cardId);
+                    } else {
+                        System.out.println("- " + trimmed);
+                    }
                 }
                 System.out.println("--------------------------");
                 System.out.println("Use these card IDs for trading.");
@@ -975,8 +1046,18 @@ public final class GameClient {
             } else if ("GAME_OVER".equals(parts[1])) {
                 inGame = false;
                 currentMatchId = null;
+                currentHand.clear(); // Clear hand when game ends
                 // Reset connection start time after game ends
                 connectionStartTime = System.currentTimeMillis();
+            } else if (parts.length > 1 && "DRAW_CARDS".equals(parts[1])) {
+                // Parse drawn cards: UPDATE:DRAW_CARDS:card1,card2,card3
+                if (parts.length > 2) {
+                    String cardsStr = parts[2];
+                    currentHand.clear();
+                    for (String card : cardsStr.split(",")) {
+                        currentHand.add(card.trim());
+                    }
+                }
             }
         } else if ("CARD_UPDATE".equals(type) || message.contains("PURCHASE_SUCCESS") || message.contains("CARDS_GRANTED") || 
                    (message.startsWith("SUCCESS:Pack purchased") || message.contains("Cards received"))) {
