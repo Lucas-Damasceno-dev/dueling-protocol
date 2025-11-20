@@ -84,12 +84,12 @@ show_menu() {
     echo "49. Run Blockchain Tests"
     echo
     echo -e "${YELLOW}🤖 Automated Workflows:${NC}"
-    echo "50. ${GREEN}🚀 Full System Deploy (Build + Start + Verify)${NC}"
-    echo "51. ${GREEN}📋 Copy Deployment Info (for ledger verification)${NC}"
-    echo "52. ${GREEN}🔄 Restart System (Down + Up + Auto Deploy)${NC}"
-    echo "53. ${GREEN}🧪 Auto Test Full Flow (2 players + purchases + trade + match)${NC}"
-    echo "54. ${GREEN}📊 Quick Ledger Check (with auto copy deployment-info)${NC}"
-    echo "55. ${GREEN}🛠️  Fix & Rebuild (compile + build + restart)${NC}"
+    echo -e "50. ${GREEN}🚀 Full System Deploy (Build + Start + Verify)${NC}"
+    echo -e "51. ${GREEN}📋 Copy Deployment Info (for ledger verification)${NC}"
+    echo -e "52. ${GREEN}🔄 Restart System (Down + Up + Auto Deploy)${NC}"
+    echo -e "53. ${GREEN}🧪 Auto Test Full Flow (2 players + purchases + trade + match)${NC}"
+    echo -e "54. ${GREEN}📊 Quick Ledger Check (with auto copy deployment-info)${NC}"
+    echo -e "55. ${GREEN}🛠️  Fix & Rebuild (compile + build + restart)${NC}"
     echo
     echo -e "${RED}0. Exit${NC}"
     echo
