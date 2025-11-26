@@ -17,7 +17,7 @@ public class WebSocketSessionManager {
 
     private final RedissonClient redissonClient;
 
-    // Mapeamentos locais para sessões ativas nesta instância
+    // Mapeamentos locais para sessões ativas nesta instância (SEMPRE disponível)
     private final ConcurrentHashMap<String, WebSocketSession> activeSessions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> sessionToPlayerId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, PrintWriter> playerWriters = new ConcurrentHashMap<>();
@@ -30,19 +30,33 @@ public class WebSocketSessionManager {
 
     public void registerSession(WebSocketSession session, String playerId) {
         String sessionId = session.getId();
+        
+        // SEMPRE armazena localmente PRIMEIRO
         activeSessions.put(sessionId, session);
         sessionToPlayerId.put(sessionId, playerId);
         sessionActivity.put(sessionId, System.currentTimeMillis());
-        playerInMatch.put(playerId, false); // Initially not in a match
+        playerInMatch.put(playerId, false);
 
-        // Armazena o mapeamento em Redis para ser visível globalmente
-        RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
-        redisSessionMap.put(sessionId, playerId);
+        logger.info("Registered session {} for player {} (local)", sessionId, playerId);
 
-        logger.debug("Registered session {} for player {}", sessionId, playerId);
+        // Tenta armazenar no Redis, mas NÃO falha se Redis estiver indisponível
+        tryStoreInRedis(sessionId, playerId);
+    }
+
+    private void tryStoreInRedis(String sessionId, String playerId) {
+        try {
+            RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
+            redisSessionMap.put(sessionId, playerId);
+            logger.debug("Stored session {} in Redis", sessionId);
+        } catch (Exception e) {
+            // Redis indisponível - NÃO é crítico, sessão ainda funciona localmente
+            logger.warn("Failed to store session {} in Redis (continuing with local storage): {}", 
+                sessionId, e.getMessage());
+        }
     }
 
     public String unregisterSession(String sessionId) {
+        // Remove localmente PRIMEIRO
         String playerId = sessionToPlayerId.get(sessionId);
         
         activeSessions.remove(sessionId);
@@ -54,22 +68,59 @@ public class WebSocketSessionManager {
 
         if (removedPlayerId != null) {
             playerWriters.remove(removedPlayerId);
-            // Remove o mapeamento do Redis
-            RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
-            redisSessionMap.remove(sessionId);
-            logger.debug("Unregistered session {} for player {}", sessionId, removedPlayerId);
+            logger.info("Unregistered session {} for player {} (local)", sessionId, removedPlayerId);
+            
+            // Tenta remover do Redis, mas não falha se indisponível
+            tryRemoveFromRedis(sessionId);
         }
         return removedPlayerId;
+    }
+
+    private void tryRemoveFromRedis(String sessionId) {
+        try {
+            RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
+            redisSessionMap.remove(sessionId);
+            logger.debug("Removed session {} from Redis", sessionId);
+        } catch (Exception e) {
+            // Redis indisponível - não é crítico
+            logger.warn("Failed to remove session {} from Redis: {}", sessionId, e.getMessage());
+        }
     }
 
     public void updateSessionActivity(String sessionId) {
         if (sessionActivity.containsKey(sessionId)) {
             sessionActivity.put(sessionId, System.currentTimeMillis());
+            logger.trace("Updated activity for session {}", sessionId);
         }
     }
 
     public String getPlayerId(String sessionId) {
-        return sessionToPlayerId.get(sessionId);
+        // SEMPRE busca localmente primeiro
+        String playerId = sessionToPlayerId.get(sessionId);
+        
+        if (playerId == null) {
+            // Fallback: tenta buscar no Redis (caso servidor tenha reiniciado)
+            playerId = tryGetPlayerIdFromRedis(sessionId);
+        }
+        
+        return playerId;
+    }
+
+    private String tryGetPlayerIdFromRedis(String sessionId) {
+        try {
+            RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
+            String playerId = redisSessionMap.get(sessionId);
+            
+            if (playerId != null) {
+                logger.info("Recovered playerId {} for session {} from Redis", playerId, sessionId);
+            }
+            
+            return playerId;
+        } catch (Exception e) {
+            logger.warn("Failed to get playerId from Redis for session {}: {}", 
+                sessionId, e.getMessage());
+            return null;
+        }
     }
 
     public WebSocketSession getSession(String sessionId) {
@@ -86,6 +137,7 @@ public class WebSocketSessionManager {
     
     public void storePlayerWriter(String playerId, PrintWriter writer) {
         playerWriters.put(playerId, writer);
+        logger.debug("Stored writer for player {}", playerId);
     }
 
     public PrintWriter getPlayerWriter(String playerId) {
@@ -93,7 +145,11 @@ public class WebSocketSessionManager {
     }
 
     public PrintWriter removePlayerWriter(String playerId) {
-        return playerWriters.remove(playerId);
+        PrintWriter writer = playerWriters.remove(playerId);
+        if (writer != null) {
+            logger.debug("Removed writer for player {}", playerId);
+        }
+        return writer;
     }
     
     public boolean isPlayerInMatch(String playerId) {
@@ -104,6 +160,36 @@ public class WebSocketSessionManager {
     public void setPlayerInMatch(String playerId, boolean inMatch) {
         if (sessionToPlayerId.containsValue(playerId)) {
             playerInMatch.put(playerId, inMatch);
+            logger.debug("Set player {} in match status: {}", playerId, inMatch);
+        }
+    }
+
+    /**
+     * Reconecta sessões do Redis após falha
+     * Usado durante recuperação de failover
+     */
+    public void reconnectSessionsFromRedis() {
+        try {
+            RMap<String, String> redisSessionMap = redissonClient.getMap("websocket:sessions");
+            int reconnected = 0;
+            
+            for (Map.Entry<String, String> entry : redisSessionMap.entrySet()) {
+                String sessionId = entry.getKey();
+                String playerId = entry.getValue();
+                
+                // Se não temos localmente, recupera do Redis
+                if (!sessionToPlayerId.containsKey(sessionId)) {
+                    sessionToPlayerId.put(sessionId, playerId);
+                    sessionActivity.put(sessionId, System.currentTimeMillis());
+                    reconnected++;
+                }
+            }
+            
+            if (reconnected > 0) {
+                logger.info("Reconnected {} sessions from Redis after recovery", reconnected);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to reconnect sessions from Redis: {}", e.getMessage());
         }
     }
 }

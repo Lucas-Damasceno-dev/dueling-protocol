@@ -81,8 +81,16 @@ public class AuthController {
         // AuthenticationService will handle player creation if needed
         boolean success = authenticationService.registerUser(username, password, playerId);
         if (success) {
-            AuthenticationResponse response = new AuthenticationResponse("User registered successfully");
-            return ResponseEntity.ok(response);
+            // Auto-login after registration to return token
+            String token = authenticationService.authenticateUser(username, password);
+            if (token != null) {
+                AuthenticationResponse response = new AuthenticationResponse(token, "User registered successfully");
+                return ResponseEntity.ok(response);
+            } else {
+                // Registration succeeded but login failed (shouldn't happen)
+                AuthenticationResponse response = new AuthenticationResponse("User registered successfully");
+                return ResponseEntity.ok(response);
+            }
         } else {
             ErrorResponse response = new ErrorResponse("Username or Player ID already exists", "CONFLICT");
             return ResponseEntity.status(HttpStatus.CONFLICT).body(new AuthenticationResponse(response.getError(), true));
