@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SCRIPT_DIR=$(cd "$(dirname -- \"$0\")" && pwd)
+
 # Main Menu Script for Dueling Protocol
 # Provides easy access to all execution options
 
@@ -8,92 +10,101 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Function to display the menu
 show_menu() {
     clear
-    echo -e "${BLUE}"
-    echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║                Dueling Protocol - Main Menu                  ║"
-    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo -e "${CYAN}${BOLD}"
+    echo "╔════════════════════════════════════════════════════════════════════╗"
+    echo "║               🎮  DUELING PROTOCOL - CONTROL CENTER  🎮           ║"
+    echo "╚════════════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
     echo
-    echo -e "${YELLOW}🎯 CRITICAL FEATURES (Main Game Functions):${NC}"
-    echo -e "1.  ${GREEN}Test PURCHASE (Compra de Pacotes)${NC}"
-    echo -e "2.  ${GREEN}Test TRADE (Troca de Cartas)${NC}"
-    echo -e "3.  ${GREEN}Test MATCHMAKING (Sistema de Partidas)${NC}"
-    echo -e "4.  ${GREEN}Test ALL Critical Features (PURCHASE + TRADE + MATCHMAKING)${NC}"
+
+    echo -e "${BOLD}${YELLOW}┌─── 🎯 CRITICAL FEATURES ───────────────────────────────────────────┐${NC}"
+    echo -e "${YELLOW}│${NC}  1.  Test PURCHASE (Compra de Pacotes)"
+    echo -e "${YELLOW}│${NC}  2.  Test TRADE (Troca de Cartas)"
+    echo -e "${YELLOW}│${NC}  3.  Test MATCHMAKING (Sistema de Partidas)"
+    echo -e "${YELLOW}│${NC}  4.  Test ALL Critical Features"
+    echo -e "${YELLOW}└────────────────────────────────────────────────────────────────────┘${NC}"
     echo
-    echo -e "${YELLOW}System Management:${NC}"
-    echo -e "5.  Start Complete System (Docker Compose) ${GREEN}[Multi-PC Ready]${NC}"
-    echo -e "6.  Start Game Local (Java + Docker DB/Blockchain) ${GREEN}[Single PC]${NC}"
-    echo -e "7.  Stop All Services (Java + Docker)"
-    echo -e "8.  Build Project"
-    echo -e "9.  System Status Check"
+
+    echo -e "${BOLD}${MAGENTA}┌─── 🚀 AUTOMATED WORKFLOWS ────────────────────────────────────────┐${NC}"
+    echo -e "${MAGENTA}│${NC}  50. ${GREEN}🚀 Full System Deploy${NC} (Build + Start + Verify)"
+    echo -e "${MAGENTA}│${NC}  52. ${GREEN}🔄 Restart System${NC} (Down + Up + Auto Deploy)"
+    echo -e "${MAGENTA}│${NC}  55. ${GREEN}🛠️  Fix & Rebuild${NC} (compile + build + restart)"
+    echo -e "${MAGENTA}│${NC}  54. ${GREEN}📊 Quick Ledger Check${NC}"
+    echo -e "${MAGENTA}│${NC}  51. 📋 Copy Deployment Info"
+    echo -e "${MAGENTA}└────────────────────────────────────────────────────────────────────┘${NC}"
     echo
-    echo -e "${YELLOW}Run Client & Server (Docker Integrated):${NC}"
-    echo "10. Run Client (Docker) ${GREEN}[Requires system running - option 5 or 6]${NC}"
-    echo "11. Run Server (Docker) ${GREEN}[Requires system running - option 5 or 6]${NC}"
-    echo "12. View Running Containers"
+
+    echo -e "${BOLD}${CYAN}┌─── 🔧 MODULAR SERVICE STARTUP ───────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC}  ${BOLD}Infrastructure:${NC}"
+    echo -e "${CYAN}│${NC}    60. 🗄️  Start Redis Master"
+    echo -e "${CYAN}│${NC}    61. 🗄️  Start Redis Slave"
+    echo -e "${CYAN}│${NC}    62. 👁️  Start Redis Sentinels (Cluster)"
+    echo -e "${CYAN}│${NC}    63. 🐘 Start PostgreSQL"
+    echo -e "${CYAN}│${NC}    64. ⛓️  Start Blockchain Node"
+    echo -e "${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC}  ${BOLD}Application Layer:${NC}"
+    echo -e "${CYAN}│${NC}    65. 🌐 Start NGINX Load Balancer"
+    echo -e "${CYAN}│${NC}    66. 🎮 Start Game Servers"
+    echo -e "${CYAN}│${NC}    10. 👤 Run Client"
+    echo -e "${CYAN}│${NC}    11. 🖥️  Run Additional Server"
+    echo -e "${CYAN}└────────────────────────────────────────────────────────────────────┘${NC}"
     echo
-    echo -e "${YELLOW}Network/Multi-PC Deployment:${NC}"
-    echo "13. Setup Distributed Environment"
-    echo "14. Start Client Remote"
-    echo "15. Start Gateway Remote"
-    echo "16. Start Server Remote"
+
+    echo -e "${BOLD}${BLUE}┌─── 🔬 RESILIENCE & FAILOVER TESTS ──────────────────────────────┐${NC}"
+    echo -e "${BLUE}│${NC}  70. Test NGINX Failover (Load Balancer)"
+    echo -e "${BLUE}│${NC}  71. Test Redis Sentinel Failover"
+    echo -e "${BLUE}│${NC}  72. ${BOLD}${GREEN}Validate Complete System${NC} (All Components)"
+    echo -e "${BLUE}│${NC}  27. Test Redis Sentinel Status"
+    echo -e "${BLUE}│${NC}  28. Test Redis Failover (Legacy)"
+    echo -e "${BLUE}└────────────────────────────────────────────────────────────────────┘${NC}"
     echo
-    echo -e "${YELLOW}Functional Tests:${NC}"
-    echo "17. Test Client WebSocket"
-    echo "18. Test Dueling Protocol"
-    echo "19. Test Purchase (Shell)"
-    echo "20. Test Matchmaking (Shell)"
-    echo "21. Test Trade Functionality"
-    echo "22. Test Cross-Server Trade"
-    echo "23. Test Cross-Server Match"
-    echo "24. Test Game State Consistency"
-    echo "25. Test Mid-Game Disconnection"
-    echo "26. Test S2S Communication"
+
+    echo -e "${BOLD}${GREEN}┌─── 📊 SYSTEM MANAGEMENT ──────────────────────────────────────────┐${NC}"
+    echo -e "${GREEN}│${NC}  5.  Start Complete System (Docker Compose)"
+    echo -e "${GREEN}│${NC}  6.  Start Game Local (Java + Docker)"
+    echo -e "${GREEN}│${NC}  7.  Stop All Services"
+    echo -e "${GREEN}│${NC}  8.  Build Project"
+    echo -e "${GREEN}│${NC}  9.  System Status Check"
+    echo -e "${GREEN}│${NC}  12. View Running Containers"
+    echo -e "${GREEN}└────────────────────────────────────────────────────────────────────┘${NC}"
     echo
-    echo -e "${YELLOW}Advanced Tests:${NC}"
-    echo "27. Test Redis Sentinel"
-    echo "28. Test Redis Failover"
-    echo "29. Test Stock Concurrency"
-    echo "30. Test Cross Server Matchmaking"
-    echo "31. Test Distributed Matchmaking"
-    echo "32. Test Advanced Security"
-    echo "33. Run All Tests"
+
+    echo -e "${BOLD}${YELLOW}┌─── 🧪 FUNCTIONAL TESTS ───────────────────────────────────────────┐${NC}"
+    echo -e "${YELLOW}│${NC}  17-21: WebSocket, Protocol, Purchase, Match, Trade"
+    echo -e "${YELLOW}│${NC}  22-26: X-Server(Trade/Match), Consistency, Disconnect, S2S"
+    echo -e "${YELLOW}│${NC}  29-33: Concurrency, Distributed, Security Tests"
+    echo -e "${YELLOW}└────────────────────────────────────────────────────────────────────┘${NC}"
     echo
-    echo -e "${YELLOW}Monitoring & Utilities:${NC}"
-    echo "34. Monitor All Logs"
-    echo "35. Check WebSocket Status"
-    echo "36. Reset Card Stock"
-    echo "37. View Logs"
-    echo "38. View Documentation"
+
+    echo -e "${BOLD}${CYAN}┌─── 🔗 BLOCKCHAIN OPERATIONS ─────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC}  39-42: Start Node, Deploy, Verify Ledger, Simulate Tx"
+    echo -e "${CYAN}│${NC}  43-46: Verify (Ownership, Uniqueness, Purchases, Matches)"
+    echo -e "${CYAN}│${NC}  47-49: Complete Verification, Console, Tests"
+    echo -e "${CYAN}└────────────────────────────────────────────────────────────────────┘${NC}"
     echo
-    echo -e "${YELLOW}🔗 Blockchain Verification:${NC}"
-    echo "39. Start Blockchain Node (Hardhat)"
-    echo "40. Deploy Blockchain Contracts"
-    echo "41. ${GREEN}Verify Distributed Ledger (Cards/Trades/Matches)${NC}"
-    echo "42. Simulate Blockchain Transactions"
-    echo "43. Verify Card Ownership"
-    echo "44. Verify Card Uniqueness"
-    echo "45. View Purchase History"
-    echo "46. View Match Results (Blockchain)"
-    echo "47. Complete Verification (All 3)"
-    echo "48. Blockchain Console"
-    echo "49. Run Blockchain Tests"
+
+    echo -e "${BOLD}${BLUE}┌─── 🌐 MULTI-PC DEPLOYMENT ───────────────────────────────────────┐${NC}"
+    echo -e "${BLUE}│${NC}  13: Setup Distributed Environment"
+    echo -e "${BLUE}│${NC}  14-16: Start Remote (Client, Gateway, Server)"
+    echo -e "${BLUE}└────────────────────────────────────────────────────────────────────┘${NC}"
     echo
-    echo -e "${YELLOW}🤖 Automated Workflows:${NC}"
-    echo -e "50. ${GREEN}🚀 Full System Deploy (Build + Start + Verify)${NC}"
-    echo -e "51. ${GREEN}📋 Copy Deployment Info (for ledger verification)${NC}"
-    echo -e "52. ${GREEN}🔄 Restart System (Down + Up + Auto Deploy)${NC}"
-    echo -e "53. ${GREEN}🧪 Auto Test Full Flow (2 players + purchases + trade + match)${NC}"
-    echo -e "54. ${GREEN}📊 Quick Ledger Check (with auto copy deployment-info)${NC}"
-    echo -e "55. ${GREEN}🛠️  Fix & Rebuild (compile + build + restart)${NC}"
+
+    echo -e "${BOLD}${MAGENTA}┌─── 📈 MONITORING & UTILITIES ────────────────────────────────────┐${NC}"
+    echo -e "${MAGENTA}│${NC}  34-38: Monitor Logs, WS Status, Reset Stock, View Logs, Docs"
+    echo -e "${MAGENTA}└────────────────────────────────────────────────────────────────────┘${NC}"
     echo
-    echo -e "${RED}0. Exit${NC}"
+    
+    echo -e "${BOLD}${RED}  0. Exit${NC}"
     echo
-    echo -n "Choose an option (0-55): "
+    echo -n "Choose an option: "
 }
 
 # Function to handle system status check
@@ -130,15 +141,16 @@ system_status() {
 # Function to view documentation
 view_docs() {
     echo -e "${BLUE}Available Documentation:${NC}"
-    if [ -d "docs" ]; then
-        for doc in docs/*.md; do
+    if [ -d "$SCRIPT_DIR/docs" ]; then
+        for doc in "$SCRIPT_DIR"/docs/*.md;
+ do
             if [ -f "$doc" ]; then
                 echo " - $(basename "$doc")"
             fi
         done
         echo
         echo -e "${YELLOW}To view a document:${NC}"
-        echo "  cat docs/DOCUMENT_NAME.md"
+        echo "  cat $SCRIPT_DIR/docs/DOCUMENT_NAME.md"
     else
         echo -e "${YELLOW}No documentation directory found${NC}"
     fi
@@ -159,44 +171,44 @@ while true; do
         1)
             echo -e "${GREEN}Testing PURCHASE (Compra de Pacotes)...${NC}"
             echo "Starting Docker services if needed..."
-            cd docker && docker compose up -d && cd ..
+            (cd "$SCRIPT_DIR/docker" && docker compose up -d)
             sleep 10
             echo ""
             echo "Running PURCHASE test..."
-            cd test_scripts && TEST_FEATURE=PURCHASE node test_websocket_features.js && cd ..
+            (cd "$SCRIPT_DIR/test_scripts" && TEST_FEATURE=PURCHASE node test_websocket_features.js)
             echo ""
             read -p "Press Enter to continue..."
             ;;
         2)
             echo -e "${GREEN}Testing TRADE (Troca de Cartas)...${NC}"
             echo "Starting Docker services if needed..."
-            cd docker && docker compose up -d && cd ..
+            (cd "$SCRIPT_DIR/docker" && docker compose up -d)
             sleep 10
             echo ""
             echo "Running TRADE test..."
-            cd test_scripts && TEST_FEATURE=TRADE node test_websocket_features.js && cd ..
+            (cd "$SCRIPT_DIR/test_scripts" && TEST_FEATURE=TRADE node test_websocket_features.js)
             echo ""
             read -p "Press Enter to continue..."
             ;;
         3)
             echo -e "${GREEN}Testing MATCHMAKING (Sistema de Partidas)...${NC}"
             echo "Starting Docker services if needed..."
-            cd docker && docker compose up -d && cd ..
+            (cd "$SCRIPT_DIR/docker" && docker compose up -d)
             sleep 10
             echo ""
             echo "Running MATCHMAKING test..."
-            cd test_scripts && TEST_FEATURE=MATCHMAKING node test_websocket_features.js && cd ..
+            (cd "$SCRIPT_DIR/test_scripts" && TEST_FEATURE=MATCHMAKING node test_websocket_features.js)
             echo ""
             read -p "Press Enter to continue..."
             ;;
         4)
             echo -e "${GREEN}Testing ALL Critical Features (PURCHASE + TRADE + MATCHMAKING)...${NC}"
             echo "Starting Docker services if needed..."
-            cd docker && docker compose up -d && cd ..
+            (cd "$SCRIPT_DIR/docker" && docker compose up -d)
             sleep 10
             echo ""
             echo "Running ALL tests..."
-            cd test_scripts && node test_websocket_features.js && cd ..
+            (cd "$SCRIPT_DIR/test_scripts" && node test_websocket_features.js)
             echo ""
             echo -e "${BLUE}════════════════════════════════════════${NC}"
             echo -e "${GREEN}Test completed!${NC}"
@@ -212,7 +224,7 @@ while true; do
             echo "  - NGINX Gateway & Multiple Game Servers"
             echo -e "${YELLOW}This may take 2-3 minutes on the first run...${NC}"
             echo ""
-            bash ./scripts/start-complete-with-blockchain.sh
+            bash "$SCRIPT_DIR/scripts/start-complete-with-blockchain.sh"
             read -p "Press Enter to continue..."
             ;;
         6)
@@ -222,17 +234,17 @@ while true; do
             echo "  - A single Game Server (as a local Java process)"
             echo -e "${YELLOW}This may take 1-2 minutes...${NC}"
             echo ""
-            bash ./scripts/start-local-with-blockchain.sh
+            bash "$SCRIPT_DIR/scripts/start-local-with-blockchain.sh"
             read -p "Press Enter to continue..."
             ;;
         7)
             echo -e "${GREEN}Stopping All Services (Java Processes and Docker Containers)...${NC}"
-            bash ./scripts/stop-all-with-blockchain.sh
+            bash "$SCRIPT_DIR/scripts/stop-all-with-blockchain.sh"
             read -p "Press Enter to continue..."
             ;;
         8)
             echo -e "${GREEN}Building Project...${NC}"
-            mvn clean package -DskipTests
+            (cd "$SCRIPT_DIR" && mvn clean package -DskipTests)
             read -p "Press Enter to continue..."
             ;;
         9)
@@ -241,23 +253,23 @@ while true; do
             echo "Blockchain Status:"
             if lsof -i:8545 > /dev/null 2>&1; then
                 echo -e "   ${GREEN}✅ Blockchain Node: Running on http://localhost:8545${NC}"
-                if [ -f logs/blockchain.pid ]; then
-                    echo "   PID: $(cat logs/blockchain.pid)"
+                if [ -f "$SCRIPT_DIR/logs/blockchain.pid" ]; then
+                    echo "   PID: $(cat "$SCRIPT_DIR/logs/blockchain.pid")"
                 fi
             else
                 echo -e "   ${YELLOW}⚠️  Blockchain Node: Not running${NC}"
-                echo "   Start with: ./menu.sh → 39"
+                echo "   Start with: $SCRIPT_DIR/menu.sh → 39"
             fi
             read -p "Press Enter to continue..."
             ;;
         10)
             echo -e "${GREEN}Running Client...${NC}"
-            bash ./scripts/run_client.sh
+            bash "$SCRIPT_DIR/scripts/run_client.sh"
             read -p "Press Enter to continue..."
             ;;
         11)
             echo -e "${GREEN}Running Server...${NC}"
-            bash ./scripts/run_server.sh
+            bash "$SCRIPT_DIR/scripts/run_server.sh"
             read -p "Press Enter to continue..."
             ;;
         12)
@@ -266,127 +278,127 @@ while true; do
             ;;
         13)
             echo -e "${GREEN}Setting up Distributed Environment...${NC}"
-            bash ./scripts/deploy/setup_distributed.sh
+            bash "$SCRIPT_DIR/scripts/deploy/setup_distributed.sh"
             read -p "Press Enter to continue..."
             ;;
         14)
             echo -e "${GREEN}Starting Client Remote...${NC}"
-            bash ./scripts/deploy/start_client_remote.sh
+            bash "$SCRIPT_DIR/scripts/deploy/start_client_remote.sh"
             read -p "Press Enter to continue..."
             ;;
         15)
             echo -e "${GREEN}Starting Gateway Remote...${NC}"
-            bash ./scripts/deploy/start_gateway_remote.sh
+            bash "$SCRIPT_DIR/scripts/deploy/start_gateway_remote.sh"
             read -p "Press Enter to continue..."
             ;;
         16)
             echo -e "${GREEN}Starting Server Remote...${NC}"
-            bash ./scripts/deploy/start_server_remote.sh
+            bash "$SCRIPT_DIR/scripts/deploy/start_server_remote.sh"
             read -p "Press Enter to continue..."
             ;;
         17)
             echo -e "${GREEN}Testing Client WebSocket...${NC}"
-            bash ./test_scripts/functional/test_client_websocket.sh
+            bash "$SCRIPT_DIR/test_scripts/functional/test_client_websocket.sh"
             read -p "Press Enter to continue..."
             ;;
         18)
             echo -e "${GREEN}Testing Dueling Protocol...${NC}"
-            bash ./test_scripts/functional/test_dueling_protocol.sh
+            bash "$SCRIPT_DIR/test_scripts/functional/test_dueling_protocol.sh"
             read -p "Press Enter to continue..."
             ;;
         19)
             echo -e "${GREEN}Testing Purchase...${NC}"
-            bash ./test_scripts/functional/test_purchase.sh
+            bash "$SCRIPT_DIR/test_scripts/functional/test_purchase.sh"
             read -p "Press Enter to continue..."
             ;;
         20)
             echo -e "${GREEN}Testing Matchmaking...${NC}"
-            bash ./test_scripts/functional/test_matchmaking.sh
+            bash "$SCRIPT_DIR/test_scripts/functional/test_matchmaking.sh"
             read -p "Press Enter to continue..."
             ;;
         21)
             echo -e "${GREEN}Testing Trade Functionality...${NC}"
-            bash ./test_scripts/functional/test_trade.sh
+            bash "$SCRIPT_DIR/test_scripts/functional/test_trade.sh"
             read -p "Press Enter to continue..."
             ;;
         22)
             echo -e "${GREEN}Testing Cross-Server Trade...${NC}"
-            bash ./test_scripts/functional/test_trade.sh
+            bash "$SCRIPT_DIR/test_scripts/functional/test_trade.sh"
             read -p "Press Enter to continue..."
             ;;
         23)
             echo -e "${GREEN}Testing Cross-Server Match...${NC}"
-            bash ./test_scripts/distributed/test_distributed_system.sh
+            bash "$SCRIPT_DIR/test_scripts/distributed/test_distributed_system.sh"
             read -p "Press Enter to continue..."
             ;;
         24)
             echo -e "${GREEN}Testing Game State Consistency...${NC}"
-            bash ./test_scripts/functional/test_game_state_consistency.sh
+            bash "$SCRIPT_DIR/test_scripts/functional/test_game_state_consistency.sh"
             read -p "Press Enter to continue..."
             ;;
         25)
             echo -e "${GREEN}Testing Mid-Game Disconnection...${NC}"
-            bash ./test_scripts/functional/test_mid_game_disconnection.sh
+            bash "$SCRIPT_DIR/test_scripts/functional/test_mid_game_disconnection.sh"
             read -p "Press Enter to continue..."
             ;;
         26)
             echo -e "${GREEN}Testing S2S Communication...${NC}"
-            bash ./test_scripts/functional/test_s2s_communication.sh
+            bash "$SCRIPT_DIR/test_scripts/functional/test_s2s_communication.sh"
             read -p "Press Enter to continue..."
             ;;
         27)
             echo -e "${GREEN}Testing Redis Sentinel...${NC}"
-            bash ./test_scripts/infrastructure/test_redis_sentinel.sh
+            bash "$SCRIPT_DIR/test_scripts/infrastructure/test_redis_sentinel.sh"
             read -p "Press Enter to continue..."
             ;;
         28)
             echo -e "${GREEN}Testing Redis Failover...${NC}"
-            bash ./test_scripts/infrastructure/test_redis_failover.sh
+            bash "$SCRIPT_DIR/test_scripts/infrastructure/test_redis_failover.sh"
             read -p "Press Enter to continue..."
             ;;
         29)
             echo -e "${GREEN}Testing Stock Concurrency...${NC}"
-            bash ./test_scripts/concurrency/test_stock_concurrency.sh
+            bash "$SCRIPT_DIR/test_scripts/concurrency/test_stock_concurrency.sh"
             read -p "Press Enter to continue..."
             ;;
         30)
             echo -e "${GREEN}Testing Cross Server Matchmaking...${NC}"
-            bash ./test_scripts/distributed/test_distributed_matchmaking.sh
+            bash "$SCRIPT_DIR/test_scripts/distributed/test_distributed_matchmaking.sh"
             read -p "Press Enter to continue..."
             ;;
         31)
             echo -e "${GREEN}Testing Distributed Matchmaking...${NC}"
-            bash ./test_scripts/distributed/test_distributed_matchmaking.sh
+            bash "$SCRIPT_DIR/test_scripts/distributed/test_distributed_matchmaking.sh"
             read -p "Press Enter to continue..."
             ;;
         32)
             echo -e "${GREEN}Testing Advanced Security...${NC}"
-            bash ./test_scripts/security/test_advanced_security.sh
+            bash "$SCRIPT_DIR/test_scripts/security/test_advanced_security.sh"
             read -p "Press Enter to continue..."
             ;;
         33)
             echo -e "${GREEN}Running All Tests...${NC}"
-            bash ./test_scripts/run_all_tests.sh
+            bash "$SCRIPT_DIR/test_scripts/run_all_tests.sh"
             read -p "Press Enter to continue..."
             ;;
         34)
             echo -e "${GREEN}Monitoring All Logs...${NC}"
-            bash ./scripts/monitor/monitor_logs.sh
+            bash "$SCRIPT_DIR/scripts/monitor/monitor_logs.sh"
             read -p "Press Enter to continue..."
             ;;
         35)
             echo -e "${GREEN}Checking WebSocket Status...${NC}"
-            bash ./scripts/check_websocket_status.sh 2>/dev/null || echo "WebSocket status script not found"
+            bash "$SCRIPT_DIR/scripts/check_websocket_status.sh" 2>/dev/null || echo "WebSocket status script not found"
             read -p "Press Enter to continue..."
             ;;
         36)
             echo -e "${GREEN}Resetting Card Stock...${NC}"
-            bash ./scripts/reset_stock.sh 2>/dev/null || echo "Reset stock script not found"
+            bash "$SCRIPT_DIR/scripts/reset_stock.sh" 2>/dev/null || echo "Reset stock script not found"
             read -p "Press Enter to continue..."
             ;;
         37)
             echo -e "${GREEN}Viewing Logs...${NC}"
-            bash ./test_scripts/functional/test_logs.sh 2>/dev/null || docker logs $(docker ps -q) 2>/dev/null || echo "No logs available"
+            bash "$SCRIPT_DIR/test_scripts/functional/test_logs.sh" 2>/dev/null || docker logs $(docker ps -q) 2>/dev/null || echo "No logs available"
             read -p "Press Enter to continue..."
             ;;
         38)
@@ -418,18 +430,17 @@ while true; do
             echo ""
             
             # Check if node_modules exists
-            if [ ! -d "dueling-blockchain/node_modules" ]; then
+            if [ ! -d "$SCRIPT_DIR/dueling-blockchain/node_modules" ]; then
                 echo "📦 Installing blockchain dependencies first..."
-                cd dueling-blockchain && npm install && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && npm install)
                 echo ""
             fi
             
             # Create logs directory
-            mkdir -p logs
+            mkdir -p "$SCRIPT_DIR/logs"
             
-            echo "Starting node... (logging to logs/blockchain-node.log)"
-            cd dueling-blockchain && npm run node 2>&1 | tee ../logs/blockchain-node.log
-            cd ..
+            echo "Starting node... (logging to $SCRIPT_DIR/logs/blockchain-node.log)"
+            (cd "$SCRIPT_DIR/dueling-blockchain" && npm run node 2>&1 | tee "$SCRIPT_DIR/logs/blockchain-node.log")
             read -p "Press Enter to continue..."
             ;;
         40)
@@ -441,7 +452,7 @@ while true; do
                 echo ""
                 echo "You need to start the blockchain node first:"
                 echo "  1. Open a NEW terminal"
-                echo "  2. Run: ./menu.sh"
+                echo "  2. Run: $SCRIPT_DIR/menu.sh"
                 echo "  3. Select option 39 (Start Blockchain Node)"
                 echo "  4. Keep that terminal open"
                 echo "  5. Return here and try again"
@@ -454,9 +465,9 @@ while true; do
             echo ""
             
             # Create logs directory
-            mkdir -p logs
+            mkdir -p "$SCRIPT_DIR/logs"
             
-            cd dueling-blockchain && npm run deploy:local 2>&1 | tee ../logs/blockchain-deploy.log && cd ..
+            (cd "$SCRIPT_DIR/dueling-blockchain" && npm run deploy:local 2>&1 | tee "$SCRIPT_DIR/logs/blockchain-deploy.log")
             
             echo ""
             echo -e "${GREEN}✅ Contracts deployed successfully!${NC}"
@@ -469,67 +480,8 @@ while true; do
             read -p "Press Enter to continue..."
             ;;
         41)
-            echo -e "${GREEN}Simulating Blockchain Transactions...${NC}"
-            
-            # Check if blockchain node is running
-            if ! lsof -i:8545 > /dev/null 2>&1; then
-                echo -e "${RED}❌ Blockchain node is NOT running!${NC}"
-                echo "Start it with option 39 first."
-                read -p "Press Enter to continue..."
-                continue
-            fi
-            
-            echo -e "${YELLOW}This will simulate: Pack Purchase, Trades, and Matches${NC}"
-            echo ""
-            cd dueling-blockchain && npm run simulate && cd ..
-            echo ""
-            echo -e "${GREEN}✅ Simulation completed!${NC}"
-            echo "You can now verify the data with options 42-46"
-            read -p "Press Enter to continue..."
-            ;;
-        42)
-            echo -e "${GREEN}Verifying Card Ownership...${NC}"
-            
-            # Check if blockchain node is running
-            if ! lsof -i:8545 > /dev/null 2>&1; then
-                echo -e "${RED}❌ Blockchain node is NOT running!${NC}"
-                echo "Start it with: ./menu.sh → 39"
-                read -p "Press Enter to continue..."
-                continue
-            fi
-            
-            echo ""
-            read -p "Enter player address (or press Enter for default): " player_addr
-            if [ -z "$player_addr" ]; then
-                cd dueling-blockchain && npm run verify:ownership && cd ..
-            else
-                cd dueling-blockchain && PLAYER_ADDRESS="$player_addr" npm run verify:ownership && cd ..
-            fi
-            read -p "Press Enter to continue..."
-            ;;
-        43)
-            echo -e "${GREEN}Verifying Card Uniqueness...${NC}"
-            
-            # Check if blockchain node is running
-            if ! lsof -i:8545 > /dev/null 2>&1; then
-                echo -e "${RED}❌ Blockchain node is NOT running!${NC}"
-                echo "Start it with: ./menu.sh → 39"
-                read -p "Press Enter to continue..."
-                continue
-            fi
-            
-            echo ""
-            read -p "Enter Token ID to verify: " token_id
-            if [ -z "$token_id" ]; then
-                echo -e "${RED}Token ID is required!${NC}"
-            else
-                cd dueling-blockchain && TOKEN_ID="$token_id" npm run verify:card && cd ..
-            fi
-            read -p "Press Enter to continue..."
-            ;;
-        41)
             echo -e "${GREEN}Verifying Distributed Ledger...${NC}"
-            bash ./scripts/verify_blockchain_ledger.sh
+            bash "$SCRIPT_DIR/scripts/verify_blockchain_ledger.sh"
             read -p "Press Enter to continue..."
             ;;
         42)
@@ -538,12 +490,12 @@ while true; do
             # Check if blockchain node is running
             if ! lsof -i:8545 > /dev/null 2>&1; then
                 echo -e "${RED}❌ Blockchain node is NOT running!${NC}"
-                echo "Start it with: ./menu.sh → 39"
+                echo "Start it with: $SCRIPT_DIR/menu.sh → 39"
                 read -p "Press Enter to continue..."
                 continue
             fi
             
-            cd dueling-blockchain && npm run simulate && cd ..
+            (cd "$SCRIPT_DIR/dueling-blockchain" && npm run simulate)
             read -p "Press Enter to continue..."
             ;;
         43)
@@ -552,7 +504,7 @@ while true; do
             # Check if blockchain node is running
             if ! lsof -i:8545 > /dev/null 2>&1; then
                 echo -e "${RED}❌ Blockchain node is NOT running!${NC}"
-                echo "Start it with: ./menu.sh → 39"
+                echo "Start it with: $SCRIPT_DIR/menu.sh → 39"
                 read -p "Press Enter to continue..."
                 continue
             fi
@@ -560,9 +512,9 @@ while true; do
             echo ""
             read -p "Enter player address (or press Enter for default): " player_addr
             if [ -z "$player_addr" ]; then
-                cd dueling-blockchain && npm run verify:ownership && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && npm run verify:ownership)
             else
-                cd dueling-blockchain && PLAYER_ADDRESS="$player_addr" npm run verify:ownership && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && PLAYER_ADDRESS="$player_addr" npm run verify:ownership)
             fi
             read -p "Press Enter to continue..."
             ;;
@@ -572,12 +524,12 @@ while true; do
             # Check if blockchain node is running
             if ! lsof -i:8545 > /dev/null 2>&1; then
                 echo -e "${RED}❌ Blockchain node is NOT running!${NC}"
-                echo "Start it with: ./menu.sh → 39"
+                echo "Start it with: $SCRIPT_DIR/menu.sh → 39"
                 read -p "Press Enter to continue..."
                 continue
             fi
             
-            cd dueling-blockchain && npm run verify:uniqueness && cd ..
+            (cd "$SCRIPT_DIR/dueling-blockchain" && npm run verify:uniqueness)
             read -p "Press Enter to continue..."
             ;;
         45)
@@ -586,7 +538,7 @@ while true; do
             # Check if blockchain node is running
             if ! lsof -i:8545 > /dev/null 2>&1; then
                 echo -e "${RED}❌ Blockchain node is NOT running!${NC}"
-                echo "Start it with: ./menu.sh → 39"
+                echo "Start it with: $SCRIPT_DIR/menu.sh → 39"
                 read -p "Press Enter to continue..."
                 continue
             fi
@@ -594,9 +546,9 @@ while true; do
             echo ""
             read -p "Enter player address (or press Enter for default): " player_addr
             if [ -z "$player_addr" ]; then
-                cd dueling-blockchain && npm run verify:purchases && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && npm run verify:purchases)
             else
-                cd dueling-blockchain && PLAYER_ADDRESS="$player_addr" npm run verify:purchases && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && PLAYER_ADDRESS="$player_addr" npm run verify:purchases)
             fi
             read -p "Press Enter to continue..."
             ;;
@@ -606,7 +558,7 @@ while true; do
             # Check if blockchain node is running
             if ! lsof -i:8545 > /dev/null 2>&1; then
                 echo -e "${RED}❌ Blockchain node is NOT running!${NC}"
-                echo "Start it with: ./menu.sh → 39"
+                echo "Start it with: $SCRIPT_DIR/menu.sh → 39"
                 read -p "Press Enter to continue..."
                 continue
             fi
@@ -614,9 +566,9 @@ while true; do
             echo ""
             read -p "Enter player address (or press Enter for default): " player_addr
             if [ -z "$player_addr" ]; then
-                cd dueling-blockchain && npm run verify:matches && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && npm run verify:matches)
             else
-                cd dueling-blockchain && PLAYER_ADDRESS="$player_addr" npm run verify:matches && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && PLAYER_ADDRESS="$player_addr" npm run verify:matches)
             fi
             read -p "Press Enter to continue..."
             ;;
@@ -628,7 +580,7 @@ while true; do
                 echo -e "${RED}❌ Blockchain node is NOT running!${NC}"
                 echo ""
                 echo "You need to:"
-                echo "   Start with: ./menu.sh → 39"
+                echo "   Start with: $SCRIPT_DIR/menu.sh → 39"
                 read -p "Press Enter to continue..."
                 continue
             fi
@@ -640,27 +592,27 @@ while true; do
             echo -e "${BLUE}1/3: Verifying Card Ownership${NC}"
             echo -e "${BLUE}════════════════════════════════════════${NC}"
             if [ -z "$player_addr" ]; then
-                cd dueling-blockchain && npm run verify:ownership && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && npm run verify:ownership)
             else
-                cd dueling-blockchain && PLAYER_ADDRESS="$player_addr" npm run verify:ownership && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && PLAYER_ADDRESS="$player_addr" npm run verify:ownership)
             fi
             echo ""
             echo -e "${BLUE}════════════════════════════════════════${NC}"
             echo -e "${BLUE}2/3: Viewing Purchase History${NC}"
             echo -e "${BLUE}════════════════════════════════════════${NC}"
             if [ -z "$player_addr" ]; then
-                cd dueling-blockchain && npm run verify:purchases && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && npm run verify:purchases)
             else
-                cd dueling-blockchain && PLAYER_ADDRESS="$player_addr" npm run verify:purchases && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && PLAYER_ADDRESS="$player_addr" npm run verify:purchases)
             fi
             echo ""
             echo -e "${BLUE}════════════════════════════════════════${NC}"
             echo -e "${BLUE}3/3: Viewing Match Results${NC}"
             echo -e "${BLUE}════════════════════════════════════════${NC}"
             if [ -z "$player_addr" ]; then
-                cd dueling-blockchain && npm run verify:matches && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && npm run verify:matches)
             else
-                cd dueling-blockchain && PLAYER_ADDRESS="$player_addr" npm run verify:matches && cd ..
+                (cd "$SCRIPT_DIR/dueling-blockchain" && PLAYER_ADDRESS="$player_addr" npm run verify:matches)
             fi
             echo ""
             echo -e "${GREEN}════════════════════════════════════════${NC}"
@@ -671,12 +623,12 @@ while true; do
         48)
             echo -e "${GREEN}Opening Blockchain Console...${NC}"
             echo -e "${YELLOW}Type 'exit' or Ctrl+D to exit console${NC}"
-            cd dueling-blockchain && npx hardhat console --network localhost && cd ..
+            (cd "$SCRIPT_DIR/dueling-blockchain" && npx hardhat console --network localhost)
             read -p "Press Enter to continue..."
             ;;
         49)
             echo -e "${GREEN}Running Blockchain Tests...${NC}"
-            cd dueling-blockchain && npm test && cd ..
+            (cd "$SCRIPT_DIR/dueling-blockchain" && npm test)
             read -p "Press Enter to continue..."
             ;;
         50)
@@ -686,16 +638,15 @@ while true; do
             echo ""
             
             echo -e "${GREEN}Step 1/4: Building project...${NC}"
-            mvn clean package -DskipTests
+            (cd "$SCRIPT_DIR" && mvn clean package -DskipTests)
             
             echo ""
             echo -e "${GREEN}Step 2/4: Building Docker images...${NC}"
-            cd docker && docker compose build
+            (cd "$SCRIPT_DIR/docker" && docker compose build)
             
             echo ""
             echo -e "${GREEN}Step 3/4: Starting services...${NC}"
-            docker compose down
-            docker compose up -d
+            (cd "$SCRIPT_DIR/docker" && docker compose down && docker compose up -d)
             
             echo ""
             echo -e "${GREEN}Step 4/4: Waiting for blockchain deploy (45 seconds)...${NC}"
@@ -712,10 +663,9 @@ while true; do
             echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}"
             echo ""
             echo "System is ready! You can now:"
-            echo "  • Run clients: ./menu.sh → 10"
-            echo "  • Verify ledger: ./menu.sh → 54"
+            echo "  • Run clients: $SCRIPT_DIR/menu.sh → 10"
+            echo "  • Verify ledger: $SCRIPT_DIR/menu.sh → 54"
             echo ""
-            cd ..
             read -p "Press Enter to continue..."
             ;;
         51)
@@ -724,21 +674,20 @@ while true; do
             
             if ! docker ps | grep -q "dueling-blockchain"; then
                 echo -e "${RED}❌ Blockchain container is not running!${NC}"
-                echo "Start system first: ./menu.sh → 5"
+                echo "Start system first: $SCRIPT_DIR/menu.sh → 5"
                 read -p "Press Enter to continue..."
                 continue
             fi
             
-            docker exec dueling-blockchain cat /usr/src/app/deployment-info.json > \
-                dueling-blockchain/deployment-info.json
+            docker exec dueling-blockchain cat /usr/src/app/deployment-info.json > "$SCRIPT_DIR/dueling-blockchain/deployment-info.json"
             
             if [ $? -eq 0 ]; then
                 echo -e "${GREEN}✅ Deployment info copied successfully!${NC}"
                 echo ""
-                echo "File location: dueling-blockchain/deployment-info.json"
+                echo "File location: $SCRIPT_DIR/dueling-blockchain/deployment-info.json"
                 echo ""
-                cat dueling-blockchain/deployment-info.json | python3 -m json.tool 2>/dev/null || \
-                    cat dueling-blockchain/deployment-info.json
+                cat "$SCRIPT_DIR/dueling-blockchain/deployment-info.json" | python3 -m json.tool 2>/dev/null || \
+                    cat "$SCRIPT_DIR/dueling-blockchain/deployment-info.json"
             else
                 echo -e "${RED}❌ Failed to copy deployment info${NC}"
             fi
@@ -753,11 +702,11 @@ while true; do
             echo ""
             
             echo -e "${GREEN}Step 1/3: Stopping all services...${NC}"
-            cd docker && docker compose down
+            (cd "$SCRIPT_DIR/docker" && docker compose down)
             
             echo ""
             echo -e "${GREEN}Step 2/3: Starting services...${NC}"
-            docker compose up -d
+            (cd "$SCRIPT_DIR/docker" && docker compose up -d)
             
             echo ""
             echo -e "${GREEN}Step 3/3: Waiting for auto deploy (45 seconds)...${NC}"
@@ -777,7 +726,6 @@ while true; do
             echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
             echo -e "${GREEN}║                  ✅ RESTART COMPLETE!                          ║${NC}"
             echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}"
-            cd ..
             read -p "Press Enter to continue..."
             ;;
         53)
@@ -793,10 +741,10 @@ while true; do
             echo "  5. Play a match"
             echo "  6. Verify ledger"
             echo ""
-            echo -e "${GREEN}Instructions saved in: FINAL_STATUS.md${NC}"
+            echo -e "${GREEN}Instructions saved in: $SCRIPT_DIR/FINAL_STATUS.md${NC}"
             echo ""
             echo -e "${BLUE}Opening guide...${NC}"
-            cat FINAL_STATUS.md | less
+            cat "$SCRIPT_DIR/FINAL_STATUS.md" | less
             read -p "Press Enter to continue..."
             ;;
         54)
@@ -807,14 +755,14 @@ while true; do
             
             if ! docker ps | grep -q "dueling-blockchain"; then
                 echo -e "${RED}❌ Blockchain is not running!${NC}"
-                echo "Start system: ./menu.sh → 5"
+                echo "Start system: $SCRIPT_DIR/menu.sh → 5"
                 read -p "Press Enter to continue..."
                 continue
             fi
             
             echo -e "${GREEN}Step 1/2: Copying deployment info...${NC}"
             docker exec dueling-blockchain cat /usr/src/app/deployment-info.json > \
-                dueling-blockchain/deployment-info.json 2>/dev/null
+                "$SCRIPT_DIR/dueling-blockchain/deployment-info.json" 2>/dev/null
             
             if [ $? -eq 0 ]; then
                 echo -e "${GREEN}✅ Deployment info updated${NC}"
@@ -825,7 +773,7 @@ while true; do
             echo ""
             echo -e "${GREEN}Step 2/2: Verifying ledger...${NC}"
             echo ""
-            bash scripts/verify_blockchain_ledger.sh
+            bash "$SCRIPT_DIR/scripts/verify_blockchain_ledger.sh"
             
             echo ""
             read -p "Press Enter to continue..."
@@ -837,20 +785,19 @@ while true; do
             echo ""
             
             echo -e "${GREEN}Step 1/5: Maven clean compile...${NC}"
-            mvn clean compile
+            (cd "$SCRIPT_DIR" && mvn clean compile)
             
             echo ""
             echo -e "${GREEN}Step 2/5: Maven package...${NC}"
-            mvn package -DskipTests
+            (cd "$SCRIPT_DIR" && mvn package -DskipTests)
             
             echo ""
             echo -e "${GREEN}Step 3/5: Docker build...${NC}"
-            cd docker && docker compose build
+            (cd "$SCRIPT_DIR/docker" && docker compose build)
             
             echo ""
             echo -e "${GREEN}Step 4/5: Restart system...${NC}"
-            docker compose down
-            docker compose up -d
+            (cd "$SCRIPT_DIR/docker" && docker compose down && docker compose up -d)
             
             echo ""
             echo -e "${GREEN}Step 5/5: Waiting for deploy (45s)...${NC}"
@@ -870,7 +817,61 @@ while true; do
             echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
             echo -e "${GREEN}║                 ✅ REBUILD COMPLETE!                           ║${NC}"
             echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}"
-            cd ..
+            read -p "Press Enter to continue..."
+            ;;
+        60)
+            echo -e "${GREEN}Starting Redis Master...${NC}"
+            bash "$SCRIPT_DIR/scripts/run/start_redis_master.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        61)
+            echo -e "${GREEN}Starting Redis Slave...${NC}"
+            bash "$SCRIPT_DIR/scripts/run/start_redis_slave.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        62)
+            echo -e "${GREEN}Starting Redis Sentinels...${NC}"
+            bash "$SCRIPT_DIR/scripts/run/start_redis_sentinels.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        63)
+            echo -e "${GREEN}Starting PostgreSQL...${NC}"
+            bash "$SCRIPT_DIR/scripts/run/start_postgresql.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        64)
+            echo -e "${GREEN}Starting Blockchain Node...${NC}"
+            bash "$SCRIPT_DIR/scripts/run/start_blockchain.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        65)
+            echo -e "${GREEN}Starting NGINX Load Balancer...${NC}"
+            bash "$SCRIPT_DIR/scripts/run/start_nginx.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        66)
+            echo -e "${GREEN}Starting Game Servers...${NC}"
+            bash "$SCRIPT_DIR/scripts/run/start_servers.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        70)
+            echo -e "${GREEN}Testing NGINX Failover...${NC}"
+            bash "$SCRIPT_DIR/scripts/test_nginx_failover.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        71)
+            echo -e "${GREEN}Testing Redis Sentinel Failover...${NC}"
+            bash "$SCRIPT_DIR/scripts/test_redis_failover.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        72)
+            echo -e "${GREEN}Validating Complete System...${NC}"
+            bash "$SCRIPT_DIR/scripts/validate_system.sh"
+            read -p "Press Enter to continue..."
+            ;;
+        73)
+            echo -e "${GREEN}Testing Redis Reconnection After Failover...${NC}"
+            bash "$SCRIPT_DIR/scripts/test_redis_reconnection.sh"
             read -p "Press Enter to continue..."
             ;;
         0)
