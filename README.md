@@ -85,7 +85,8 @@ The following diagram shows the physical structure and relationships between sys
 1. **Client Layer**: JavaFX-based GUI communicating via WebSocket
 2. **Gateway Layer**: NGINX reverse proxy for load balancing and routing
 3. **Server Cluster**: Multiple stateless server instances running game logic
-4. **Infrastructure Services**:
+4. **`dueling-blockchain`**: Manages digital assets (cards) as NFTs on a local Ethereum blockchain using Solidity smart contracts.
+5. **Infrastructure Services**:
    - **PostgreSQL**: Single source of truth for persistent data (players, matches, cards)
    - **Redis Sentinel Cluster**: High-availability cache, Pub/Sub broker, and leader election
    - **Sentinels**: Automatic failover and monitoring
@@ -178,7 +179,10 @@ The following diagram illustrates the complete flow of key operations:
 | PostgreSQL | 16 | Relational database |
 | Redis | 7.2 | Cache, Pub/Sub, distributed locks |
 | Redisson | 3.25.0 | Redis client with advanced features |
-| NGINX | latest | Reverse proxy & load balancer |
+| NGINX      | latest  | Reverse proxy & load balancer |
+| Node.js    | 18+     | Blockchain Environment        |
+| Hardhat    | 2.x     | Ethereum Development Framework|
+| Solidity   | 0.8.x   | Smart Contract Language       |
 
 ### Libraries & Frameworks
 
@@ -240,6 +244,16 @@ mvn clean package -DskipTests
 mvn clean package
 ```
 
+### 3. Install Blockchain Dependencies
+
+Navigate to the blockchain directory and install the necessary npm packages. This is required for the Docker build and for running local tests.
+
+```bash
+cd dueling-blockchain
+npm install
+cd ..
+```
+
 ### 3. Build Docker Images (Optional)
 
 ```bash
@@ -253,65 +267,47 @@ docker compose build
 
 ## Running the Project
 
-### Full Distributed Setup
+### Using Docker (Recommended Method)
 
-Start the complete distributed system with all infrastructure services:
+The recommended way to run the entire system is by using the provided shell script. This script handles building the images, starting all services in the correct order, and deploying the necessary smart contracts to the local blockchain.
 
 ```bash
-# Navigate to docker directory
-cd docker
+# Make sure the script is executable
+chmod +x scripts/start-complete-with-blockchain.sh
 
-# Start all services (PostgreSQL, Redis Sentinel, Gateway, Servers)
-docker compose up -d
-
-# Check status
-docker compose ps
-
-# View logs
-docker compose logs -f
+# Run the script
+./scripts/start-complete-with-blockchain.sh
 ```
 
-**Services Started:**
-- PostgreSQL (port 5432)
-- Redis Master (port 6379)
-- Redis Slaves (ports 6380-6381)
-- Redis Sentinels (ports 26379-26381)
-- NGINX Gateway (port 80)
-- Game Server 1 (port 8080)
-- Game Server 2 (port 8083)
+This will start all services, including:
+- NGINX Gateway (port 8080)
+- Multiple Game Servers
+- PostgreSQL Database
+- Redis Sentinel Cluster
+- Dueling-Blockchain Node (port 8545)
+- Prometheus & Grafana for monitoring
 
-### Local Development
+To stop the system, use the corresponding stop script:
+```bash
+./scripts/stop-all-with-blockchain.sh
+```
 
-For faster development iterations without Docker:
+### Local Development (Advanced)
+
+For faster development iterations without Docker for the Java services, you can run the infrastructure in Docker and the servers locally.
 
 ```bash
-# Terminal 1: Start infrastructure
+# Terminal 1: Start infrastructure (DB, Redis, Blockchain)
 cd docker
-docker compose up postgres redis-master redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 -d
+docker compose up -d postgres redis-master redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 dueling-blockchain
 
 # Terminal 2: Start Server 1
-SERVER_PORT=8080 \
-SERVER_NAME=server-1 \
-POSTGRES_HOST=localhost \
-POSTGRES_PORT=5432 \
-REDIS_HOST=localhost \
-REDIS_PORT=6379 \
-java -Dspring.profiles.active=server,distributed,local-distributed \
-     -jar dueling-server/target/dueling-server-1.0-SNAPSHOT.jar
+./scripts/run_server.sh 8081 server-1
 
 # Terminal 3: Start Server 2
-SERVER_PORT=8083 \
-SERVER_NAME=server-2 \
-POSTGRES_HOST=localhost \
-POSTGRES_PORT=5432 \
-REDIS_HOST=localhost \
-REDIS_PORT=6379 \
-java -Dspring.profiles.active=server,distributed,local-distributed \
-     -jar dueling-server/target/dueling-server-1.0-SNAPSHOT.jar
-
-# Terminal 4: Run tests
-./test_scripts/test_cross_server_trade.sh
+./scripts/run_server.sh 8082 server-2
 ```
+
 
 ### Production Mode
 
@@ -504,6 +500,16 @@ mvn test -Dtest=MatchmakingServiceTest
 
 # Run with coverage
 mvn clean test jacoco:report
+```
+
+### Blockchain Tests
+
+Run the tests for the Solidity smart contracts using Hardhat.
+
+```bash
+cd dueling-blockchain
+npx hardhat test
+cd ..
 ```
 
 ### Integration Tests
