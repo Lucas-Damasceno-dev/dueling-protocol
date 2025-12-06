@@ -2,6 +2,7 @@ package service.store;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import model.Card;
 import model.CardPack;
 import model.Player;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import service.lock.LockService;
 import service.blockchain.BlockchainService;
+import service.oracle.OracleService;
 
 @Service
 @Transactional
@@ -21,12 +23,19 @@ public class StoreServiceImpl implements StoreService {
     private final CardPackFactory cardPackFactory;
     private final LockService lockService;
     private final BlockchainService blockchainService;
+    private final OracleService oracleService;
 
     @Autowired
-    public StoreServiceImpl(CardPackFactory cardPackFactory, LockService lockService, BlockchainService blockchainService) {
+    public StoreServiceImpl(
+        CardPackFactory cardPackFactory, 
+        LockService lockService, 
+        BlockchainService blockchainService,
+        OracleService oracleService
+    ) {
         this.cardPackFactory = cardPackFactory;
         this.lockService = lockService;
         this.blockchainService = blockchainService;
+        this.oracleService = oracleService;
     }
 
     @Override
@@ -82,6 +91,19 @@ public class StoreServiceImpl implements StoreService {
             
             // Record purchase on blockchain asynchronously
             blockchainService.recordPurchase(player, newCards, packType);
+            
+            // ORACLE PATTERN: Record cryptographic proof on blockchain
+            String purchaseId = "purchase-" + UUID.randomUUID().toString();
+            long timestamp = System.currentTimeMillis();
+            oracleService.recordPurchaseProof(
+                purchaseId,
+                player,
+                newCards,
+                packType,
+                pack.getCost(),
+                timestamp
+            );
+            logger.info("🔐 Oracle proof queued for purchase: {}", purchaseId);
             
             return PurchaseResult.success(newCards);
 

@@ -71,6 +71,7 @@ public class GameFacade {
     private final ChatGroupService chatGroupService;
     private final service.lock.LockService lockService;
     private final BlockchainService blockchainService;
+    private final service.oracle.OracleService oracleService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -87,7 +88,7 @@ public class GameFacade {
                       ChatGroupService chatGroupService, InGameChatService inGameChatService, EmoteService emoteService,
                       service.lock.LockService lockService, WebSocketSessionManager sessionManager,
                       TransactionTemplate transactionTemplate, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
-                      BlockchainService blockchainService) {
+                      BlockchainService blockchainService, service.oracle.OracleService oracleService) {
         this.matchmakingService = matchmakingService;
         this.storeService = storeService;
         this.playerRepository = playerRepository;
@@ -111,6 +112,7 @@ public class GameFacade {
         this.transactionTemplate = transactionTemplate;
         this.jdbcTemplate = jdbcTemplate;
         this.blockchainService = blockchainService;
+        this.oracleService = oracleService;
     }
 
     private String getSelfUrl() {
@@ -696,6 +698,17 @@ public class GameFacade {
         logger.info("🔗 Calling blockchainService.recordMatch() - matchId: {}, winner: {}, loser: {}", 
             matchId, winner != null ? winner.getNickname() : "null", loser != null ? loser.getNickname() : "null");
         blockchainService.recordMatch(matchId, winner, loser);
+        
+        // ORACLE PATTERN: Record cryptographic proof of match
+        oracleService.recordMatchProof(
+            matchId,
+            winner,
+            loser,
+            10, // winner score (could extract from match logic)
+            0,  // loser score
+            System.currentTimeMillis()
+        );
+        logger.info("🔐 Oracle proof queued for match: {}", matchId);
 
         logger.info("Match {} finished. Winner: {}, Loser: {}", matchId, winnerId, loserId);
     }
@@ -813,6 +826,17 @@ public class GameFacade {
                     // Record trade on blockchain asynchronously (before releasing synchronized blocks)
                     java.util.concurrent.CompletableFuture<service.blockchain.BlockchainService.TradeBlockchainStatus> blockchainFuture = 
                         blockchainService.recordTrade(p1, p1OfferedCards, p2, p2RequestedCards, tradeId);
+                    
+                    // ORACLE PATTERN: Record cryptographic proof of trade
+                    oracleService.recordTradeProof(
+                        tradeId,
+                        p1,
+                        p1OfferedCards,
+                        p2,
+                        p2RequestedCards,
+                        System.currentTimeMillis()
+                    );
+                    logger.info("🔐 Oracle proof queued for trade: {}", tradeId);
                     
                     // Handle blockchain result asynchronously
                     blockchainFuture.thenAccept(status -> {

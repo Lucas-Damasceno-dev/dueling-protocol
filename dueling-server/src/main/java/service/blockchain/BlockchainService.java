@@ -17,9 +17,10 @@ import org.web3j.abi.datatypes.generated.Uint8;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
-import org.web3j.tx.RawTransactionManager;
+import org.web3j.tx.FastRawTransactionManager;
 import org.web3j.tx.TransactionManager;
 import org.web3j.tx.gas.ContractGasProvider;
+import org.web3j.tx.response.PollingTransactionReceiptProcessor;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -28,6 +29,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,26 +45,48 @@ public class BlockchainService {
     private final TransactionManager transactionManager;
     private final Map<String, BigInteger> cardTokenIdMapping;
     private final Map<String, String> addressToUsernameMapping;
-    private final Map<String, String> playerIdToAddressMapping; // Persistent player → address
-    private int nextAddressIndex = 0; // Track next available address
+    private final Map<String, String> playerIdToAddressMapping;
+    private int nextAddressIndex = 0;
+    
+    // Shared executor injected from BlockchainConfig
+    private final ExecutorService blockchainExecutor;
 
     @Autowired
-    public BlockchainService(BlockchainConfig config, Web3j web3j, ContractGasProvider gasProvider) {
+    public BlockchainService(
+        BlockchainConfig config, 
+        Web3j web3j, 
+        ContractGasProvider gasProvider,
+        ExecutorService blockchainExecutor
+    ) {
         this.config = config;
         this.web3j = web3j;
         this.gasProvider = gasProvider;
+        this.blockchainExecutor = blockchainExecutor;
         this.cardTokenIdMapping = new java.util.concurrent.ConcurrentHashMap<>();
         this.addressToUsernameMapping = new java.util.concurrent.ConcurrentHashMap<>();
-        this.playerIdToAddressMapping = new java.util.concurrent.ConcurrentHashMap<>(); // NEW
+        this.playerIdToAddressMapping = new java.util.concurrent.ConcurrentHashMap<>();
         
         // Use deployer account private key (Account #0 from Hardhat)
         String privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
         this.credentials = Credentials.create(privateKey);
         
         if (config.isBlockchainEnabled() && web3j != null) {
-            // Chain ID 1337 is configured in hardhat.config.js
-            this.transactionManager = new RawTransactionManager(web3j, credentials, 1337L);
+            // Use FastRawTransactionManager with polling processor for automatic nonce management
+            PollingTransactionReceiptProcessor receiptProcessor = new PollingTransactionReceiptProcessor(
+                web3j,
+                1000, // polling interval in ms
+                30    // max attempts
+            );
+            
+            this.transactionManager = new FastRawTransactionManager(
+                web3j, 
+                credentials,
+                1337L, // chain ID
+                receiptProcessor
+            );
+            
             logger.info("BlockchainService initialized - Blockchain integration ENABLED");
+            logger.info("Using FastRawTransactionManager with automatic nonce management");
             logger.info("Using account: {}", credentials.getAddress());
             logger.info("AssetContract: {}", config.getAssetContractAddress());
             loadAddressMapping();
@@ -78,18 +103,25 @@ public class BlockchainService {
             return;
         }
 
-        try {
-            logger.info("Recording {} cards on blockchain for {}", cards.size(), player.getNickname());
-            
-            for (Card card : cards) {
-                mintCardOnBlockchain(player, card);
+        // Submit to sequential executor to avoid nonce conflicts
+        blockchainExecutor.submit(() -> {
+            try {
+                logger.info("Recording {} cards on blockchain for {}", cards.size(), player.getNickname());
+                
+                for (Card card : cards) {
+                    try {
+                        mintCardOnBlockchain(player, card);
+                    } catch (Exception e) {
+                        logger.error("Failed to mint card {} on blockchain: {}", card.getId(), e.getMessage());
+                    }
+                }
+                
+                logger.info("Purchase recorded on blockchain for {}", player.getNickname());
+                
+            } catch (Exception e) {
+                logger.error("Failed to record purchase on blockchain: {}", e.getMessage());
             }
-            
-            logger.info("Purchase recorded on blockchain for {}", player.getNickname());
-            
-        } catch (Exception e) {
-            logger.error("Failed to record purchase on blockchain: {}", e.getMessage());
-        }
+        });
     }
 
     private void mintCardOnBlockchain(Player player, Card card) throws Exception {
@@ -240,8 +272,12 @@ public class BlockchainService {
             return java.util.concurrent.CompletableFuture.completedFuture(status);
         }
 
-        try {
-            String addr1 = getPlayerAddress(player1);
+        // Submit entire trade to sequential executor to avoid nonce conflicts
+        java.util.concurrent.CompletableFuture<TradeBlockchainStatus> future = new java.util.concurrent.CompletableFuture<>();
+        
+        blockchainExecutor.submit(() -> {
+            try {
+                String addr1 = getPlayerAddress(player1);
             String addr2 = getPlayerAddress(player2);
             
             logger.info("🔄 Recording trade on blockchain - {} ↔ {}", player1.getNickname(), player2.getNickname());
@@ -291,7 +327,8 @@ public class BlockchainService {
                 logger.warn("   Available card mappings: {}", cardTokenIdMapping.keySet());
                 status.success = false;
                 status.message = "None of the traded cards have blockchain tokens. Trade completed in database only.";
-                return java.util.concurrent.CompletableFuture.completedFuture(status);
+                future.complete(status);
+                return;
             }
             
             // Warn about one-way transfers
@@ -318,6 +355,8 @@ public class BlockchainService {
                 if (transferCard(addr1, addr2, tokenId)) {
                     player1Transferred++;
                 }
+                // Small delay to ensure nonce is updated
+                Thread.sleep(200);
             }
             
             // Transfer player2's cards to player1
@@ -325,6 +364,7 @@ public class BlockchainService {
                 if (transferCard(addr2, addr1, tokenId)) {
                     player2Transferred++;
                 }
+                Thread.sleep(200);
             }
             
             logger.info("✅ Trade {} recorded on blockchain - {} cards transferred (P1: {}, P2: {})", 
@@ -347,14 +387,17 @@ public class BlockchainService {
                 status.message = "Trade fully recorded on blockchain";
             }
             
-            return java.util.concurrent.CompletableFuture.completedFuture(status);
+            future.complete(status);
             
-        } catch (Exception e) {
-            logger.error("❌ Failed to record trade on blockchain: {}", e.getMessage(), e);
-            status.success = false;
-            status.message = "Blockchain error: " + e.getMessage();
-            return java.util.concurrent.CompletableFuture.completedFuture(status);
-        }
+            } catch (Exception e) {
+                logger.error("❌ Failed to record trade on blockchain: {}", e.getMessage(), e);
+                status.success = false;
+                status.message = "Blockchain error: " + e.getMessage();
+                future.complete(status);
+            }
+        });
+        
+        return future;
     }
     
     // Inner class to hold trade blockchain status
@@ -466,53 +509,56 @@ public class BlockchainService {
             return;
         }
 
-        try {
-            String winnerAddr = winner != null ? getPlayerAddress(winner) : "0x0000000000000000000000000000000000000000";
-            String loserAddr = loser != null ? getPlayerAddress(loser) : "0x0000000000000000000000000000000000000000";
-            
-            // Convert matchId to bytes32 using hash
-            byte[] matchIdHash = hashToBytes32(matchId);
-            
-            logger.debug("Calling blockchain with player1: {}, player2: {}, winner: {}", loserAddr, winnerAddr, winnerAddr);
-            
-            // MatchContract signature: recordMatch(address player1, address player2, address winner, bytes32 gameStateHash, uint8 player1Score, uint8 player2Score)
-            Function function = new Function(
-                "recordMatch",
-                Arrays.asList(
-                    new org.web3j.abi.datatypes.Address(loserAddr),    // player1 (loser)
-                    new org.web3j.abi.datatypes.Address(winnerAddr),   // player2 (winner)
-                    new org.web3j.abi.datatypes.Address(winnerAddr),   // winner
-                    new org.web3j.abi.datatypes.generated.Bytes32(matchIdHash), // gameStateHash
-                    new org.web3j.abi.datatypes.generated.Uint8(0),    // player1Score (loser)
-                    new org.web3j.abi.datatypes.generated.Uint8(100)   // player2Score (winner)
-                ),
-                Collections.emptyList()
-            );
-
-            String encodedFunction = FunctionEncoder.encode(function);
-            
-            logger.debug("🔍 Encoded function data: {}", encodedFunction);
-            logger.debug("🔍 Function selector: {}", encodedFunction.substring(0, 10));
-            logger.debug("🔍 Target contract: {}", config.getMatchContractAddress());
-            
-            org.web3j.protocol.core.methods.response.EthSendTransaction response = 
-                transactionManager.sendTransaction(
-                    gasProvider.getGasPrice(),
-                    gasProvider.getGasLimit(),
-                    config.getMatchContractAddress(),
-                    encodedFunction,
-                    BigInteger.ZERO
+        // Submit to sequential executor to avoid nonce conflicts
+        blockchainExecutor.submit(() -> {
+            try {
+                String winnerAddr = winner != null ? getPlayerAddress(winner) : "0x0000000000000000000000000000000000000000";
+                String loserAddr = loser != null ? getPlayerAddress(loser) : "0x0000000000000000000000000000000000000000";
+                
+                // Convert matchId to bytes32 using hash
+                byte[] matchIdHash = hashToBytes32(matchId);
+                
+                logger.debug("Calling blockchain with player1: {}, player2: {}, winner: {}", loserAddr, winnerAddr, winnerAddr);
+                
+                // MatchContract signature: recordMatch(address player1, address player2, address winner, bytes32 gameStateHash, uint8 player1Score, uint8 player2Score)
+                Function function = new Function(
+                    "recordMatch",
+                    Arrays.asList(
+                        new org.web3j.abi.datatypes.Address(loserAddr),    // player1 (loser)
+                        new org.web3j.abi.datatypes.Address(winnerAddr),   // player2 (winner)
+                        new org.web3j.abi.datatypes.Address(winnerAddr),   // winner
+                        new org.web3j.abi.datatypes.generated.Bytes32(matchIdHash), // gameStateHash
+                        new org.web3j.abi.datatypes.generated.Uint8(0),    // player1Score (loser)
+                        new org.web3j.abi.datatypes.generated.Uint8(100)   // player2Score (winner)
+                    ),
+                    Collections.emptyList()
                 );
 
-            if (!response.hasError()) {
-                logger.info("✅ Match {} recorded on blockchain - Tx: {}", matchId, response.getTransactionHash());
-            } else {
-                logger.error("❌ Blockchain error: {}", response.getError().getMessage());
+                String encodedFunction = FunctionEncoder.encode(function);
+                
+                logger.debug("🔍 Encoded function data: {}", encodedFunction);
+                logger.debug("🔍 Function selector: {}", encodedFunction.substring(0, 10));
+                logger.debug("🔍 Target contract: {}", config.getMatchContractAddress());
+                
+                org.web3j.protocol.core.methods.response.EthSendTransaction response = 
+                    transactionManager.sendTransaction(
+                        gasProvider.getGasPrice(),
+                        gasProvider.getGasLimit(),
+                        config.getMatchContractAddress(),
+                        encodedFunction,
+                        BigInteger.ZERO
+                    );
+
+                if (!response.hasError()) {
+                    logger.info("✅ Match {} recorded on blockchain - Tx: {}", matchId, response.getTransactionHash());
+                } else {
+                    logger.error("❌ Blockchain error: {}", response.getError().getMessage());
+                }
+                
+            } catch (Exception e) {
+                logger.error("Failed to record match: {}", e.getMessage(), e);
             }
-            
-        } catch (Exception e) {
-            logger.error("Failed to record match: {}", e.getMessage(), e);
-        }
+        });
     }
 
     private String getPlayerAddress(Player player) {
