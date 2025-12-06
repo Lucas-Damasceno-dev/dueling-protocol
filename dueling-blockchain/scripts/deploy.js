@@ -45,15 +45,40 @@ async function main() {
   await matchContract.waitForDeployment();
   console.log("✅ MatchContract deployed to:", await matchContract.getAddress());
 
+  // Deploy IntegrityContract (Oracle Pattern)
+  console.log("\n📦 Deploying IntegrityContract (Oracle Pattern)...");
+  const IntegrityContract = await hre.ethers.getContractFactory("IntegrityContract");
+  const integrityContract = await IntegrityContract.deploy();
+  await integrityContract.waitForDeployment();
+  console.log("✅ IntegrityContract deployed to:", await integrityContract.getAddress());
+
+  // Deploy OracleRegistry
+  console.log("\n📦 Deploying OracleRegistry...");
+  const OracleRegistry = await hre.ethers.getContractFactory("OracleRegistry");
+  const oracleRegistry = await OracleRegistry.deploy();
+  await oracleRegistry.waitForDeployment();
+  console.log("✅ OracleRegistry deployed to:", await oracleRegistry.getAddress());
+
+  // Register deployer as first oracle
+  console.log("\n🔄 Registering deployer as authorized oracle...");
+  await oracleRegistry.registerOracle(
+    deployer.address,
+    "Game Server 1",
+    "http://localhost:8080"
+  );
+  console.log("✅ Deployer registered as oracle in registry");
+
   // Summary
   console.log("\n" + "=".repeat(70));
   console.log("🎉 DEPLOYMENT COMPLETE!");
   console.log("=".repeat(70));
   console.log("\n📋 Contract Addresses:");
-  console.log("   AssetContract  :", await assetContract.getAddress());
-  console.log("   StoreContract  :", await storeContract.getAddress());
-  console.log("   TradeContract  :", await tradeContract.getAddress());
-  console.log("   MatchContract  :", await matchContract.getAddress());
+  console.log("   AssetContract     :", await assetContract.getAddress());
+  console.log("   StoreContract     :", await storeContract.getAddress());
+  console.log("   TradeContract     :", await tradeContract.getAddress());
+  console.log("   MatchContract     :", await matchContract.getAddress());
+  console.log("   IntegrityContract :", await integrityContract.getAddress());
+  console.log("   OracleRegistry    :", await oracleRegistry.getAddress());
   console.log("\n📝 Save these addresses for integration with the gateway!\n");
 
   // Save deployment info to file
@@ -67,6 +92,8 @@ async function main() {
       StoreContract: await storeContract.getAddress(),
       TradeContract: await tradeContract.getAddress(),
       MatchContract: await matchContract.getAddress(),
+      IntegrityContract: await integrityContract.getAddress(),
+      OracleRegistry: await oracleRegistry.getAddress(),
     },
   };
 
