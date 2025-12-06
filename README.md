@@ -1,6 +1,6 @@
 # Dueling Protocol
 
-A distributed multiplayer card game system built with microservices architecture, featuring cross-server matchmaking, atomic card trading using distributed locks, and real-time WebSocket communication.
+A distributed multiplayer card game system built with microservices architecture, featuring cross-server matchmaking, atomic card trading using distributed locks, real-time WebSocket communication, and **Oracle Pattern blockchain integration** for tamper-evident auditability.
 
 ## 📑 Table of Contents
 
@@ -8,6 +8,7 @@ A distributed multiplayer card game system built with microservices architecture
 - [Distributed Architecture](#distributed-architecture)
   - [Component Diagram](#component-diagram)
   - [Sequence Diagram](#sequence-diagram)
+- [Oracle Pattern Integration](#oracle-pattern-integration)
 - [Key Features](#key-features)
 - [Technologies](#technologies)
 - [System Requirements](#system-requirements)
@@ -17,6 +18,7 @@ A distributed multiplayer card game system built with microservices architecture
   - [Local Development](#local-development)
   - [Production Mode](#production-mode)
 - [Communication Protocol](#communication-protocol)
+- [Blockchain Verification](#blockchain-verification)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
 - [Configuration](#configuration)
@@ -37,6 +39,24 @@ A distributed multiplayer card game system built with microservices architecture
 - 🔐 **Distributed Locking**: Redisson-based distributed locks prevent race conditions
 - 📊 **High Availability**: Redis Sentinel for automatic failover
 - 🎯 **Horizontal Scalability**: Stateless server instances with shared persistence layer
+- 🔗 **Oracle Pattern Blockchain**: Tamper-evident proofs for all critical operations
+
+## Oracle Pattern Integration
+
+**NEW**: This system implements the **Oracle Pattern** for blockchain integration, where:
+
+- **PostgreSQL** maintains operational data for performance
+- **Backend Java servers** act as trusted oracles
+- **Blockchain (Ethereum)** stores cryptographic proofs (SHA-256 hashes) of all operations
+- **Anyone** can verify data integrity by comparing database records with blockchain proofs
+
+This approach provides:
+- ✅ **Tamper-evident storage** - Any data modification is immediately detectable
+- ✅ **Public auditability** - Open API for integrity verification
+- ✅ **Performance** - Fast operations with PostgreSQL
+- ✅ **Decentralized truth** - Blockchain is the ultimate authority
+
+See [ORACLE_PATTERN_IMPLEMENTATION.md](ORACLE_PATTERN_IMPLEMENTATION.md) for detailed documentation.
 
 ## Distributed Architecture
 
@@ -455,6 +475,68 @@ CROSS_SERVER:{playerId}
 SYSTEM:matches
 SYSTEM:trades
 ```
+
+## Blockchain Verification
+
+### Oracle Pattern Integrity Verification
+
+The system records cryptographic proofs of all critical operations on the blockchain. Anyone can verify data integrity:
+
+#### API Endpoints
+
+```bash
+# Health check
+GET http://localhost:8080/api/verify/health
+
+# Get verification instructions  
+GET http://localhost:8080/api/verify/instructions
+
+# Verify a purchase
+POST http://localhost:8080/api/verify/purchase
+Content-Type: application/json
+
+{
+  "purchaseId": "purchase-uuid",
+  "operationType": "PURCHASE",
+  "playerId": "player-id",
+  "packType": "bronze",
+  "coinsCost": 100,
+  "timestamp": 1701900000000,
+  "cardsReceived": [...]
+}
+
+# Verify a trade
+POST http://localhost:8080/api/verify/trade
+
+# Verify a match
+POST http://localhost:8080/api/verify/match
+```
+
+#### Test Verification System
+
+```bash
+# Run automated Oracle Pattern tests
+./test-oracle-pattern.sh
+```
+
+#### How It Works
+
+1. **Operation Occurs**: Player buys pack, trades cards, or finishes match
+2. **Hash Generation**: Backend calculates SHA-256 hash of operation data
+3. **Blockchain Recording**: Hash stored in IntegrityContract (immutable)
+4. **Public Verification**: Anyone can verify by providing same data
+   - System recalculates hash
+   - Compares with blockchain
+   - Match = authentic ✅, Mismatch = tampered ❌
+
+#### Benefits
+
+- **Tamper-Evident**: Impossible to modify data without detection
+- **Public Auditability**: Open API, no authentication required
+- **Cryptographic Proof**: SHA-256 industry standard
+- **Decentralized Truth**: Blockchain is ultimate authority
+
+See [ORACLE_PATTERN_IMPLEMENTATION.md](ORACLE_PATTERN_IMPLEMENTATION.md) for complete documentation.
 
 ## Testing
 
