@@ -13,14 +13,21 @@ import org.web3j.tx.gas.DefaultGasProvider;
 import org.web3j.tx.gas.ContractGasProvider;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class BlockchainConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(BlockchainConfig.class);
+    
+    // Shared executor for ALL blockchain transactions to prevent nonce conflicts
+    private static final ExecutorService BLOCKCHAIN_EXECUTOR = Executors.newSingleThreadExecutor();
 
     @Value("${blockchain.enabled:true}")
     private boolean blockchainEnabled;
@@ -35,6 +42,8 @@ public class BlockchainConfig {
     private String storeContractAddress;
     private String tradeContractAddress;
     private String matchContractAddress;
+    private String integrityContractAddress;
+    private String oracleRegistryAddress;
 
     @PostConstruct
     public void loadContractAddresses() {
@@ -67,12 +76,16 @@ public class BlockchainConfig {
             this.storeContractAddress = contracts.get("StoreContract").asText();
             this.tradeContractAddress = contracts.get("TradeContract").asText();
             this.matchContractAddress = contracts.get("MatchContract").asText();
+            this.integrityContractAddress = contracts.get("IntegrityContract").asText();
+            this.oracleRegistryAddress = contracts.get("OracleRegistry").asText();
             
             logger.info("✅ Contract addresses loaded successfully:");
-            logger.info("   AssetContract: {}", assetContractAddress);
-            logger.info("   StoreContract: {}", storeContractAddress);
-            logger.info("   TradeContract: {}", tradeContractAddress);
-            logger.info("   MatchContract: {}", matchContractAddress);
+            logger.info("   AssetContract     : {}", assetContractAddress);
+            logger.info("   StoreContract     : {}", storeContractAddress);
+            logger.info("   TradeContract     : {}", tradeContractAddress);
+            logger.info("   MatchContract     : {}", matchContractAddress);
+            logger.info("   IntegrityContract : {}", integrityContractAddress);
+            logger.info("   OracleRegistry    : {}", oracleRegistryAddress);
             
         } catch (Exception e) {
             logger.error("Failed to load contract addresses from {}: {}", 
@@ -94,6 +107,30 @@ public class BlockchainConfig {
     public ContractGasProvider gasProvider() {
         return new DefaultGasProvider();
     }
+    
+    /**
+     * Shared blockchain executor to prevent nonce conflicts.
+     * ALL blockchain transactions MUST go through this executor.
+     */
+    @Bean
+    public ExecutorService blockchainExecutor() {
+        logger.info("Creating shared blockchain executor for nonce management");
+        return BLOCKCHAIN_EXECUTOR;
+    }
+    
+    @PreDestroy
+    public void shutdown() {
+        logger.info("Shutting down blockchain executor...");
+        BLOCKCHAIN_EXECUTOR.shutdown();
+        try {
+            if (!BLOCKCHAIN_EXECUTOR.awaitTermination(10, TimeUnit.SECONDS)) {
+                BLOCKCHAIN_EXECUTOR.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            BLOCKCHAIN_EXECUTOR.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
 
     public boolean isBlockchainEnabled() {
         return blockchainEnabled;
@@ -113,5 +150,13 @@ public class BlockchainConfig {
 
     public String getMatchContractAddress() {
         return matchContractAddress;
+    }
+
+    public String getIntegrityContractAddress() {
+        return integrityContractAddress;
+    }
+
+    public String getOracleRegistryAddress() {
+        return oracleRegistryAddress;
     }
 }
