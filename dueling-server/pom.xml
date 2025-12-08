@@ -142,7 +142,21 @@
         <dependency>
             <groupId>org.web3j</groupId>
             <artifactId>core</artifactId>
-            <version>4.10.3</version>
+            <version>5.0.1</version>
+        </dependency>
+
+        <!-- Required by web3j v5 (annotations) -->
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <version>2.1.1</version>
+        </dependency>
+
+        <!-- OkHttp client used by newer web3j HttpService constructors -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.11.0</version>
         </dependency>
         
         

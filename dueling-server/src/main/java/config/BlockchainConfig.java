@@ -2,6 +2,7 @@ package config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -100,7 +101,10 @@ public class BlockchainConfig {
             return null;
         }
         logger.info("Connecting to blockchain node at: {}", nodeUrl);
-        return Web3j.build(new HttpService(nodeUrl));
+        // Build OkHttp client with sensible defaults. web3j v5 prefers passing an OkHttpClient instance.
+        OkHttpClient client = new OkHttpClient.Builder().build();
+        // HttpService expects (String url, OkHttpClient client) in this web3j version
+        return Web3j.build(new HttpService(nodeUrl, client));
     }
 
     @Bean
