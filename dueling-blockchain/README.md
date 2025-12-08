@@ -1,17 +1,32 @@
 # Dueling Protocol - Blockchain Smart Contracts
 
-## ⚠️ IMPORTANTE: Status de Integração
+## ✅ STATUS: INTEGRADO E FUNCIONAL
 
-**O módulo blockchain está FUNCIONAL mas NÃO está integrado ao jogo Java.**
+**O módulo blockchain está TOTALMENTE INTEGRADO ao jogo Java.**
 
-- ✅ **Smart contracts**: Implementados e testados
+- ✅ **Smart contracts**: Implementados, testados e deployados
 - ✅ **Blockchain local**: Funcionando (Hardhat Network)  
-- ❌ **Integração com jogo**: Não implementada
+- ✅ **Integração com jogo**: Totalmente implementada
+- ✅ **Event listeners**: Sincronização em tempo real
+- ✅ **API de transparência**: Verificação pública disponível
 
 **O que isso significa:**
-- Compras, trocas e partidas no jogo são registradas apenas no PostgreSQL
-- Para testar a blockchain, use os scripts de simulação (veja abaixo)
-- A integração blockchain é um recurso futuro planejado
+- Compras, trocas e partidas são registradas na blockchain E no PostgreSQL
+- Jogadores podem verificar seus dados diretamente na blockchain
+- Transparência total: não é necessário confiar no servidor
+- Auditabilidade completa via Etherscan
+
+## 🔍 TRANSPARÊNCIA E AUDITABILIDADE
+
+**Este projeto prioriza transparência. Você não precisa confiar - pode verificar!**
+
+### Para Usuários Finais
+📖 Veja: [VERIFICACAO_USUARIO.md](../VERIFICACAO_USUARIO.md)  
+Guia passo-a-passo para verificar suas cartas e estatísticas
+
+### Para Desenvolvedores
+📖 Veja: [BLOCKCHAIN_TRANSPARENCY_GUIDE.md](../BLOCKCHAIN_TRANSPARENCY_GUIDE.md)  
+API completa de transparência e auditabilidade
 
 ## 📋 Visão Geral
 

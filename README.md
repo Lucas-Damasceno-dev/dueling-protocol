@@ -58,6 +58,148 @@ This approach provides:
 
 See [ORACLE_PATTERN_IMPLEMENTATION.md](ORACLE_PATTERN_IMPLEMENTATION.md) for detailed documentation.
 
+## 🔗 Blockchain Integration Status
+
+### Current Status: ✅ FULLY INTEGRATED AND OPERATIONAL
+
+The blockchain module is **production-ready** with complete integration:
+
+#### ✅ What's Working:
+- **Smart Contracts**: Deployed and tested (AssetContract, TradeContract, MatchContract, StoreContract, IntegrityContract, OracleRegistry)
+- **Backend Integration**: Java backend writes all critical operations to blockchain
+- **Event Listeners**: Real-time synchronization via Web3j event listeners
+- **Transparency API**: REST endpoints for public blockchain verification
+- **Cross-Server Sync**: Blockchain events propagated via Redis Pub/Sub
+
+#### 📊 Data Storage Model:
+- **PostgreSQL**: Primary operational database (fast queries, complex joins)
+- **Blockchain**: Immutable audit trail and proof-of-ownership
+- **Dual-Write Strategy**: Critical operations written to both systems
+
+#### 🎯 What's Recorded On-Chain:
+- ✅ Card minting (NFT creation with metadata)
+- ✅ Card trades (atomic transfers between players)
+- ✅ Match results (immutable win/loss records)
+- ✅ Player statistics (cumulative stats)
+- ✅ Purchase history (provenance tracking)
+
+#### 🔍 Transparency & Auditability:
+- **API Endpoints**: `/api/blockchain/*` for public queries
+- **Etherscan Integration**: Auto-generated explorer links
+- **Verification Methods**: 4 ways to verify data (API, Etherscan, Scripts, Web3 direct)
+- **User Guides**: [VERIFICACAO_USUARIO.md](VERIFICACAO_USUARIO.md) (Portuguese), [BLOCKCHAIN_TRANSPARENCY_GUIDE.md](BLOCKCHAIN_TRANSPARENCY_GUIDE.md) (English)
+
+#### 🌐 Network Support:
+- **Local Development**: Hardhat Network (localhost:8545)
+- **Testnet**: Sepolia (deployment scripts ready)
+- **Mainnet**: Configuration ready (not deployed yet)
+
+#### 📖 Documentation:
+- Main blockchain README: [dueling-blockchain/README.md](dueling-blockchain/README.md)
+- Transparency guide: [BLOCKCHAIN_TRANSPARENCY_GUIDE.md](BLOCKCHAIN_TRANSPARENCY_GUIDE.md)
+- User verification guide: [VERIFICACAO_USUARIO.md](VERIFICACAO_USUARIO.md)
+- Oracle pattern: [ORACLE_PATTERN_IMPLEMENTATION.md](ORACLE_PATTERN_IMPLEMENTATION.md)
+
+### Quick Start - Blockchain
+
+```bash
+# Start local blockchain
+cd dueling-blockchain
+npm install
+npm run node  # Terminal 1
+
+# Deploy contracts
+npm run deploy:local  # Terminal 2
+
+# Verify blockchain integration
+curl http://localhost:8080/api/blockchain/info
+
+# Check player cards on-chain
+curl http://localhost:8080/api/blockchain/cards/0xYOUR_ADDRESS
+```
+
+### Deploy to Sepolia Testnet
+
+```bash
+cd dueling-blockchain
+cp .env.example .env
+# Edit .env with your Infura/Alchemy key and private key
+npm run deploy:sepolia
+npm run verify:contracts  # Verify on Etherscan
+```
+
+**Get testnet ETH**: https://sepoliafaucet.com
+
+## ⚠️ Known Limitations
+
+### Current Limitations:
+
+1. **Blockchain Network**
+   - ❗ **Not deployed to mainnet** - Currently runs on localhost/Sepolia testnet only
+   - ❗ **Gas costs** - Mainnet deployment would require gas optimization
+   - ⚠️ **Single signer** - Oracle uses single private key (should be multi-sig in production)
+
+2. **Scalability Constraints**
+   - ❗ **Shared Database** - PostgreSQL is a single point of bottleneck
+   - ⚠️ **Redis Single Instance** - Can be upgraded to Redis Cluster for higher throughput
+   - ⚠️ **Stateless Servers** - Good for horizontal scaling but session data in Redis
+
+3. **Blockchain Sync**
+   - ⚠️ **Eventual Consistency** - Blockchain confirmations take 1-2 blocks (~15-30 seconds)
+   - ⚠️ **Reorg Risk** - Very rare but possible on testnets (wait 12 blocks for finality)
+
+4. **Security Considerations**
+   - ❗ **Private Key Management** - Oracle private key stored in env var (use KMS in production)
+   - ❗ **No Rate Limiting** - REST API should have rate limits in production
+   - ⚠️ **CORS Enabled** - Currently allows all origins (`origins = "*"`)
+
+5. **Performance**
+   - ⚠️ **Blockchain Writes Async** - Cards appear in database before blockchain confirmation
+   - ⚠️ **No Connection Pooling for Blockchain** - Single Web3j instance per server
+   - ⚠️ **Sequential Blockchain Writes** - Nonce management requires serialization
+
+6. **Monitoring & Observability**
+   - ❗ **No Metrics Collection** - Should integrate Prometheus/Grafana
+   - ❗ **No Distributed Tracing** - Should add OpenTelemetry for cross-service tracing
+   - ⚠️ **Basic Health Checks** - Should add comprehensive readiness/liveness probes
+
+7. **Testing**
+   - ⚠️ **Limited Integration Tests** - Blockchain tests mostly unit-level
+   - ⚠️ **No Load Testing** - Performance under high load not validated
+   - ⚠️ **No Chaos Engineering** - Resilience testing needed
+
+### Planned Improvements:
+
+#### High Priority:
+- [ ] Deploy to Ethereum mainnet
+- [ ] Implement multi-sig oracle pattern
+- [ ] Add rate limiting and DDoS protection
+- [ ] Upgrade to Redis Cluster
+- [ ] Implement comprehensive monitoring (Prometheus + Grafana)
+
+#### Medium Priority:
+- [ ] Add distributed tracing (OpenTelemetry)
+- [ ] Optimize gas usage in smart contracts
+- [ ] Implement connection pooling for blockchain RPC
+- [ ] Add comprehensive integration tests
+- [ ] Implement automatic fallback for RPC providers
+
+#### Low Priority:
+- [ ] Support multiple blockchain networks simultaneously
+- [ ] Add GraphQL API for complex queries
+- [ ] Implement IPFS for card artwork storage
+- [ ] Add WebSocket subscriptions for blockchain events
+
+### Workarounds:
+
+**For Production Deployment:**
+
+1. **Blockchain Gas Costs**: Use L2 solution (Polygon, Arbitrum, Optimism) for cheaper transactions
+2. **Database Bottleneck**: Implement read replicas with master-slave replication
+3. **Redis Single Point of Failure**: Use Redis Sentinel (already configured) or Redis Cluster
+4. **Private Key Security**: Migrate to AWS KMS, HashiCorp Vault, or hardware security module
+5. **Rate Limiting**: Add NGINX rate limiting or use cloud WAF (Cloudflare, AWS WAF)
+
 ## Distributed Architecture
 
 The system follows a **microservices architecture** with **shared-database** pattern for consistency and **event-driven communication** for real-time coordination.
@@ -781,6 +923,126 @@ grep "\[MATCH\]" logs/*.log
 grep "cooldown" logs/*.log
 ```
 
+### 6. Blockchain Connection Issues
+
+```bash
+# Check if blockchain node is running
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  http://localhost:8545
+
+# Expected response: {"jsonrpc":"2.0","id":1,"result":"0x..."}
+
+# Check blockchain service status
+curl http://localhost:8080/api/blockchain/info
+
+# Check for blockchain errors in logs
+grep "Blockchain" logs/server.log | grep -i error
+
+# Restart blockchain node
+cd dueling-blockchain
+npm run node
+```
+
+### 7. Smart Contract Deployment Failed
+
+```bash
+# Check deployment file exists
+ls -la dueling-blockchain/deployment-info.json
+
+# Verify contract addresses
+cat dueling-blockchain/deployment-info.json
+
+# Redeploy contracts
+cd dueling-blockchain
+npx hardhat clean
+npm run compile
+npm run deploy:local
+
+# Restart server to reload contract addresses
+```
+
+### 8. Cards Not Appearing on Blockchain
+
+```bash
+# Check if blockchain is enabled
+grep "blockchain.enabled" dueling-server/src/main/resources/application.yml
+
+# Check BlockchainService logs
+grep "BlockchainService" logs/server.log
+
+# Verify card-token mapping
+cat dueling-blockchain/card-token-mapping.json
+
+# Check pending transactions
+cd dueling-blockchain
+node check_transactions.js
+
+# Query blockchain directly
+curl http://localhost:8080/api/blockchain/cards/0xYOUR_ADDRESS
+```
+
+### 9. Blockchain Event Listeners Not Working
+
+```bash
+# Check if listeners started
+grep "Listening to.*events" logs/server.log
+
+# Should see:
+# "📡 Listening to CardMinted events"
+# "📡 Listening to TradeAccepted events"
+# "📡 Listening to MatchRecorded events"
+
+# Check for event processing
+grep "event:" logs/server.log
+
+# Verify Web3j connection
+grep "Web3j" logs/server.log | grep -i error
+```
+
+### 10. Transaction Nonce Issues
+
+```bash
+# Check for nonce errors
+grep "nonce" logs/server.log | grep -i error
+
+# Reset nonce (in blockchain node)
+cd dueling-blockchain
+npx hardhat clean
+npm run node  # Restarts with fresh state
+
+# Or manually reset pending transactions
+# (Stop server, restart blockchain, restart server)
+```
+
+### 11. Gas Estimation Errors
+
+```bash
+# Check gas settings
+grep "gas" logs/server.log | grep -i error
+
+# Increase gas limit in BlockchainConfig
+# Default: 6721975 (should be sufficient for local)
+
+# For Sepolia testnet, ensure you have testnet ETH
+# Get from: https://sepoliafaucet.com
+```
+
+### 12. Explorer Links Not Working
+
+```bash
+# Check network configuration
+curl http://localhost:8080/api/blockchain/info | jq '.explorerUrl'
+
+# For localhost: Should return local endpoint
+# For Sepolia: Should return https://sepolia.etherscan.io
+
+# Verify network ID
+curl http://localhost:8080/api/blockchain/info | jq '.networkId'
+# 1337 = Hardhat local
+# 11155111 = Sepolia testnet
+```
+
 ### Debug Mode
 
 Enable debug logging:
@@ -808,6 +1070,28 @@ docker compose exec postgres pg_isready
 
 # Redis health
 docker compose exec redis-master redis-cli ping
+```
+
+### Blockchain Troubleshooting
+
+For comprehensive blockchain-specific troubleshooting, see:
+📖 **[BLOCKCHAIN_TROUBLESHOOTING.md](BLOCKCHAIN_TROUBLESHOOTING.md)**
+
+Quick blockchain checks:
+```bash
+# Check if blockchain is running
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  http://localhost:8545
+
+# Check blockchain integration status
+curl http://localhost:8080/api/blockchain/info
+
+# View blockchain logs
+grep "Blockchain" logs/server.log | tail -20
+
+# Check event listeners
+grep "Listening to.*events" logs/server.log
 ```
 
 ## Contributing

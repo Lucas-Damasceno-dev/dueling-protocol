@@ -6,13 +6,18 @@
     "test": "hardhat test",
     "compile": "hardhat compile",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:sepolia": "./deploy-sepolia.sh",
+    "verify:contracts": "./verify-contracts.sh sepolia",
     "node": "hardhat node",
     "simulate": "hardhat run scripts/simulate.js",
     "simulate:purchase": "hardhat run scripts/simulate-purchase.js --network localhost",
     "verify:ownership": "hardhat run scripts/verify-ownership.js --network localhost",
     "verify:card": "hardhat run scripts/verify-uniqueness.js --network localhost",
     "verify:purchases": "hardhat run scripts/verify-purchase-history.js --network localhost",
-    "verify:matches": "hardhat run scripts/verify-matches.js --network localhost"
+    "verify:matches": "hardhat run scripts/verify-matches.js --network localhost",
+    "check:ledger": "node check_ledger.js",
+    "check:transactions": "node check_transactions.js",
+    "check:current": "node check_current.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
