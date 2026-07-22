@@ -32,8 +32,8 @@ show_menu() {
     echo -e "9.  System Status Check"
     echo
     echo -e "${YELLOW}Run Client & Server (Docker Integrated):${NC}"
-    echo "10. Run Client (Docker) ${GREEN}[Requires system running - option 5 or 6]${NC}"
-    echo "11. Run Server (Docker) ${GREEN}[Requires system running - option 5 or 6]${NC}"
+    echo -e "10. Run Client (Docker) ${GREEN}[Requires system running - option 5 or 6]${NC}"
+    echo -e "11. Run Server (Docker) ${GREEN}[Requires system running - option 5 or 6]${NC}"
     echo "12. View Running Containers"
     echo
     echo -e "${YELLOW}Network/Multi-PC Deployment:${NC}"
